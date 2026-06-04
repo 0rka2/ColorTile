@@ -7,6 +7,7 @@
 }
 
 body {
+
   min-height: 100vh;
   margin: 0;
   background-color: #f6f7f1;
@@ -25,3 +26,5 @@ input,
 select {
   font: inherit;
 }
+
+

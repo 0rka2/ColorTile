@@ -184,21 +184,13 @@ export function GameModal({
 }
 
 type ControlsProps = {
-  customSize: number;
-  customTime: number;
   difficulty: DifficultyKey;
-  onCustomSizeChange: (value: number) => void;
-  onCustomTimeChange: (value: number) => void;
   onDifficultyChange: (difficulty: DifficultyKey) => void;
   onRestart: () => void;
 };
 
 export function GameControls({
-  customSize,
-  customTime,
   difficulty,
-  onCustomSizeChange,
-  onCustomTimeChange,
   onDifficultyChange,
   onRestart: onShuffle,
 }: Readonly<ControlsProps>) {
@@ -232,39 +224,90 @@ export function GameControls({
             Shuffle
           </button>
         </div>
-
-        {difficulty === "custom" && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-              <span className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-400">
-                Grid Size
-              </span>
-              <input
-                type="number"
-                min={3}
-                max={12}
-                value={customSize}
-                onChange={(event) => onCustomSizeChange(Number(event.target.value) || 3)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none"
-              />
-            </label>
-
-            <label className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-              <span className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-400">
-                Time Limit
-              </span>
-              <input
-                type="number"
-                min={10}
-                max={180}
-                value={customTime}
-                onChange={(event) => onCustomTimeChange(Number(event.target.value) || 10)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none"
-              />
-            </label>
-          </div>
-        )}
       </div>
     </section>
+  );
+}
+
+type CustomGameModalProps = {
+  draftSize: number;
+  draftTime: number;
+  isOpen: boolean;
+  onClose: () => void;
+  onSizeChange: (value: number) => void;
+  onStart: () => void;
+  onTimeChange: (value: number) => void;
+};
+
+export function CustomGameModal({
+  draftSize,
+  draftTime,
+  isOpen,
+  onClose,
+  onSizeChange,
+  onStart,
+  onTimeChange,
+}: Readonly<CustomGameModalProps>) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/18 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-[1.75rem] border border-slate-200/90 bg-white p-6 shadow-2xl">
+        <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Custom Game</p>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-800">Build your board</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Choose your grid size and timer, then press Start when you are ready. The countdown waits for you.
+        </p>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <label className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+            <span className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-400">
+              Grid Size
+            </span>
+            <input
+              type="number"
+              min={3}
+              max={12}
+              value={draftSize}
+              onChange={(event) => onSizeChange(Number(event.target.value) || 3)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none"
+            />
+          </label>
+
+          <label className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+            <span className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-400">
+              Time Limit
+            </span>
+            <input
+              type="number"
+              min={10}
+              max={180}
+              value={draftTime}
+              onChange={(event) => onTimeChange(Number(event.target.value) || 10)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none"
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onStart}
+            className="rounded-full bg-slate-800 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700"
+          >
+            Start
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
