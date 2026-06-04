@@ -34,7 +34,7 @@ export function GameHud({
   moves,
   timeDisplay,
   timeWarning,
-}: HudProps) {
+}: Readonly<HudProps>) {
   return (
     <section className="mb-5 flex w-full max-w-[28rem] items-center justify-between rounded-[1.75rem] border border-slate-200/90 bg-white/95 px-5 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur">
       <div>
@@ -83,7 +83,7 @@ export function GameBoard({
   onDragOver,
   onDragStart,
   onDrop,
-}: BoardProps) {
+}: Readonly<BoardProps>) {
   const size = Math.sqrt(board.length);
 
   return (
@@ -114,7 +114,7 @@ export function GameBoard({
               disabled={winState || loseState}
               className={`relative aspect-square border border-white/75 transition duration-150 ${tileRadiusClass} ${
                 isLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing"
-              } ${!isLocked ? "hover:-translate-y-0.5 hover:shadow-lg" : ""} ${
+              } ${isLocked ? "" : "hover:-translate-y-0.5 hover:shadow-lg"} ${
                 isDragging ? "scale-[0.98] opacity-80 shadow-lg" : "shadow-[0_10px_24px_rgba(148,163,184,0.12)]"
               }`}
               style={{ backgroundColor: tile.color }}
@@ -152,7 +152,7 @@ export function GameModal({
   onRestart,
   timeDisplay,
   winState,
-}: ModalProps) {
+}: Readonly<ModalProps>) {
   if (!winState && !loseState) {
     return null;
   }
@@ -201,7 +201,7 @@ export function GameControls({
   onCustomTimeChange,
   onDifficultyChange,
   onRestart: onShuffle,
-}: ControlsProps) {
+}: Readonly<ControlsProps>) {
   return (
     <section className="mt-5 flex w-full max-w-[42rem] flex-col gap-3">
       <div className="rounded-[1.6rem] border border-slate-200/80 bg-white/90 p-3 shadow-[0_16px_40px_rgba(148,163,184,0.1)] backdrop-blur">
