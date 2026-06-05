@@ -1,10 +1,10 @@
 import { DifficultyConfig, DifficultyKey, PresetDifficultyKey, Tile } from "./game-types";
 
 export const PRESET_DIFFICULTIES: Record<PresetDifficultyKey, DifficultyConfig> = {
-  normal: { label: "Normal", size: 4, time: 35 },
-  hard: { label: "Hard", size: 6, time: 30 },
-  expert: { label: "Expert", size: 7, time: 30 },
-  extreme: { label: "Extreme", size: 12, time: 30 },
+  normal: { label: "Normal", size: 4, time:  120},
+  hard: { label: "Hard", size: 6, time: 180},
+  expert: { label: "Expert", size: 7, time: 240 },
+  extreme: { label: "Extreme", size: 12, time: 300 },
 };
 
 export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = {
