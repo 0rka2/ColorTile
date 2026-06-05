@@ -5,20 +5,23 @@ import { DragEvent, useEffect, useState } from "react";
 import {
   checkCompletion,
   clamp,
-  DIFFICULTIES,
+  DIFFICULTY_LABELS,
   formatTime,
   generateCornerColors,
   generateSolvedBoard,
-  getBoardSpacing,
+  getBoardDensityClass,
   getTileRadiusClass,
   isSolved,
   isTileCorrect,
   isTileLocked,
+  PRESET_DIFFICULTIES,
   scrambleBoard,
   swapTiles,
 } from "./game-logic";
 import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal } from "./game-components";
-import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
+import { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-types";
+
+const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
 
 export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
@@ -29,24 +32,52 @@ export default function Home() {
   const [board, setBoard] = useState<Tile[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [moves, setMoves] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(DIFFICULTIES.normal.time);
+  const [timeLeft, setTimeLeft] = useState(PRESET_DIFFICULTIES.normal.time);
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
+  const [bestStats, setBestStats] = useState<BestStats>({});
 
   const activeConfig =
     difficulty === "custom"
       ? {
-          label: DIFFICULTIES.custom.label,
-          size: clamp(customSize, 3, 12),
+          label: DIFFICULTY_LABELS.custom,
+          size: clamp(customSize, 4, 25),
           time: clamp(customTime, 10, 180),
         }
-      : DIFFICULTIES[difficulty];
+      : PRESET_DIFFICULTIES[difficulty];
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
-  const { gap: boardGap, padding: boardPadding } = getBoardSpacing(activeConfig.size);
+  const boardDensityClass = getBoardDensityClass(activeConfig.size);
+  const currentBest = bestStats[difficulty];
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(BEST_STATS_STORAGE_KEY);
+      if (!stored) {
+        return;
+      }
+
+      const parsed = JSON.parse(stored) as BestStats;
+      setBestStats(parsed);
+    } catch {
+      // Ignore malformed local storage and start fresh.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
+  }, [bestStats]);
 
   const startGame = (config: DifficultyConfig) => {
     const corners = generateCornerColors();
@@ -82,8 +113,27 @@ export default function Home() {
     if (isSolved(board)) {
       setWinState(true);
       setDraggedIndex(null);
+
+      setBestStats((current) => {
+        const currentRecord = current[difficulty] ?? {};
+        const nextRecord = {
+          bestTimeLeft:
+            currentRecord.bestTimeLeft === undefined
+              ? timeLeft
+              : Math.max(currentRecord.bestTimeLeft, timeLeft),
+          fewestMoves:
+            currentRecord.fewestMoves === undefined
+              ? moves
+              : Math.min(currentRecord.fewestMoves, moves),
+        };
+
+        return {
+          ...current,
+          [difficulty]: nextRecord,
+        };
+      });
     }
-  }, [board]);
+  }, [board, difficulty, moves, timeLeft]);
 
   useEffect(() => {
     if (!board.length || winState || loseState || customModalOpen || !timerStarted) {
@@ -170,8 +220,8 @@ export default function Home() {
 
   const handleCustomStart = () => {
     const nextConfig = {
-      label: DIFFICULTIES.custom.label,
-      size: clamp(customDraftSize, 3, 12),
+      label: DIFFICULTY_LABELS.custom,
+      size: clamp(customDraftSize, 4, 25),
       time: clamp(customDraftTime, 10, 180),
     };
 
@@ -189,8 +239,21 @@ export default function Home() {
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[72rem] flex-col items-center justify-center">
+      <header className="fixed left-6 top-5 z-20 sm:left-8 sm:top-6 lg:left-10">
+        <div className="rounded-[1.4rem] border border-white/80 bg-white/72 px-4 py-3 shadow-[0_14px_34px_rgba(148,163,184,0.10)] backdrop-blur">
+          <p className="text-4xl font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
+            ColorTile
+          </p>
+        </div>
+      </header>
+
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[72rem] flex-col">
+        <div className="flex flex-1 flex-col items-center justify-center">
         <GameHud
+          bestMoves={currentBest?.fewestMoves ?? null}
+          bestTimeDisplay={
+            currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft)
+          }
           completion={completion}
           difficultyLabel={activeConfig.label}
           moves={moves}
@@ -201,8 +264,7 @@ export default function Home() {
         <section className="relative w-full">
           <GameBoard
             board={board}
-            boardGap={boardGap}
-            boardPadding={boardPadding}
+            boardDensityClass={boardDensityClass}
             draggedIndex={draggedIndex}
             tileRadiusClass={tileRadiusClass}
             winState={winState}
@@ -231,6 +293,7 @@ export default function Home() {
           onDifficultyChange={handleDifficultyChange}
           onRestart={() => startGame(activeConfig)}
         />
+        </div>
       </div>
 
       <CustomGameModal
@@ -238,7 +301,7 @@ export default function Home() {
         draftTime={customDraftTime}
         isOpen={customModalOpen}
         onClose={handleCustomClose}
-        onSizeChange={(value) => setCustomDraftSize(clamp(value, 3, 12))}
+        onSizeChange={(value) => setCustomDraftSize(clamp(value, 4, 25))}
         onStart={handleCustomStart}
         onTimeChange={(value) => setCustomDraftTime(clamp(value, 10, 180))}
       />

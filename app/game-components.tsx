@@ -1,6 +1,6 @@
 import { DragEvent } from "react";
 
-import { DIFFICULTIES } from "./game-logic";
+import { DIFFICULTY_LABELS } from "./game-logic";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
 
 export function CheckMark() {
@@ -21,6 +21,8 @@ export function CheckMark() {
 }
 
 type HudProps = {
+  bestMoves: number | null;
+  bestTimeDisplay: string;
   completion: number;
   difficultyLabel: string;
   moves: number;
@@ -29,6 +31,8 @@ type HudProps = {
 };
 
 export function GameHud({
+  bestMoves,
+  bestTimeDisplay,
   completion,
   difficultyLabel,
   moves,
@@ -36,18 +40,31 @@ export function GameHud({
   timeWarning,
 }: Readonly<HudProps>) {
   return (
-    <section className="mb-5 flex w-full max-w-[28rem] items-center justify-between rounded-[1.75rem] border border-slate-200/90 bg-white/95 px-5 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur">
-      <div>
-        <p className={`text-4xl font-black leading-none tracking-tight ${timeWarning ? "text-rose-500" : "text-slate-800"}`}>
-          {timeDisplay}
-        </p>
+    <section className="mb-5 flex w-full max-w-[36rem] items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-1 items-center justify-between rounded-[1.75rem] border border-slate-200/90 bg-white/95 px-5 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur">
+        <div>
+          <p className={`text-4xl font-black leading-none tracking-tight ${timeWarning ? "text-rose-500" : "text-slate-800"}`}>
+            {timeDisplay}
+          </p>
+        </div>
+
+        <div className="text-right">
+          <p className="text-sm font-medium leading-none text-slate-500">{difficultyLabel}</p>
+          <p className="mt-2 text-base font-semibold leading-none text-slate-800">
+            {moves} moves | {completion}%
+          </p>
+        </div>
       </div>
 
-      <div className="text-right">
-        <p className="text-sm font-medium leading-none text-slate-500">{difficultyLabel}</p>
-        <p className="mt-2 text-base font-semibold leading-none text-slate-800">
-          {moves} moves | {completion}%
-        </p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="min-w-[6.25rem] rounded-[1.15rem] border border-slate-200/90 bg-white/95 px-3 py-2 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur">
+          <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-slate-400">Best Time</p>
+          <p className="mt-1 text-xl font-black leading-none text-slate-800">{bestTimeDisplay}</p>
+        </div>
+        <div className="min-w-[6.25rem] rounded-[1.15rem] border border-slate-200/90 bg-white/95 px-3 py-2 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur">
+          <p className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-slate-400">Fewest Moves</p>
+          <p className="mt-1 text-xl font-black leading-none text-slate-800">{bestMoves ?? "-"}</p>
+        </div>
       </div>
     </section>
   );
@@ -55,8 +72,7 @@ export function GameHud({
 
 type BoardProps = {
   board: Tile[];
-  boardGap: string;
-  boardPadding: string;
+  boardDensityClass: string;
   draggedIndex: number | null;
   tileRadiusClass: string;
   winState: boolean;
@@ -71,8 +87,7 @@ type BoardProps = {
 
 export function GameBoard({
   board,
-  boardGap,
-  boardPadding,
+  boardDensityClass,
   draggedIndex,
   tileRadiusClass,
   winState,
@@ -87,13 +102,11 @@ export function GameBoard({
   const size = Math.sqrt(board.length);
 
   return (
-    <div className="mx-auto aspect-square w-full max-w-[42rem] rounded-[2rem] border border-slate-200/90 bg-white/95 p-2.5 shadow-[0_22px_56px_rgba(148,163,184,0.14)] backdrop-blur sm:p-3">
+    <div className="mx-auto aspect-square w-full max-w-[58rem] rounded-[1rem] border border-slate-200/90 bg-white/95 p-2.5 shadow-[0_22px_56px_rgba(148,163,184,0.14)] backdrop-blur sm:p-3">
       <div
-        className="grid h-full w-full rounded-[1.5rem]"
+        className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[1.5rem]`}
         style={{
           gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
-          gap: boardGap,
-          padding: boardPadding,
         }}
       >
         {board.map((tile, index) => {
@@ -198,7 +211,7 @@ export function GameControls({
     <section className="mt-5 flex w-full max-w-[42rem] flex-col gap-3">
       <div className="rounded-[1.6rem] border border-slate-200/80 bg-white/90 p-3 shadow-[0_16px_40px_rgba(148,163,184,0.1)] backdrop-blur">
         <div className="flex flex-wrap items-center justify-center gap-2">
-          {(Object.keys(DIFFICULTIES) as DifficultyKey[]).map((key) => {
+          {(Object.keys(DIFFICULTY_LABELS) as DifficultyKey[]).map((key) => {
             const isActive = difficulty === key;
             return (
               <button
@@ -211,7 +224,7 @@ export function GameControls({
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                {DIFFICULTIES[key].label}
+                {DIFFICULTY_LABELS[key]}
               </button>
             );
           })}
@@ -268,10 +281,10 @@ export function CustomGameModal({
             </span>
             <input
               type="number"
-              min={3}
-              max={12}
+              min={4}
+              max={25}
               value={draftSize}
-              onChange={(event) => onSizeChange(Number(event.target.value) || 3)}
+              onChange={(event) => onSizeChange(Number(event.target.value) || 4)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none"
             />
           </label>
