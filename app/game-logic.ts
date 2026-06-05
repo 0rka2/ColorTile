@@ -1,11 +1,18 @@
-import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
+import { DifficultyConfig, DifficultyKey, PresetDifficultyKey, Tile } from "./game-types";
 
-export const DIFFICULTIES: Record<DifficultyKey, DifficultyConfig> = {
-  normal: { label: "Normal", size: 4, time: 3000 },
-  hard: { label: "Hard", size: 6, time: 2500 },
-  expert: { label: "Expert", size: 7, time: 2000 },
-  extreme: { label: "Extreme", size: 12, time: 2000 },
-  custom: { label: "Custom", size: 8, time: 3500 },
+export const PRESET_DIFFICULTIES: Record<PresetDifficultyKey, DifficultyConfig> = {
+  normal: { label: "Normal", size: 4, time:  120},
+  hard: { label: "Hard", size: 6, time: 180},
+  expert: { label: "Expert", size: 7, time: 240 },
+  extreme: { label: "Extreme", size: 12, time: 300 },
+};
+
+export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = {
+  normal: PRESET_DIFFICULTIES.normal.label,
+  hard: PRESET_DIFFICULTIES.hard.label,
+  expert: PRESET_DIFFICULTIES.expert.label,
+  extreme: PRESET_DIFFICULTIES.extreme.label,
+  custom: "Custom",
 };
 
 export const clamp = (value: number, min: number, max: number) =>
@@ -214,9 +221,14 @@ export function getTileRadiusClass(size: number) {
   return "rounded-[1.35rem]";
 }
 
-export function getBoardSpacing(size: number) {
-  return {
-    gap: size >= 10 ? "0.35rem" : size >= 7 ? "0.45rem" : "0.5rem",
-    padding: size >= 10 ? "0.6rem" : size >= 7 ? "0.7rem" : "0.8rem",
-  };
+export function getBoardDensityClass(size: number) {
+  if (size >= 18) {
+    return "board-grid--dense";
+  }
+
+  if (size >= 10) {
+    return "board-grid--compact";
+  }
+
+  return "board-grid--default";
 }

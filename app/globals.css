@@ -7,6 +7,7 @@
 }
 
 body {
+
   min-height: 100vh;
   margin: 0;
   background-color: #f6f7f1;
@@ -25,3 +26,26 @@ input,
 select {
   font: inherit;
 }
+
+.board-grid {
+  --tile-gap: 0.42rem;
+  --board-padding: 0.58rem;
+  gap: var(--tile-gap);
+  padding: var(--board-padding);
+}
+
+.board-grid--default {
+  --tile-gap: 0.52rem;
+  --board-padding: 0.72rem;
+}
+
+.board-grid--compact {
+  --tile-gap: 0.34rem;
+  --board-padding: 0.46rem;
+}
+
+.board-grid--dense {
+  --tile-gap: 0.22rem;
+  --board-padding: 0.28rem;
+}
+
