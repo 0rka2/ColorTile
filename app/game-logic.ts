@@ -4,7 +4,7 @@ export const PRESET_DIFFICULTIES: Record<PresetDifficultyKey, DifficultyConfig> 
   normal: { label: "Normal", size: 4, time:  120},
   hard: { label: "Hard", size: 6, time: 180},
   expert: { label: "Expert", size: 7, time: 240 },
-  extreme: { label: "Extreme", size: 12, time: 300 },
+  extreme: { label: "Extreme", size: 9, time: 300 },
 };
 
 export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = {
@@ -18,12 +18,29 @@ export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = {
 export const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
-export function generateCornerColors(): [string, string, string, string] {
-  const hue = Math.random() * 360;
-  const build = (offset: number) =>
-    hslToHex((hue + offset) % 360, 72, 78 - Math.random() * 12);
+function getGradientContrastBoost(size: number) {
+  return clamp((size - 4) / 16, 0, 0.45);
+}
 
-  return [build(0), build(45), build(190), build(235)];
+function remapCenteredRatio(value: number, strength: number) {
+  const centered = value - 0.5;
+  return clamp(0.5 + centered * (1 + strength), 0, 1);
+}
+
+export function generateCornerColors(size: number): [string, string, string, string] {
+  const hue = Math.random() * 360;
+  const contrastBoost = getGradientContrastBoost(size);
+  const topRightOffset = 45 + contrastBoost * 6;
+  const bottomLeftOffset = 190 + contrastBoost * 4;
+  const bottomRightOffset = 235 + contrastBoost * 8;
+  const build = (offset: number) =>
+    hslToHex(
+      (hue + offset) % 360,
+      clamp(78 + contrastBoost * 12 + Math.random() * 5, 74, 88),
+      clamp(74 - contrastBoost * 11 + (Math.random() - 0.5) * (18 + contrastBoost * 10), 40, 78),
+    );
+
+  return [build(0), build(topRightOffset), build(bottomLeftOffset), build(bottomRightOffset)];
 }
 
 export function hslToHex(h: number, s: number, l: number): string {
@@ -102,22 +119,31 @@ export function interpolateColors(
   bottomRight: string,
   xRatio: number,
   yRatio: number,
+  contrastBoost = 0,
 ): string {
   const tl = hexToHsl(topLeft);
   const tr = hexToHsl(topRight);
   const bl = hexToHsl(bottomLeft);
   const br = hexToHsl(bottomRight);
+  const mappedXRatio = remapCenteredRatio(xRatio, contrastBoost * 0.05);
+  const mappedYRatio = remapCenteredRatio(yRatio, contrastBoost * 0.05);
 
   const blend = (start: number, end: number, amount: number) => start + (end - start) * amount;
-  const mixHueAxis = (top: number, bottom: number) => interpolateHue(top, bottom, yRatio);
-  const mixAxis = (top: number, bottom: number) => blend(top, bottom, yRatio);
+  const mixHueAxis = (top: number, bottom: number) => interpolateHue(top, bottom, mappedYRatio);
+  const mixAxis = (top: number, bottom: number) => blend(top, bottom, mappedYRatio);
 
   const leftHue = mixHueAxis(tl.h, bl.h);
   const rightHue = mixHueAxis(tr.h, br.h);
-  const hue = interpolateHue(leftHue, rightHue, xRatio);
+  const hue = interpolateHue(leftHue, rightHue, mappedXRatio);
 
-  const saturation = Math.max(42, blend(mixAxis(tl.s, bl.s), mixAxis(tr.s, br.s), xRatio));
-  const lightness = clamp(blend(mixAxis(tl.l, bl.l), mixAxis(tr.l, br.l), xRatio), 42, 72);
+  const baseSaturation = blend(mixAxis(tl.s, bl.s), mixAxis(tr.s, br.s), mappedXRatio);
+  const saturation = clamp(baseSaturation + 6 + contrastBoost * 10, 50, 88);
+  const baseLightness = blend(mixAxis(tl.l, bl.l), mixAxis(tr.l, br.l), mappedXRatio);
+  const lightness = clamp(
+    58 + (baseLightness - 58) * (1 + contrastBoost * 0.44),
+    34,
+    76,
+  );
 
   return hslToHex(hue, saturation, lightness);
 }
@@ -125,6 +151,7 @@ export function interpolateColors(
 export function generateSolvedBoard(size: number, corners: [string, string, string, string]): Tile[] {
   const [topLeft, topRight, bottomLeft, bottomRight] = corners;
   const lastIndex = size - 1;
+  const contrastBoost = getGradientContrastBoost(size);
 
   return Array.from({ length: size * size }, (_, index) => {
     const row = Math.floor(index / size);
@@ -141,7 +168,15 @@ export function generateSolvedBoard(size: number, corners: [string, string, stri
       id: `tile-${index}`,
       correctIndex: index,
       currentIndex: index,
-      color: interpolateColors(topLeft, topRight, bottomLeft, bottomRight, xRatio, yRatio),
+      color: interpolateColors(
+        topLeft,
+        topRight,
+        bottomLeft,
+        bottomRight,
+        xRatio,
+        yRatio,
+        contrastBoost,
+      ),
       isCorner,
     };
   });
