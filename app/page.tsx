@@ -11,7 +11,6 @@ import {
   generateSolvedBoard,
   getBoardDensityClass,
   getTileRadiusClass,
-  isSolved,
   isTileCorrect,
   isTileLocked,
   PRESET_DIFFICULTIES,
@@ -70,6 +69,7 @@ export default function Home() {
   const dragPointerTargetRef = useRef<HTMLButtonElement | null>(null);
   const dragOverlayElementRef = useRef<HTMLDivElement | null>(null);
   const dragAnimationFrameRef = useRef<number | null>(null);
+  const latestBoardRef = useRef<Tile[]>([]);
 
   const activeConfig =
     difficulty === "custom"
@@ -243,6 +243,10 @@ export default function Home() {
     window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
   }, [bestStats]);
 
+  useEffect(() => {
+    latestBoardRef.current = board;
+  }, [board]);
+
   const startGame = (config: DifficultyConfig) => {
     const corners = generateCornerColors(config.size);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
@@ -270,14 +274,14 @@ export default function Home() {
   }, [difficulty]);
 
   useEffect(() => {
-    if (!board.length) {
+    if (!board.length || winState || loseState) {
       return;
     }
 
     const nextCompletion = checkCompletion(board);
     setCompletion(nextCompletion);
 
-    if (isSolved(board)) {
+    if (nextCompletion === 100) {
       setWinState(true);
       clearDragSession();
 
@@ -312,6 +316,9 @@ export default function Home() {
       setTimeLeft((current) => {
         if (current <= 1) {
           window.clearInterval(interval);
+          const finalBoard = latestBoardRef.current;
+          const finalCompletion = finalBoard.length ? checkCompletion(finalBoard) : 0;
+
           setBestStats((currentStats) => {
             const currentRecord = currentStats[difficulty] ?? {};
 
@@ -319,7 +326,7 @@ export default function Home() {
               ...currentStats,
               [difficulty]: {
                 ...currentRecord,
-                bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, completion),
+                bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, finalCompletion),
               },
             };
           });
@@ -333,7 +340,7 @@ export default function Home() {
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [board.length, clearDragSession, completion, difficulty, winState, loseState, customModalOpen, timerStarted]);
+  }, [board.length, clearDragSession, difficulty, winState, loseState, customModalOpen, timerStarted]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -508,7 +515,7 @@ export default function Home() {
      
       <header className="fixed left-6 top-5 z-20 sm:left-8 sm:top-6 lg:left-10">
         <div className="rounded-[1.4rem] border border-white/90 bg-white px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur">
-          <p className="text-4xl font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
+          <p className="font-fredoka-display text-4xl font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
             <GradientText className="px-1">ColorTile</GradientText>
           </p>
         </div>

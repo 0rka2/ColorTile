@@ -15,6 +15,38 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.font-fredoka-display {
+  font-family: var(--font-fredoka), Arial, Helvetica, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-weight: 612;
+  font-variation-settings: "wdth" 104.6, "wght" 612;
+}
+
+.font-fredoka-regular {
+  font-family: var(--font-fredoka), Arial, Helvetica, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-weight: 400;
+  font-variation-settings: "wdth" 104.6, "wght" 400;
+}
+
+.font-fredoka-strong {
+  font-family: var(--font-fredoka), Arial, Helvetica, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-weight: 612;
+  font-variation-settings: "wdth" 104.6, "wght" 612;
+}
+
+.font-fredoka-timer {
+  font-family: var(--font-fredoka), Arial, Helvetica, sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-weight: 550;
+  font-variation-settings: "wdth" 104.6, "wght" 550;
+}
+
 button,
 input,
 select {

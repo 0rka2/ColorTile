@@ -185,15 +185,19 @@ export function generateSolvedBoard(size: number, corners: [string, string, stri
 export function scrambleBoard(solvedBoard: Tile[]): Tile[] {
   const movableTiles = solvedBoard.filter((tile) => !tile.isCorner);
   const shuffled = [...movableTiles];
-  let isValidShuffle = false;
 
-  while (!isValidShuffle) {
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(Math.random() * (index + 1));
-      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  for (let index = 0; index < shuffled.length; index += 1) {
+    if (shuffled[index].id !== movableTiles[index].id) {
+      continue;
     }
 
-    isValidShuffle = shuffled.every((tile, index) => tile.id !== movableTiles[index].id);
+    const swapIndex = index === shuffled.length - 1 ? index - 1 : index + 1;
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
 
   let movablePointer = 0;
