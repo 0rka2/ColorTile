@@ -16,6 +16,33 @@ const CELEBRATION_CONFETTI = [
   { left: "82%", top: "14%", color: "#a78bfa", delay: 0.12 },
   { left: "91%", top: "24%", color: "#f472b6", delay: 0.2 },
 ];
+const TIME_UP_QUOTES = [
+  "Almost there!",
+  "That gradient was fighting back.",
+  "Only a few swaps from perfection.",
+  "The colors aren't blending yet.",
+  "So close. Try one more run.",
+];
+
+function getTimeUpStars(completion: number) {
+  if (completion >= 100) {
+    return 3;
+  }
+
+  if (completion >= 90) {
+    return 2;
+  }
+
+  if (completion >= 85) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function renderStars(count: number) {
+  return "⭐".repeat(count);
+}
 
 export function CheckMark() {
   return (
@@ -85,6 +112,7 @@ export function GameHud({
 }
 
 type BoardProps = {
+  allowHoverWhenLocked: boolean;
   board: Tile[];
   boardDensityClass: string;
   dragSession: {
@@ -103,6 +131,7 @@ type BoardProps = {
   hoveredTargetIndex: number | null;
   setDragOverlayRef: (element: HTMLDivElement | null) => void;
   tileRadiusClass: string;
+  winCelebrationActive: boolean;
   winState: boolean;
   loseState: boolean;
   isTileCorrect: (tile: Tile, index: number) => boolean;
@@ -208,6 +237,7 @@ const TileButton = memo(function TileButton({
 });
 
 export function GameBoard({
+  allowHoverWhenLocked,
   board,
   boardDensityClass,
   dragSession,
@@ -216,6 +246,7 @@ export function GameBoard({
   hoveredTargetIndex,
   setDragOverlayRef,
   tileRadiusClass,
+  winCelebrationActive,
   winState,
   loseState,
   isTileCorrect,
@@ -255,7 +286,7 @@ export function GameBoard({
         className="mx-auto aspect-square w-full max-w-[58rem] rounded-[1.2rem] bg-gradient-to-br from-white/85 via-slate-100/70 to-sky-100/65 p-px shadow-[0_28px_80px_rgba(15,23,42,0.12),0_12px_28px_rgba(15,23,42,0.07)]"
         initial={false}
         animate={
-          winState
+          winCelebrationActive
             ? {
                 scale: [1, 1.01, 1],
                 boxShadow: [
@@ -269,10 +300,14 @@ export function GameBoard({
                 boxShadow: "0 28px 80px rgba(15,23,42,0.12), 0 12px 28px rgba(15,23,42,0.07)",
               }
         }
-        transition={winState ? { duration: 1.2, ease: [0.22, 1, 0.36, 1], repeat: Infinity, repeatDelay: 0.25 } : { duration: 0.2 }}
+        transition={
+          winCelebrationActive
+            ? { duration: 1.2, ease: [0.22, 1, 0.36, 1], repeat: Infinity, repeatDelay: 0.25 }
+            : { duration: 0.2 }
+        }
       >
         <div className="relative h-full w-full overflow-hidden rounded-[calc(1.2rem-1px)] bg-[rgba(255,255,255,0.85)] p-2 backdrop-blur-[20px] sm:p-2.5">
-          {winState && (
+          {winCelebrationActive && (
             <motion.div
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent"
@@ -292,7 +327,7 @@ export function GameBoard({
               const isDragging = draggedIndex === index;
               const isLocked = isTileLocked(tile, index);
               const canDrag = !isLocked && !winState && !loseState;
-              const canHover = !winState && !loseState && (canDrag || isCorrect);
+              const canHover = allowHoverWhenLocked || (!winState && !loseState && (canDrag || isCorrect));
               const isDropTarget =
                 hoveredTargetIndex === index && draggedIndex !== null && draggedIndex !== index && !isLocked;
 
@@ -325,9 +360,13 @@ export function GameBoard({
 type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
+  bestCompletion: number | null;
+  bestTimeDisplay: string;
   completion: number;
+  isDismissed: boolean;
   loseState: boolean;
   moves: number;
+  onClose: () => void;
   onRestart: () => void;
   timeDisplay: string;
   winState: boolean;
@@ -336,16 +375,23 @@ type ModalProps = {
 export function GameModal({
   activeConfig,
   accuracy,
+  bestCompletion,
+  bestTimeDisplay,
   completion,
+  isDismissed,
   loseState,
   moves,
+  onClose,
   onRestart,
   timeDisplay,
   winState,
 }: Readonly<ModalProps>) {
-  if (!winState && !loseState) {
+  if ((!winState && !loseState) || isDismissed) {
     return null;
   }
+
+  const timeUpQuote = TIME_UP_QUOTES[(moves + completion + activeConfig.size) % TIME_UP_QUOTES.length];
+  const timeUpStars = getTimeUpStars(completion);
 
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-950/34 p-4 backdrop-blur-md">
@@ -353,12 +399,19 @@ export function GameModal({
         initial={{ opacity: 0, y: 28, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-        className={`relative w-full max-w-md overflow-hidden rounded-[2rem] border p-7 text-center shadow-[0_32px_90px_rgba(15,23,42,0.24),0_14px_34px_rgba(15,23,42,0.12)] ${
-          winState
-            ? "border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,248,255,0.92))]"
-            : "border-slate-200/80 bg-white/96"
-        }`}
+        className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,248,255,0.92))] p-7 text-center shadow-[0_32px_90px_rgba(15,23,42,0.24),0_14px_34px_rgba(15,23,42,0.12)]"
       >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close modal"
+          className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.14)] transition hover:bg-white hover:text-slate-700"
+        >
+          <span aria-hidden="true" className="text-lg leading-none">
+            ×
+          </span>
+        </button>
+
         {winState &&
           CELEBRATION_CONFETTI.map((piece, index) => (
             <motion.span
@@ -373,16 +426,13 @@ export function GameModal({
           ))}
 
         <div className="relative z-10">
-          <p className="text-xs uppercase tracking-[0.34em] text-slate-400">
-            {winState ? "Perfect Gradient" : "Time's Up"}
-          </p>
-          <h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-slate-900">
-            {winState ? "Gradient Complete!" : "The board needs another pass."}
-          </h2>
-
           {winState ? (
             <>
-              <div className="mt-4 text-m=l font-black uppercase tracking-[1em] text-amber-1500">⭐⭐⭐</div>
+              <p className="text-xs uppercase tracking-[0.34em] text-slate-400">Perfect Gradient</p>
+              <h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-slate-900">Gradient Complete!</h2>
+              <div className="mt-4 text-sm font-black uppercase tracking-[0.34em] text-amber-500">
+                {renderStars(3)}
+              </div>
               <p className="mt-4 text-sm leading-6 text-slate-500">
                 You restored the gradient with a clean finish on {activeConfig.label.toLowerCase()}.
               </p>
@@ -402,9 +452,37 @@ export function GameModal({
               </div>
             </>
           ) : (
-            <p className="mt-3 text-sm leading-6 text-slate-500">
-              {`You reached ${completion}% completion on ${activeConfig.label.toLowerCase()}.`}
-            </p>
+            <div className="mx-auto mt-2 max-w-sm">
+              <h2 className="text-3xl font-black tracking-[-0.04em] text-slate-900">Time&apos;s up</h2>
+              {timeUpStars > 0 && (
+                <p className="mt-4 text-base font-black tracking-[0.24em] text-amber-500">{renderStars(timeUpStars)}</p>
+              )}
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-slate-400">Gradient Completion</p>
+                  <p className="mt-2 text-xl font-black leading-none text-slate-900">{completion}%</p>
+                </div>
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-slate-400">Moves</p>
+                  <p className="mt-2 text-xl font-black leading-none text-slate-900">{moves}</p>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-500">{timeUpQuote}</p>
+              {completion < 100 && (
+                <p className="mt-3 text-sm font-medium text-slate-600">You were only {100 - completion}% away!</p>
+              )}
+              <div className="mx-auto mt-6 h-px w-full max-w-xs bg-slate-200/90" />
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/70 px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-slate-400">Best Completion</p>
+                  <p className="mt-2 text-xl font-black leading-none text-slate-900">{bestCompletion === null ? "-" : `${bestCompletion}%`}</p>
+                </div>
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/70 px-3 py-3 shadow-[0_12px_28px_rgba(148,163,184,0.1)]">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.22em] text-slate-400">Best Time</p>
+                  <p className="mt-2 text-xl font-black leading-none text-slate-900">{bestTimeDisplay}</p>
+                </div>
+              </div>
+            </div>
           )}
 
           <button
@@ -419,7 +497,6 @@ export function GameModal({
     </div>
   );
 }
-
 type ControlsProps = {
   difficulty: DifficultyKey;
   onAutoSolve: () => void;
@@ -562,3 +639,4 @@ export function CustomGameModal({
     </div>
   );
 }
+

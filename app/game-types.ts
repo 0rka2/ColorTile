@@ -17,6 +17,7 @@ export type DifficultyConfig = {
 export type PresetDifficultyKey = Exclude<DifficultyKey, "custom">;
 
 export type BestRecord = {
+  bestCompletion?: number;
   bestTimeLeft?: number;
   fewestMoves?: number;
 };

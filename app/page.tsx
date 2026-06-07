@@ -59,6 +59,7 @@ export default function Home() {
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
+  const [modalDismissed, setModalDismissed] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
   const [bestStats, setBestStats] = useState<BestStats>({});
@@ -82,8 +83,12 @@ export default function Home() {
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
   const currentBest = bestStats[difficulty];
+  const currentBestCompletion = currentBest?.bestCompletion ?? null;
+  const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
+  const winCelebrationActive = winState && !modalDismissed;
+  const allowHoverWhenLocked = modalDismissed && (winState || loseState);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -252,6 +257,7 @@ export default function Home() {
     setCompletion(checkCompletion(nextBoard));
     setWinState(false);
     setLoseState(false);
+    setModalDismissed(false);
     setTimerStarted(true);
   };
 
@@ -278,6 +284,7 @@ export default function Home() {
       setBestStats((current) => {
         const currentRecord = current[difficulty] ?? {};
         const nextRecord = {
+          bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
           bestTimeLeft:
             currentRecord.bestTimeLeft === undefined
               ? timeLeft
@@ -305,6 +312,17 @@ export default function Home() {
       setTimeLeft((current) => {
         if (current <= 1) {
           window.clearInterval(interval);
+          setBestStats((currentStats) => {
+            const currentRecord = currentStats[difficulty] ?? {};
+
+            return {
+              ...currentStats,
+              [difficulty]: {
+                ...currentRecord,
+                bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, completion),
+              },
+            };
+          });
           setLoseState(true);
           clearDragSession();
           return 0;
@@ -315,7 +333,7 @@ export default function Home() {
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [board.length, clearDragSession, winState, loseState, customModalOpen, timerStarted]);
+  }, [board.length, clearDragSession, completion, difficulty, winState, loseState, customModalOpen, timerStarted]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -513,6 +531,7 @@ export default function Home() {
         <section className="relative w-full">
           <GameBoard
             key={boardResetKey}
+            allowHoverWhenLocked={allowHoverWhenLocked}
             board={board}
             boardDensityClass={boardDensityClass}
             dragSession={dragSession}
@@ -521,6 +540,7 @@ export default function Home() {
             hoveredTargetIndex={hoveredTargetIndex}
             setDragOverlayRef={setDragOverlayRef}
             tileRadiusClass={tileRadiusClass}
+            winCelebrationActive={winCelebrationActive}
             winState={winState}
             loseState={loseState}
             isTileCorrect={isTileCorrect}
@@ -531,9 +551,13 @@ export default function Home() {
           <GameModal
             activeConfig={activeConfig}
             accuracy={accuracy}
+            bestCompletion={currentBestCompletion}
+            bestTimeDisplay={bestTimeDisplay}
             completion={completion}
             loseState={loseState}
+            isDismissed={modalDismissed}
             moves={moves}
+            onClose={() => setModalDismissed(true)}
             onRestart={() => startGame(activeConfig)}
             timeDisplay={formatTime(timeLeft)}
             winState={winState}
