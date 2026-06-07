@@ -11,7 +11,6 @@ import {
   generateSolvedBoard,
   getBoardDensityClass,
   getTileRadiusClass,
-  isSolved,
   isTileCorrect,
   isTileLocked,
   PRESET_DIFFICULTIES,
@@ -45,6 +44,8 @@ type DragSession = {
   width: number;
 };
 
+type BoardStateUpdater = Tile[] | ((currentBoard: Tile[]) => Tile[]);
+
 export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
   const [customSize, setCustomSize] = useState(8);
@@ -59,6 +60,7 @@ export default function Home() {
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
+  const [modalDismissed, setModalDismissed] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
   const [bestStats, setBestStats] = useState<BestStats>({});
@@ -69,6 +71,7 @@ export default function Home() {
   const dragPointerTargetRef = useRef<HTMLButtonElement | null>(null);
   const dragOverlayElementRef = useRef<HTMLDivElement | null>(null);
   const dragAnimationFrameRef = useRef<number | null>(null);
+  const latestBoardRef = useRef<Tile[]>([]);
 
   const activeConfig =
     difficulty === "custom"
@@ -82,8 +85,11 @@ export default function Home() {
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
   const currentBest = bestStats[difficulty];
+  const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
+  const winCelebrationActive = winState && !modalDismissed;
+  const allowHoverWhenLocked = modalDismissed && (winState || loseState);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -94,6 +100,18 @@ export default function Home() {
 
   const setDragOverlayRef = useCallback((element: HTMLDivElement | null) => {
     dragOverlayElementRef.current = element;
+  }, []);
+
+  const updateBoard = useCallback((nextBoardOrUpdater: BoardStateUpdater) => {
+    setBoard((currentBoard) => {
+      const nextBoard =
+        typeof nextBoardOrUpdater === "function"
+          ? nextBoardOrUpdater(currentBoard)
+          : nextBoardOrUpdater;
+
+      latestBoardRef.current = nextBoard;
+      return nextBoard;
+    });
   }, []);
 
   const cancelDragAnimationFrame = useCallback(() => {
@@ -190,7 +208,9 @@ export default function Home() {
         return;
       }
 
-      element.animate(
+      element.style.zIndex = "20";
+
+      const animation = element.animate(
         [
           { transform: `translate3d(${deltaX}px, ${deltaY}px, 0)` },
           { transform: "translate3d(0, 0, 0)" },
@@ -200,6 +220,13 @@ export default function Home() {
           easing: TILE_SWAP_ANIMATION_EASING,
         },
       );
+
+      const resetStacking = () => {
+        element.style.zIndex = "";
+      };
+
+      animation.addEventListener("finish", resetStacking, { once: true });
+      animation.addEventListener("cancel", resetStacking, { once: true });
     });
   }, [board]);
 
@@ -237,12 +264,13 @@ export default function Home() {
     clearDragSession();
     setBoardResetKey((currentKey) => currentKey + 1);
     pendingSwapAnimationRef.current = null;
-    setBoard(nextBoard);
+    updateBoard(nextBoard);
     setMoves(0);
     setTimeLeft(config.time);
     setCompletion(checkCompletion(nextBoard));
     setWinState(false);
     setLoseState(false);
+    setModalDismissed(false);
     setTimerStarted(true);
   };
 
@@ -255,20 +283,21 @@ export default function Home() {
   }, [difficulty]);
 
   useEffect(() => {
-    if (!board.length) {
+    if (!board.length || winState || loseState) {
       return;
     }
 
     const nextCompletion = checkCompletion(board);
     setCompletion(nextCompletion);
 
-    if (isSolved(board)) {
+    if (nextCompletion === 100) {
       setWinState(true);
       clearDragSession();
 
       setBestStats((current) => {
         const currentRecord = current[difficulty] ?? {};
         const nextRecord = {
+          bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
           bestTimeLeft:
             currentRecord.bestTimeLeft === undefined
               ? timeLeft
@@ -296,6 +325,21 @@ export default function Home() {
       setTimeLeft((current) => {
         if (current <= 1) {
           window.clearInterval(interval);
+          const finalBoard = latestBoardRef.current;
+          const finalCompletion = finalBoard.length ? checkCompletion(finalBoard) : 0;
+
+          setBestStats((currentStats) => {
+            const currentRecord = currentStats[difficulty] ?? {};
+
+            return {
+              ...currentStats,
+              [difficulty]: {
+                ...currentRecord,
+                bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, finalCompletion),
+              },
+            };
+          });
+          setCompletion(finalCompletion);
           setLoseState(true);
           clearDragSession();
           return 0;
@@ -306,7 +350,7 @@ export default function Home() {
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [board.length, clearDragSession, winState, loseState, customModalOpen, timerStarted]);
+  }, [board.length, clearDragSession, difficulty, winState, loseState, customModalOpen, timerStarted]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -357,7 +401,7 @@ export default function Home() {
           pendingSwapAnimationRef.current = null;
         }
 
-        setBoard((currentBoard) => swapTiles(currentBoard, sourceIndex, targetIndex));
+        updateBoard((currentBoard) => swapTiles(currentBoard, sourceIndex, targetIndex));
         setMoves((currentMoves) => currentMoves + 1);
       } else {
         pendingSwapAnimationRef.current = null;
@@ -375,7 +419,7 @@ export default function Home() {
       window.removeEventListener("pointerup", handlePointerEnd);
       window.removeEventListener("pointercancel", handlePointerEnd);
     };
-  }, [board, clearDragSession, dragSession, loseState, resolveDropTargetIndex, scheduleDragOverlayPositionUpdate, winState]);
+  }, [board, clearDragSession, dragSession, loseState, resolveDropTargetIndex, scheduleDragOverlayPositionUpdate, updateBoard, winState]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -469,19 +513,19 @@ export default function Home() {
   const handleAutoSolve = useCallback(() => {
     clearDragSession();
     pendingSwapAnimationRef.current = null;
-    setBoard((currentBoard) =>
+    updateBoard((currentBoard) =>
       [...currentBoard]
         .sort((firstTile, secondTile) => firstTile.correctIndex - secondTile.correctIndex)
         .map((tile, index) => ({ ...tile, currentIndex: index })),
     );
-  }, [clearDragSession]);
+  }, [clearDragSession, updateBoard]);
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6">
      
       <header className="fixed left-6 top-5 z-20 sm:left-8 sm:top-6 lg:left-10">
         <div className="rounded-[1.4rem] border border-white/90 bg-white px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur">
-          <p className="text-4xl font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
+          <p className="font-fredoka-display text-4xl font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
             <GradientText className="px-1">ColorTile</GradientText>
           </p>
         </div>
@@ -504,6 +548,7 @@ export default function Home() {
         <section className="relative w-full">
           <GameBoard
             key={boardResetKey}
+            allowHoverWhenLocked={allowHoverWhenLocked}
             board={board}
             boardDensityClass={boardDensityClass}
             dragSession={dragSession}
@@ -512,6 +557,7 @@ export default function Home() {
             hoveredTargetIndex={hoveredTargetIndex}
             setDragOverlayRef={setDragOverlayRef}
             tileRadiusClass={tileRadiusClass}
+            winCelebrationActive={winCelebrationActive}
             winState={winState}
             loseState={loseState}
             isTileCorrect={isTileCorrect}
@@ -524,7 +570,9 @@ export default function Home() {
             accuracy={accuracy}
             completion={completion}
             loseState={loseState}
+            isDismissed={modalDismissed}
             moves={moves}
+            onClose={() => setModalDismissed(true)}
             onRestart={() => startGame(activeConfig)}
             timeDisplay={formatTime(timeLeft)}
             winState={winState}
