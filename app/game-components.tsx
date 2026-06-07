@@ -41,7 +41,7 @@ function getTimeUpStars(completion: number) {
 }
 
 function renderStars(count: number) {
-  return "\u2605".repeat(count);
+  return "⭐".repeat(count);
 }
 
 export function CheckMark() {
@@ -360,8 +360,6 @@ export function GameBoard({
 type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
-  bestCompletion: number | null;
-  bestTimeDisplay: string;
   completion: number;
   isDismissed: boolean;
   loseState: boolean;
@@ -375,8 +373,6 @@ type ModalProps = {
 export function GameModal({
   activeConfig,
   accuracy,
-  bestCompletion,
-  bestTimeDisplay,
   completion,
   isDismissed,
   loseState,
@@ -399,7 +395,7 @@ export function GameModal({
         initial={{ opacity: 0, y: 28, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,248,255,0.92))] p-7 text-center shadow-[0_32px_90px_rgba(15,23,42,0.24),0_14px_34px_rgba(15,23,42,0.12)]"
+        className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,248,255,0.92))] p-8 text-center shadow-[0_32px_90px_rgba(15,23,42,0.24),0_14px_34px_rgba(15,23,42,0.12)]"
       >
         <button
           type="button"
@@ -428,53 +424,53 @@ export function GameModal({
         <div className="relative z-10">
           {winState ? (
             <>
-              <p className="font-fredoka-regular text-xs uppercase tracking-[0.34em] text-slate-400">Perfect Gradient</p>
-              <h2 className="font-fredoka-display mt-3 text-3xl tracking-[-0.04em] text-slate-900">Gradient Complete!</h2>
-              <div className="font-fredoka-strong mt-4 text-sm uppercase tracking-[0.34em] text-amber-500">
+              <p className="font-fredoka-strong text-sm uppercase tracking-[0.3em] text-slate-400">Perfect Gradient</p>
+              <h2 className="font-fredoka-display mt-4 text-[2.35rem] leading-none tracking-[-0.05em] text-slate-900">Gradient Complete!</h2>
+              <div className="font-fredoka-strong mt-5 text-lg leading-none tracking-[0.24em] text-amber-500">
                 {renderStars(3)}
               </div>
-              <p className="font-fredoka-regular mt-4 text-sm leading-6 text-slate-500">
+              <p className="font-fredoka-regular mt-5 text-[1.05rem] leading-7 text-slate-500">
                 You restored the gradient with a clean finish on {activeConfig.label.toLowerCase()}.
               </p>
-              <div className="mt-6 grid grid-cols-3 gap-3">
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
-                  <p className="font-fredoka-strong text-[0.65rem] uppercase tracking-[0.22em] text-slate-400">Time</p>
-                  <p className="font-fredoka-strong mt-2 text-xl leading-none text-slate-900">{timeDisplay}</p>
+              <div className="mt-7 grid grid-cols-3 gap-3">
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em] text-slate-400">Time</p>
+                  <p className="font-fredoka-strong mt-3 text-[1.7rem] leading-none text-slate-900">{timeDisplay}</p>
                 </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
-                  <p className="font-fredoka-strong text-[0.65rem] uppercase tracking-[0.22em] text-slate-400">Moves</p>
-                  <p className="font-fredoka-strong mt-2 text-xl leading-none text-slate-900">{moves}</p>
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em] text-slate-400">Moves</p>
+                  <p className="font-fredoka-strong mt-3 text-[1.7rem] leading-none text-slate-900">{moves}</p>
                 </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
-                  <p className="font-fredoka-strong text-[0.65rem] uppercase tracking-[0.22em] text-slate-400">Accuracy</p>
-                  <p className="font-fredoka-strong mt-2 text-xl leading-none text-slate-900">{accuracy}%</p>
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em] text-slate-400">Accuracy</p>
+                  <p className="font-fredoka-strong mt-3 text-[1.7rem] leading-none text-slate-900">{accuracy}%</p>
                 </div>
               </div>
             </>
           ) : (
             <div className="mx-auto mt-2 max-w-sm">
-              <h2 className="font-fredoka-display text-3xl tracking-[-0.04em] text-slate-900">Time&apos;s up</h2>
+              <h2 className="font-fredoka-display text-[2.35rem] leading-none tracking-[-0.05em] text-slate-900">Time&apos;s up</h2>
               {timeUpStars > 0 && (
-                <p className="font-fredoka-strong mt-4 text-base tracking-[0.24em] text-amber-500">{renderStars(timeUpStars)}</p>
+                <p className="font-fredoka-strong mt-5 text-lg leading-none tracking-[0.24em] text-amber-500">{renderStars(timeUpStars)}</p>
               )}
-              <div className="mt-6 grid grid-cols-2 gap-3">
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
-                  <p className="font-fredoka-strong text-[0.65rem] uppercase tracking-[0.22em] text-slate-400">Gradient Completion</p>
-                  <p className="font-fredoka-strong mt-2 text-xl leading-none text-slate-900">{completion}%</p>
+              <div className="mt-7 grid grid-cols-2 gap-3">
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em] text-slate-400">Gradient Completion</p>
+                  <p className="font-fredoka-strong mt-3 text-[1.7rem] leading-none text-slate-900">{completion}%</p>
                 </div>
-                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-3 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
-                  <p className="font-fredoka-strong text-[0.65rem] uppercase tracking-[0.22em] text-slate-400">Moves</p>
-                  <p className="font-fredoka-strong mt-2 text-xl leading-none text-slate-900">{moves}</p>
+                <div className="rounded-[1.4rem] border border-white/80 bg-white/80 px-3 py-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)]">
+                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em] text-slate-400">Moves</p>
+                  <p className="font-fredoka-strong mt-3 text-[1.7rem] leading-none text-slate-900">{moves}</p>
                 </div>
               </div>
-              <p className="font-fredoka-regular mt-4 text-sm leading-6 text-slate-500">{timeUpQuote}</p>
+              <p className="font-fredoka-regular mt-5 text-[1.05rem] leading-7 text-slate-500">{timeUpQuote}</p>
             </div>
           )}
 
           <button
             type="button"
             onClick={onRestart}
-            className="font-fredoka-strong mt-7 rounded-full bg-slate-800 px-6 py-3 text-sm text-white shadow-[0_18px_34px_rgba(15,23,42,0.2)] transition hover:bg-slate-700"
+            className="font-fredoka-strong mt-8 rounded-full bg-slate-800 px-7 py-3.5 text-base text-white shadow-[0_18px_34px_rgba(15,23,42,0.2)] transition hover:bg-slate-700"
           >
             Play Again
           </button>
@@ -568,16 +564,16 @@ export function CustomGameModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/18 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-[1.75rem] border border-slate-200/90 bg-white p-6 shadow-2xl">
-        <p className="font-fredoka-regular text-xs uppercase tracking-[0.28em] text-slate-400">Custom Game</p>
-        <h2 className="font-fredoka-display mt-2 text-2xl text-slate-800">Build your board</h2>
-        <p className="font-fredoka-regular mt-2 text-sm leading-6 text-slate-500">
+      <div className="w-full max-w-md rounded-[1.75rem] border border-slate-200/90 bg-white p-7 shadow-2xl">
+        <p className="font-fredoka-strong text-sm uppercase tracking-[0.28em] text-slate-400">Custom Game</p>
+        <h2 className="font-fredoka-display mt-3 text-[2.15rem] leading-none text-slate-800">Build your board</h2>
+        <p className="font-fredoka-regular mt-4 text-[1.05rem] leading-7 text-slate-500">
           Choose your grid size and timer, then press Start when you are ready. The countdown waits for you.
         </p>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <label className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-            <span className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-400">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <label className="rounded-2xl bg-slate-50 p-4 text-base text-slate-600">
+            <span className="font-fredoka-strong mb-3 block text-[0.82rem] uppercase tracking-[0.24em] text-slate-400">
               Grid Size
             </span>
             <input
@@ -586,12 +582,12 @@ export function CustomGameModal({
               max={16}
               value={draftSize}
               onChange={(event) => onSizeChange(Number(event.target.value) || 4)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none"
+              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg outline-none"
             />
           </label>
 
-          <label className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-            <span className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-400">
+          <label className="rounded-2xl bg-slate-50 p-4 text-base text-slate-600">
+            <span className="font-fredoka-strong mb-3 block text-[0.82rem] uppercase tracking-[0.24em] text-slate-400">
               Time Limit
             </span>
             <input
@@ -600,23 +596,23 @@ export function CustomGameModal({
               max={480}
               value={draftTime}
               onChange={(event) => onTimeChange(Number(event.target.value) || 10)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none"
+              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg outline-none"
             />
           </label>
         </div>
 
-        <div className="mt-5 flex items-center justify-end gap-3">
+        <div className="mt-6 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="font-fredoka-regular rounded-full bg-slate-100 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-200"
+            className="font-fredoka-regular rounded-full bg-slate-100 px-5 py-2.5 text-base text-slate-600 transition hover:bg-slate-200"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onStart}
-            className="font-fredoka-strong rounded-full bg-slate-800 px-5 py-2.5 text-sm text-white transition hover:bg-slate-700"
+            className="font-fredoka-strong rounded-full bg-slate-800 px-6 py-3 text-base text-white transition hover:bg-slate-700"
           >
             Start
           </button>

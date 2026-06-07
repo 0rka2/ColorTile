@@ -44,6 +44,8 @@ type DragSession = {
   width: number;
 };
 
+type BoardStateUpdater = Tile[] | ((currentBoard: Tile[]) => Tile[]);
+
 export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
   const [customSize, setCustomSize] = useState(8);
@@ -83,7 +85,6 @@ export default function Home() {
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
   const currentBest = bestStats[difficulty];
-  const currentBestCompletion = currentBest?.bestCompletion ?? null;
   const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
@@ -99,6 +100,18 @@ export default function Home() {
 
   const setDragOverlayRef = useCallback((element: HTMLDivElement | null) => {
     dragOverlayElementRef.current = element;
+  }, []);
+
+  const updateBoard = useCallback((nextBoardOrUpdater: BoardStateUpdater) => {
+    setBoard((currentBoard) => {
+      const nextBoard =
+        typeof nextBoardOrUpdater === "function"
+          ? nextBoardOrUpdater(currentBoard)
+          : nextBoardOrUpdater;
+
+      latestBoardRef.current = nextBoard;
+      return nextBoard;
+    });
   }, []);
 
   const cancelDragAnimationFrame = useCallback(() => {
@@ -243,10 +256,6 @@ export default function Home() {
     window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
   }, [bestStats]);
 
-  useEffect(() => {
-    latestBoardRef.current = board;
-  }, [board]);
-
   const startGame = (config: DifficultyConfig) => {
     const corners = generateCornerColors(config.size);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
@@ -255,7 +264,7 @@ export default function Home() {
     clearDragSession();
     setBoardResetKey((currentKey) => currentKey + 1);
     pendingSwapAnimationRef.current = null;
-    setBoard(nextBoard);
+    updateBoard(nextBoard);
     setMoves(0);
     setTimeLeft(config.time);
     setCompletion(checkCompletion(nextBoard));
@@ -330,6 +339,7 @@ export default function Home() {
               },
             };
           });
+          setCompletion(finalCompletion);
           setLoseState(true);
           clearDragSession();
           return 0;
@@ -391,7 +401,7 @@ export default function Home() {
           pendingSwapAnimationRef.current = null;
         }
 
-        setBoard((currentBoard) => swapTiles(currentBoard, sourceIndex, targetIndex));
+        updateBoard((currentBoard) => swapTiles(currentBoard, sourceIndex, targetIndex));
         setMoves((currentMoves) => currentMoves + 1);
       } else {
         pendingSwapAnimationRef.current = null;
@@ -409,7 +419,7 @@ export default function Home() {
       window.removeEventListener("pointerup", handlePointerEnd);
       window.removeEventListener("pointercancel", handlePointerEnd);
     };
-  }, [board, clearDragSession, dragSession, loseState, resolveDropTargetIndex, scheduleDragOverlayPositionUpdate, winState]);
+  }, [board, clearDragSession, dragSession, loseState, resolveDropTargetIndex, scheduleDragOverlayPositionUpdate, updateBoard, winState]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -503,12 +513,12 @@ export default function Home() {
   const handleAutoSolve = useCallback(() => {
     clearDragSession();
     pendingSwapAnimationRef.current = null;
-    setBoard((currentBoard) =>
+    updateBoard((currentBoard) =>
       [...currentBoard]
         .sort((firstTile, secondTile) => firstTile.correctIndex - secondTile.correctIndex)
         .map((tile, index) => ({ ...tile, currentIndex: index })),
     );
-  }, [clearDragSession]);
+  }, [clearDragSession, updateBoard]);
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6">
@@ -558,8 +568,6 @@ export default function Home() {
           <GameModal
             activeConfig={activeConfig}
             accuracy={accuracy}
-            bestCompletion={currentBestCompletion}
-            bestTimeDisplay={bestTimeDisplay}
             completion={completion}
             loseState={loseState}
             isDismissed={modalDismissed}
