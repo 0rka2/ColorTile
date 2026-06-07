@@ -190,7 +190,9 @@ export default function Home() {
         return;
       }
 
-      element.animate(
+      element.style.zIndex = "20";
+
+      const animation = element.animate(
         [
           { transform: `translate3d(${deltaX}px, ${deltaY}px, 0)` },
           { transform: "translate3d(0, 0, 0)" },
@@ -200,6 +202,13 @@ export default function Home() {
           easing: TILE_SWAP_ANIMATION_EASING,
         },
       );
+
+      const resetStacking = () => {
+        element.style.zIndex = "";
+      };
+
+      animation.addEventListener("finish", resetStacking, { once: true });
+      animation.addEventListener("cancel", resetStacking, { once: true });
     });
   }, [board]);
 
