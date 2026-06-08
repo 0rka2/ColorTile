@@ -60,7 +60,6 @@ export default function Home() {
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
-  const [modalDismissed, setModalDismissed] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
   const [bestStats, setBestStats] = useState<BestStats>({});
@@ -88,8 +87,8 @@ export default function Home() {
   const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
-  const winCelebrationActive = winState && !modalDismissed;
-  const allowHoverWhenLocked = modalDismissed && (winState || loseState);
+  const winCelebrationActive = winState;
+  const allowHoverWhenLocked = false;
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -270,7 +269,6 @@ export default function Home() {
     setCompletion(checkCompletion(nextBoard));
     setWinState(false);
     setLoseState(false);
-    setModalDismissed(false);
     setTimerStarted(true);
   };
 
@@ -545,47 +543,49 @@ export default function Home() {
           timeWarning={timeLeft <= 5 && !winState && !loseState}
         />
 
-        <section className="relative w-full">
-          <GameBoard
-            key={boardResetKey}
-            allowHoverWhenLocked={allowHoverWhenLocked}
-            board={board}
-            boardDensityClass={boardDensityClass}
-            dragSession={dragSession}
-            draggedIndex={draggedIndex}
-            getTileRef={getTileRef}
-            hoveredTargetIndex={hoveredTargetIndex}
-            setDragOverlayRef={setDragOverlayRef}
-            tileRadiusClass={tileRadiusClass}
-            winCelebrationActive={winCelebrationActive}
-            winState={winState}
-            loseState={loseState}
-            isTileCorrect={isTileCorrect}
-            isTileLocked={isTileLocked}
-            onPointerDown={handlePointerDown}
-          />
+        <section className="relative mt-2 flex w-full flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-center lg:gap-6">
+          <div className="order-2 lg:order-1 lg:shrink-0">
+            <GameControls
+              difficulty={difficulty}
+              showDevControls={process.env.NODE_ENV !== "production"}
+              onAutoSolve={handleAutoSolve}
+              onDifficultyChange={handleDifficultyChange}
+              onRestart={() => startGame(activeConfig)}
+            />
+          </div>
+
+          <div className="order-1 w-full lg:order-2 lg:max-w-[58rem]">
+            <GameBoard
+              key={boardResetKey}
+              allowHoverWhenLocked={allowHoverWhenLocked}
+              board={board}
+              boardDensityClass={boardDensityClass}
+              dragSession={dragSession}
+              draggedIndex={draggedIndex}
+              getTileRef={getTileRef}
+              hoveredTargetIndex={hoveredTargetIndex}
+              setDragOverlayRef={setDragOverlayRef}
+              tileRadiusClass={tileRadiusClass}
+              winCelebrationActive={winCelebrationActive}
+              winState={winState}
+              loseState={loseState}
+              isTileCorrect={isTileCorrect}
+              isTileLocked={isTileLocked}
+              onPointerDown={handlePointerDown}
+            />
+          </div>
 
           <GameModal
             activeConfig={activeConfig}
             accuracy={accuracy}
             completion={completion}
             loseState={loseState}
-            isDismissed={modalDismissed}
             moves={moves}
-            onClose={() => setModalDismissed(true)}
             onRestart={() => startGame(activeConfig)}
             timeDisplay={formatTime(timeLeft)}
             winState={winState}
           />
         </section>
-
-        <GameControls
-          difficulty={difficulty}
-          showDevControls={process.env.NODE_ENV !== "production"}
-          onAutoSolve={handleAutoSolve}
-          onDifficultyChange={handleDifficultyChange}
-          onRestart={() => startGame(activeConfig)}
-        />
         </div>
       </div>
 

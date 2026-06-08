@@ -1,4 +1,4 @@
-import { memo, PointerEvent as ReactPointerEvent } from "react";
+import { memo, PointerEvent as ReactPointerEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 
@@ -361,10 +361,8 @@ type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
   completion: number;
-  isDismissed: boolean;
   loseState: boolean;
   moves: number;
-  onClose: () => void;
   onRestart: () => void;
   timeDisplay: string;
   winState: boolean;
@@ -374,15 +372,13 @@ export function GameModal({
   activeConfig,
   accuracy,
   completion,
-  isDismissed,
   loseState,
   moves,
-  onClose,
   onRestart,
   timeDisplay,
   winState,
 }: Readonly<ModalProps>) {
-  if ((!winState && !loseState) || isDismissed) {
+  if (!winState && !loseState) {
     return null;
   }
 
@@ -397,17 +393,6 @@ export function GameModal({
         transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,248,255,0.92))] p-8 text-center shadow-[0_32px_90px_rgba(15,23,42,0.24),0_14px_34px_rgba(15,23,42,0.12)]"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close modal"
-          className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-slate-500 shadow-[0_10px_24px_rgba(148,163,184,0.14)] transition hover:bg-white hover:text-slate-700"
-        >
-          <span aria-hidden="true" className="text-lg leading-none">
-            {"\u00D7"}
-          </span>
-        </button>
-
         {winState &&
           CELEBRATION_CONFETTI.map((piece, index) => (
             <motion.span
@@ -494,32 +479,46 @@ export function GameControls({
   onRestart: onShuffle,
   showDevControls,
 }: Readonly<ControlsProps>) {
+  const [isModesOpen, setIsModesOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isModesOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsModesOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isModesOpen]);
+
+  const handleModeSelect = (nextDifficulty: DifficultyKey) => {
+    onDifficultyChange(nextDifficulty);
+    setIsModesOpen(false);
+  };
+
   return (
-    <section className="mt-5 flex w-full max-w-[42rem] flex-col gap-3">
-      <div className="rounded-[1.6rem] border border-slate-200/80 bg-white/90 p-3 shadow-[0_16px_40px_rgba(148,163,184,0.1)] backdrop-blur">
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {(Object.keys(DIFFICULTY_LABELS) as DifficultyKey[]).map((key) => {
-            const isActive = difficulty === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onDifficultyChange(key)}
-                className={`font-fredoka-strong rounded-full px-4 py-2 text-sm transition ${
-                  isActive
-                    ? "bg-slate-800 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {DIFFICULTY_LABELS[key]}
-              </button>
-            );
-          })}
+    <section className="flex w-full justify-center lg:w-auto">
+      <div className="flex flex-row items-center justify-center gap-2 lg:flex-col">
+          <button
+            type="button"
+            onClick={() => setIsModesOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={isModesOpen}
+            aria-label="Open modes"
+            className="font-fredoka-strong flex h-24 w-24 items-center justify-center rounded-[1.4rem] bg-slate-800 text-center text-[0.95rem] leading-tight text-white shadow-[0_14px_26px_rgba(15,23,42,0.16)] transition hover:bg-slate-700"
+          >
+            Modes
+          </button>
 
           <button
             type="button"
             onClick={onShuffle}
-            className="font-fredoka-strong rounded-full bg-slate-800 px-4 py-2 text-sm text-white transition hover:bg-slate-700"
+            className="font-fredoka-strong flex h-24 w-24 items-center justify-center rounded-[1.4rem] bg-slate-800 text-center text-[0.95rem] leading-tight text-white transition hover:bg-slate-700"
           >
             Shuffle
           </button>
@@ -528,13 +527,68 @@ export function GameControls({
             <button
               type="button"
               onClick={onAutoSolve}
-              className="font-fredoka-strong rounded-full bg-amber-100 px-4 py-2 text-sm text-amber-900 transition hover:bg-amber-200"
+              className="font-fredoka-strong flex h-24 w-24 items-center justify-center rounded-[1.4rem] bg-amber-100 text-center text-[0.95rem] leading-tight text-amber-900 transition hover:bg-amber-200"
             >
               Auto Solve
             </button>
           )}
-        </div>
       </div>
+
+      {isModesOpen && (
+        <motion.div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/20 p-4 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="absolute inset-0" onClick={() => setIsModesOpen(false)} aria-hidden="true" />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Select game mode"
+            className="relative w-full max-w-sm rounded-[1.75rem] border border-slate-200/90 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.16)]"
+            initial={{ opacity: 0, y: 18, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-fredoka-strong text-sm uppercase tracking-[0.24em] text-slate-400">Modes</p>
+                <h2 className="font-fredoka-display mt-2 text-[2rem] leading-none text-slate-800">Choose a mode</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModesOpen(false)}
+                aria-label="Close modes window"
+                className="font-fredoka-strong flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+              >
+                {"\u00D7"}
+              </button>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              {(Object.keys(DIFFICULTY_LABELS) as DifficultyKey[]).map((key) => {
+                const isActive = difficulty === key;
+
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleModeSelect(key)}
+                    className={`font-fredoka-strong rounded-2xl px-4 py-3 text-sm transition ${
+                      isActive
+                        ? "bg-slate-800 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {DIFFICULTY_LABELS[key]}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </section>
   );
 }
