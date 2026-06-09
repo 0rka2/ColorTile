@@ -130,7 +130,6 @@ type BoardProps = {
   } | null;
   draggedIndex: number | null;
   getTileRef: (tileId: string) => (element: HTMLButtonElement | null) => void;
-  hoveredTargetIndex: number | null;
   setDragOverlayRef: (element: HTMLDivElement | null) => void;
   tileRadiusClass: string;
   winCelebrationActive: boolean;
@@ -147,7 +146,6 @@ type TileButtonProps = {
   index: number;
   isCorrect: boolean;
   isDragging: boolean;
-  isDropTarget: boolean;
   tile: Tile;
   tileRadiusClass: string;
   winState: boolean;
@@ -162,7 +160,6 @@ const TileButton = memo(function TileButton({
   index,
   isCorrect,
   isDragging,
-  isDropTarget,
   tile,
   tileRadiusClass,
   winState,
@@ -209,7 +206,7 @@ const TileButton = memo(function TileButton({
           : undefined
       }
       className={`tile-surface relative aspect-square border border-white/75 ${tileRadiusClass} ${
-        isDragging ? "pointer-events-none" : isDropTarget ? "ring-2 ring-slate-300/70 ring-offset-2 ring-offset-white/80" : ""
+        isDragging ? "pointer-events-none" : ""
       } ${canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
       style={{ backgroundColor: tile.color, touchAction: "none" }}
       aria-label={`Tile ${index + 1}${tile.isCorner ? ", fixed corner tile" : ""}${isCorrect ? ", correct position" : ""}${!canDrag && !tile.isCorner ? ", locked" : ""}`}
@@ -230,7 +227,6 @@ const TileButton = memo(function TileButton({
     previousProps.index === nextProps.index &&
     previousProps.isCorrect === nextProps.isCorrect &&
     previousProps.isDragging === nextProps.isDragging &&
-    previousProps.isDropTarget === nextProps.isDropTarget &&
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
     previousProps.winState === nextProps.winState &&
@@ -238,14 +234,13 @@ const TileButton = memo(function TileButton({
   );
 });
 
-export function GameBoard({
+export const GameBoard = memo(function GameBoard({
   allowHoverWhenLocked,
   board,
   boardDensityClass,
   dragSession,
   draggedIndex,
   getTileRef,
-  hoveredTargetIndex,
   setDragOverlayRef,
   tileRadiusClass,
   winCelebrationActive,
@@ -330,8 +325,6 @@ export function GameBoard({
               const isLocked = isTileLocked(tile, index);
               const canDrag = !isLocked && !winState && !loseState;
               const canHover = allowHoverWhenLocked || (!winState && !loseState && (canDrag || isCorrect));
-              const isDropTarget =
-                hoveredTargetIndex === index && draggedIndex !== null && draggedIndex !== index && !isLocked;
 
               return (
                 <TileButton
@@ -341,7 +334,6 @@ export function GameBoard({
                   index={index}
                   isCorrect={isCorrect}
                   isDragging={isDragging && dragSession !== null}
-                  isDropTarget={isDropTarget}
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
                   winState={winState}
@@ -357,7 +349,7 @@ export function GameBoard({
       {dragOverlay}
     </>
   );
-}
+});
 
 type ModalProps = {
   activeConfig: DifficultyConfig;

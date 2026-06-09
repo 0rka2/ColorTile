@@ -24,6 +24,12 @@ import { GradientText } from "../components/ui/gradient-text";
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
 const TILE_SWAP_ANIMATION_DURATION_MS = 180;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.25, 0.1, 0.25, 1)";
+const DROP_TARGET_RING_CLASSES = [
+  "ring-2",
+  "ring-slate-300/70",
+  "ring-offset-2",
+  "ring-offset-white/80",
+];
 
 function getAccuracyScore(size: number, moves: number) {
   const targetMoves = Math.max(1, Math.round(size * size * 0.58));
@@ -54,7 +60,6 @@ export default function Home() {
   const [customDraftTime, setCustomDraftTime] = useState(35);
   const [board, setBoard] = useState<Tile[]>([]);
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
-  const [hoveredTargetIndex, setHoveredTargetIndex] = useState<number | null>(null);
   const [moves, setMoves] = useState(0);
   const [timeLeft, setTimeLeft] = useState(PRESET_DIFFICULTIES.normal.time);
   const [completion, setCompletion] = useState(0);
@@ -70,6 +75,7 @@ export default function Home() {
   const dragPointerTargetRef = useRef<HTMLButtonElement | null>(null);
   const dragOverlayElementRef = useRef<HTMLDivElement | null>(null);
   const dragAnimationFrameRef = useRef<number | null>(null);
+  const hoveredTargetIndexRef = useRef<number | null>(null);
   const latestBoardRef = useRef<Tile[]>([]);
 
   const activeConfig =
@@ -144,6 +150,40 @@ export default function Home() {
     dragAnimationFrameRef.current = window.requestAnimationFrame(updateDragOverlayPosition);
   }, [updateDragOverlayPosition]);
 
+  const setDropTargetHighlight = useCallback((index: number | null, active: boolean) => {
+    if (index === null) {
+      return;
+    }
+
+    const tile = latestBoardRef.current[index];
+    if (!tile) {
+      return;
+    }
+
+    const element = tileElementsRef.current[tile.id];
+    if (!element) {
+      return;
+    }
+
+    if (active) {
+      element.classList.add(...DROP_TARGET_RING_CLASSES);
+      return;
+    }
+
+    element.classList.remove(...DROP_TARGET_RING_CLASSES);
+  }, []);
+
+  const updateHoveredDropTarget = useCallback((nextIndex: number | null) => {
+    const previousIndex = hoveredTargetIndexRef.current;
+    if (previousIndex === nextIndex) {
+      return;
+    }
+
+    setDropTargetHighlight(previousIndex, false);
+    hoveredTargetIndexRef.current = nextIndex;
+    setDropTargetHighlight(nextIndex, true);
+  }, [setDropTargetHighlight]);
+
   const clearDragSession = useCallback(() => {
     cancelDragAnimationFrame();
 
@@ -161,9 +201,9 @@ export default function Home() {
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
+    updateHoveredDropTarget(null);
     setDragSession(null);
-    setHoveredTargetIndex(null);
-  }, [cancelDragAnimationFrame, dragSession]);
+  }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
     if (typeof document === "undefined") {
@@ -363,8 +403,17 @@ export default function Home() {
       dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
       scheduleDragOverlayPositionUpdate();
 
-      const nextHoveredTargetIndex = resolveDropTargetIndex(event.clientX, event.clientY);
-      setHoveredTargetIndex((currentIndex) => (currentIndex === nextHoveredTargetIndex ? currentIndex : nextHoveredTargetIndex));
+      const rawTargetIndex = resolveDropTargetIndex(event.clientX, event.clientY);
+      const targetTile = rawTargetIndex === null ? null : latestBoardRef.current[rawTargetIndex];
+      const nextHoveredTargetIndex =
+        rawTargetIndex === null ||
+        rawTargetIndex === dragSession.index ||
+        !targetTile ||
+        isTileLocked(targetTile, rawTargetIndex)
+          ? null
+          : rawTargetIndex;
+
+      updateHoveredDropTarget(nextHoveredTargetIndex);
     };
 
     const handlePointerEnd = (event: PointerEvent) => {
@@ -470,7 +519,6 @@ export default function Home() {
       tileId: tile.id,
       width: tileRect.width,
     });
-    setHoveredTargetIndex(index);
   }, [board, loseState, winState]);
 
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
@@ -555,7 +603,6 @@ export default function Home() {
               dragSession={dragSession}
               draggedIndex={draggedIndex}
               getTileRef={getTileRef}
-              hoveredTargetIndex={hoveredTargetIndex}
               setDragOverlayRef={setDragOverlayRef}
               tileRadiusClass={tileRadiusClass}
               winCelebrationActive={winCelebrationActive}
