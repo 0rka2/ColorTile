@@ -24,6 +24,28 @@ import { GradientText } from "../components/ui/gradient-text";
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
 const TILE_SWAP_ANIMATION_DURATION_MS = 180;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.25, 0.1, 0.25, 1)";
+const DROP_TARGET_RING_CLASSES = [
+  "ring-2",
+  "ring-slate-300/70",
+  "ring-offset-2",
+  "ring-offset-white/80",
+];
+
+function getResponsiveCustomSizeMax(viewportWidth: number) {
+  if (viewportWidth < 480) {
+    return 8;
+  }
+
+  if (viewportWidth < 768) {
+    return 10;
+  }
+
+  if (viewportWidth < 1024) {
+    return 12;
+  }
+
+  return 14;
+}
 
 function getAccuracyScore(size: number, moves: number) {
   const targetMoves = Math.max(1, Math.round(size * size * 0.58));
@@ -48,19 +70,18 @@ type BoardStateUpdater = Tile[] | ((currentBoard: Tile[]) => Tile[]);
 
 export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
+  const [customSizeMax, setCustomSizeMax] = useState(14);
   const [customSize, setCustomSize] = useState(8);
   const [customTime, setCustomTime] = useState(60);
   const [customDraftSize, setCustomDraftSize] = useState(8);
   const [customDraftTime, setCustomDraftTime] = useState(35);
   const [board, setBoard] = useState<Tile[]>([]);
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
-  const [hoveredTargetIndex, setHoveredTargetIndex] = useState<number | null>(null);
   const [moves, setMoves] = useState(0);
   const [timeLeft, setTimeLeft] = useState(PRESET_DIFFICULTIES.normal.time);
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
-  const [modalDismissed, setModalDismissed] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
   const [bestStats, setBestStats] = useState<BestStats>({});
@@ -71,13 +92,14 @@ export default function Home() {
   const dragPointerTargetRef = useRef<HTMLButtonElement | null>(null);
   const dragOverlayElementRef = useRef<HTMLDivElement | null>(null);
   const dragAnimationFrameRef = useRef<number | null>(null);
+  const hoveredTargetIndexRef = useRef<number | null>(null);
   const latestBoardRef = useRef<Tile[]>([]);
 
   const activeConfig =
     difficulty === "custom"
       ? {
           label: DIFFICULTY_LABELS.custom,
-          size: clamp(customSize, 4, 14),
+          size: clamp(customSize, 4, customSizeMax),
           time: clamp(customTime, 10, 480),
         }
       : PRESET_DIFFICULTIES[difficulty];
@@ -88,8 +110,8 @@ export default function Home() {
   const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
-  const winCelebrationActive = winState && !modalDismissed;
-  const allowHoverWhenLocked = modalDismissed && (winState || loseState);
+  const winCelebrationActive = winState;
+  const allowHoverWhenLocked = false;
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -145,6 +167,40 @@ export default function Home() {
     dragAnimationFrameRef.current = window.requestAnimationFrame(updateDragOverlayPosition);
   }, [updateDragOverlayPosition]);
 
+  const setDropTargetHighlight = useCallback((index: number | null, active: boolean) => {
+    if (index === null) {
+      return;
+    }
+
+    const tile = latestBoardRef.current[index];
+    if (!tile) {
+      return;
+    }
+
+    const element = tileElementsRef.current[tile.id];
+    if (!element) {
+      return;
+    }
+
+    if (active) {
+      element.classList.add(...DROP_TARGET_RING_CLASSES);
+      return;
+    }
+
+    element.classList.remove(...DROP_TARGET_RING_CLASSES);
+  }, []);
+
+  const updateHoveredDropTarget = useCallback((nextIndex: number | null) => {
+    const previousIndex = hoveredTargetIndexRef.current;
+    if (previousIndex === nextIndex) {
+      return;
+    }
+
+    setDropTargetHighlight(previousIndex, false);
+    hoveredTargetIndexRef.current = nextIndex;
+    setDropTargetHighlight(nextIndex, true);
+  }, [setDropTargetHighlight]);
+
   const clearDragSession = useCallback(() => {
     cancelDragAnimationFrame();
 
@@ -162,9 +218,9 @@ export default function Home() {
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
+    updateHoveredDropTarget(null);
     setDragSession(null);
-    setHoveredTargetIndex(null);
-  }, [cancelDragAnimationFrame, dragSession]);
+  }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
     if (typeof document === "undefined") {
@@ -256,6 +312,26 @@ export default function Home() {
     window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
   }, [bestStats]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateCustomSizeMax = () => {
+      const nextMax = getResponsiveCustomSizeMax(window.innerWidth);
+      setCustomSizeMax(nextMax);
+      setCustomSize((currentSize) => clamp(currentSize, 4, nextMax));
+      setCustomDraftSize((currentSize) => clamp(currentSize, 4, nextMax));
+    };
+
+    updateCustomSizeMax();
+    window.addEventListener("resize", updateCustomSizeMax);
+
+    return () => {
+      window.removeEventListener("resize", updateCustomSizeMax);
+    };
+  }, []);
+
   const startGame = (config: DifficultyConfig) => {
     const corners = generateCornerColors(config.size);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
@@ -270,7 +346,6 @@ export default function Home() {
     setCompletion(checkCompletion(nextBoard));
     setWinState(false);
     setLoseState(false);
-    setModalDismissed(false);
     setTimerStarted(true);
   };
 
@@ -365,8 +440,17 @@ export default function Home() {
       dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
       scheduleDragOverlayPositionUpdate();
 
-      const nextHoveredTargetIndex = resolveDropTargetIndex(event.clientX, event.clientY);
-      setHoveredTargetIndex((currentIndex) => (currentIndex === nextHoveredTargetIndex ? currentIndex : nextHoveredTargetIndex));
+      const rawTargetIndex = resolveDropTargetIndex(event.clientX, event.clientY);
+      const targetTile = rawTargetIndex === null ? null : latestBoardRef.current[rawTargetIndex];
+      const nextHoveredTargetIndex =
+        rawTargetIndex === null ||
+        rawTargetIndex === dragSession.index ||
+        !targetTile ||
+        isTileLocked(targetTile, rawTargetIndex)
+          ? null
+          : rawTargetIndex;
+
+      updateHoveredDropTarget(nextHoveredTargetIndex);
     };
 
     const handlePointerEnd = (event: PointerEvent) => {
@@ -472,7 +556,6 @@ export default function Home() {
       tileId: tile.id,
       width: tileRect.width,
     });
-    setHoveredTargetIndex(index);
   }, [board, loseState, winState]);
 
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
@@ -493,7 +576,7 @@ export default function Home() {
   const handleCustomStart = () => {
     const nextConfig = {
       label: DIFFICULTY_LABELS.custom,
-      size: clamp(customDraftSize, 4, 14),
+      size: clamp(customDraftSize, 4, customSizeMax),
       time: clamp(customDraftTime, 10, 480),
     };
 
@@ -521,71 +604,76 @@ export default function Home() {
   }, [clearDragSession, updateBoard]);
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6">
+    <main className="h-screen overflow-hidden px-3 py-4 sm:px-6 sm:py-6">
      
-      <header className="fixed left-6 top-5 z-20 sm:left-8 sm:top-6 lg:left-10">
-        <div className="rounded-[1.4rem] border border-white/90 bg-white px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur">
-          <p className="font-fredoka-display text-4xl font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
+      <header className="fixed left-3 top-2 z-20 sm:left-8 sm:top-4 md:left-6 md:top-3 lg:left-10 lg:top-4">
+        <div className="rounded-[1.15rem] border border-white/90 bg-white px-3 py-2.5 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur sm:rounded-[1.4rem] sm:px-4 sm:py-3">
+          <p className="font-fredoka-display text-[2rem] font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
             <GradientText className="px-1">ColorTile</GradientText>
           </p>
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[72rem] flex-col">
-        <div className="flex flex-1 flex-col items-center justify-center">
-        <GameHud
-          bestMoves={currentBest?.fewestMoves ?? null}
-          bestTimeDisplay={
-            currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft)
-          }
-          completion={completion}
-          difficultyLabel={activeConfig.label}
-          moves={moves}
-          timeDisplay={formatTime(timeLeft)}
-          timeWarning={timeLeft <= 5 && !winState && !loseState}
-        />
+      <div className="mx-auto flex h-full w-full max-w-[72rem] flex-col pt-11 sm:pt-14 md:pt-24 lg:pt-12">
+        <div className="flex flex-1 flex-col items-center justify-center md:justify-start lg:justify-center">
+        <section className="relative flex w-full flex-col items-center gap-2 sm:gap-3 md:gap-3 lg:mx-auto lg:-translate-y-[5vh] lg:grid lg:max-w-[58rem] lg:grid-cols-[6rem_minmax(0,42rem)_6rem] lg:items-start lg:gap-x-5 lg:gap-y-3">
+          <div className="order-1 w-full lg:col-start-2 lg:max-w-[42rem]">
+            <GameHud
+              bestMoves={currentBest?.fewestMoves ?? null}
+              bestTimeDisplay={
+                currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft)
+              }
+              completion={completion}
+              difficultyLabel={activeConfig.label}
+              moves={moves}
+              timeDisplay={formatTime(timeLeft)}
+              timeWarning={timeLeft <= 5 && !winState && !loseState}
+            />
+          </div>
 
-        <section className="relative w-full">
-          <GameBoard
-            key={boardResetKey}
-            allowHoverWhenLocked={allowHoverWhenLocked}
-            board={board}
-            boardDensityClass={boardDensityClass}
-            dragSession={dragSession}
-            draggedIndex={draggedIndex}
-            getTileRef={getTileRef}
-            hoveredTargetIndex={hoveredTargetIndex}
-            setDragOverlayRef={setDragOverlayRef}
-            tileRadiusClass={tileRadiusClass}
-            winCelebrationActive={winCelebrationActive}
-            winState={winState}
-            loseState={loseState}
-            isTileCorrect={isTileCorrect}
-            isTileLocked={isTileLocked}
-            onPointerDown={handlePointerDown}
-          />
+          <div className="order-3 w-full lg:col-start-2 lg:max-w-[42rem]">
+            <GameBoard
+              key={boardResetKey}
+              allowHoverWhenLocked={allowHoverWhenLocked}
+              board={board}
+              boardDensityClass={boardDensityClass}
+              dragSession={dragSession}
+              draggedIndex={draggedIndex}
+              getTileRef={getTileRef}
+              setDragOverlayRef={setDragOverlayRef}
+              tileRadiusClass={tileRadiusClass}
+              winCelebrationActive={winCelebrationActive}
+              winState={winState}
+              loseState={loseState}
+              isTileCorrect={isTileCorrect}
+              isTileLocked={isTileLocked}
+              onPointerDown={handlePointerDown}
+            />
+          </div>
+
+          <div className="order-4 w-full lg:col-start-1 lg:row-start-2 lg:self-start lg:pt-6">
+            <GameControls
+              difficulty={difficulty}
+              showDevControls={process.env.NODE_ENV !== "production"}
+              onAutoSolve={handleAutoSolve}
+              onDifficultyChange={handleDifficultyChange}
+              onRestart={() => startGame(activeConfig)}
+            />
+          </div>
+
+          <div aria-hidden="true" className="hidden lg:block lg:col-start-3 lg:row-start-2 lg:w-24" />
 
           <GameModal
             activeConfig={activeConfig}
             accuracy={accuracy}
             completion={completion}
             loseState={loseState}
-            isDismissed={modalDismissed}
             moves={moves}
-            onClose={() => setModalDismissed(true)}
             onRestart={() => startGame(activeConfig)}
             timeDisplay={formatTime(timeLeft)}
             winState={winState}
           />
         </section>
-
-        <GameControls
-          difficulty={difficulty}
-          showDevControls={process.env.NODE_ENV !== "production"}
-          onAutoSolve={handleAutoSolve}
-          onDifficultyChange={handleDifficultyChange}
-          onRestart={() => startGame(activeConfig)}
-        />
         </div>
       </div>
 
@@ -593,8 +681,9 @@ export default function Home() {
         draftSize={customDraftSize}
         draftTime={customDraftTime}
         isOpen={customModalOpen}
+        maxSize={customSizeMax}
         onClose={handleCustomClose}
-        onSizeChange={(value) => setCustomDraftSize(clamp(value, 4, 14))}
+        onSizeChange={(value) => setCustomDraftSize(clamp(value, 4, customSizeMax))}
         onStart={handleCustomStart}
         onTimeChange={(value) => setCustomDraftTime(clamp(value, 10, 480))}
       />
