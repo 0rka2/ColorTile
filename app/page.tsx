@@ -31,6 +31,22 @@ const DROP_TARGET_RING_CLASSES = [
   "ring-offset-white/80",
 ];
 
+function getResponsiveCustomSizeMax(viewportWidth: number) {
+  if (viewportWidth < 480) {
+    return 8;
+  }
+
+  if (viewportWidth < 768) {
+    return 10;
+  }
+
+  if (viewportWidth < 1024) {
+    return 12;
+  }
+
+  return 14;
+}
+
 function getAccuracyScore(size: number, moves: number) {
   const targetMoves = Math.max(1, Math.round(size * size * 0.58));
   const moveCount = Math.max(1, moves);
@@ -54,6 +70,7 @@ type BoardStateUpdater = Tile[] | ((currentBoard: Tile[]) => Tile[]);
 
 export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
+  const [customSizeMax, setCustomSizeMax] = useState(14);
   const [customSize, setCustomSize] = useState(8);
   const [customTime, setCustomTime] = useState(60);
   const [customDraftSize, setCustomDraftSize] = useState(8);
@@ -82,7 +99,7 @@ export default function Home() {
     difficulty === "custom"
       ? {
           label: DIFFICULTY_LABELS.custom,
-          size: clamp(customSize, 4, 14),
+          size: clamp(customSize, 4, customSizeMax),
           time: clamp(customTime, 10, 480),
         }
       : PRESET_DIFFICULTIES[difficulty];
@@ -294,6 +311,26 @@ export default function Home() {
 
     window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
   }, [bestStats]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateCustomSizeMax = () => {
+      const nextMax = getResponsiveCustomSizeMax(window.innerWidth);
+      setCustomSizeMax(nextMax);
+      setCustomSize((currentSize) => clamp(currentSize, 4, nextMax));
+      setCustomDraftSize((currentSize) => clamp(currentSize, 4, nextMax));
+    };
+
+    updateCustomSizeMax();
+    window.addEventListener("resize", updateCustomSizeMax);
+
+    return () => {
+      window.removeEventListener("resize", updateCustomSizeMax);
+    };
+  }, []);
 
   const startGame = (config: DifficultyConfig) => {
     const corners = generateCornerColors(config.size);
@@ -539,7 +576,7 @@ export default function Home() {
   const handleCustomStart = () => {
     const nextConfig = {
       label: DIFFICULTY_LABELS.custom,
-      size: clamp(customDraftSize, 4, 14),
+      size: clamp(customDraftSize, 4, customSizeMax),
       time: clamp(customDraftTime, 10, 480),
     };
 
@@ -644,8 +681,9 @@ export default function Home() {
         draftSize={customDraftSize}
         draftTime={customDraftTime}
         isOpen={customModalOpen}
+        maxSize={customSizeMax}
         onClose={handleCustomClose}
-        onSizeChange={(value) => setCustomDraftSize(clamp(value, 4, 14))}
+        onSizeChange={(value) => setCustomDraftSize(clamp(value, 4, customSizeMax))}
         onStart={handleCustomStart}
         onTimeChange={(value) => setCustomDraftTime(clamp(value, 10, 480))}
       />

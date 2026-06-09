@@ -601,6 +601,7 @@ type CustomGameModalProps = {
   draftSize: number;
   draftTime: number;
   isOpen: boolean;
+  maxSize: number;
   onClose: () => void;
   onSizeChange: (value: number) => void;
   onStart: () => void;
@@ -611,6 +612,7 @@ export function CustomGameModal({
   draftSize,
   draftTime,
   isOpen,
+  maxSize,
   onClose,
   onSizeChange,
   onStart,
@@ -641,11 +643,14 @@ export function CustomGameModal({
             <input
               type="number"
               min={4}
-              max={16}
+              max={maxSize}
               value={draftSize}
               onChange={(event) => onSizeChange(Number(event.target.value) || 4)}
               className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-800 outline-none sm:text-[1.05rem]"
             />
+            <span className="font-fredoka-regular mt-2 block text-sm text-slate-500">
+              Max for this screen: {maxSize} x {maxSize}
+            </span>
           </label>
 
           <label className="rounded-[1rem] bg-slate-50 p-4 text-base text-slate-600 sm:rounded-2xl">
