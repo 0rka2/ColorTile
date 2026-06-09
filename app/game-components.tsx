@@ -81,30 +81,32 @@ export function GameHud({
   timeWarning,
 }: Readonly<HudProps>) {
   return (
-    <section className="mb-5 flex w-full max-w-[40rem] items-stretch justify-between gap-3">
-      <div className="flex min-w-0 flex-1 items-center justify-between rounded-[1.75rem] border border-slate-200/90 bg-white/95 px-5 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur">
+    <section className="mb-4 flex w-full max-w-[40rem] flex-col gap-3 sm:mb-5">
+      <div className="flex min-w-0 items-center justify-between rounded-[1.4rem] border border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur sm:flex-1 sm:rounded-[1.75rem] sm:px-5">
         <div>
-          <p className={`font-fredoka-display text-5xl leading-none tracking-tight ${timeWarning ? "text-rose-500" : "text-slate-800"}`}>
+          <p className={`font-fredoka-display text-[2.4rem] leading-none tracking-tight sm:text-5xl ${timeWarning ? "text-rose-500" : "text-slate-800"}`}>
             {timeDisplay}
           </p>
         </div>
 
-        <div className="text-right">
-          <p className="font-fredoka-strong text-[1.125rem] leading-none text-slate-500">{difficultyLabel}</p>
-          <p className="font-fredoka-strong mt-2 text-[1.275rem] leading-none text-slate-800">
-            {moves} moves | {completion}%
+        <div className="max-w-[11rem] text-right sm:max-w-none">
+          <p className="font-fredoka-strong text-[0.95rem] leading-none text-slate-500 sm:text-[1.125rem]">{difficultyLabel}</p>
+          <p className="font-fredoka-strong mt-2 text-[1rem] leading-tight text-slate-800 sm:text-[1.275rem] sm:leading-none">
+            {moves} moves
+            <span className="mx-1.5 text-slate-300">|</span>
+            {completion}%
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 self-stretch">
-        <div className="flex min-w-[6.25rem] flex-col items-center justify-center gap-2 rounded-[1.15rem] border border-slate-200/90 bg-white/95 px-3 py-3 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur">
-          <p className="font-fredoka-strong text-[1.125rem] leading-none text-slate-500">Best Time</p>
-          <p className="font-fredoka-display text-[1.9rem] leading-none text-slate-800">{bestTimeDisplay}</p>
+      <div className="grid grid-cols-2 gap-2 self-stretch sm:gap-3">
+        <div className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-[1rem] border border-slate-200/90 bg-white/95 px-3 py-3 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur sm:min-w-[6.25rem] sm:gap-2 sm:rounded-[1.15rem]">
+          <p className="font-fredoka-strong text-[0.9rem] leading-tight text-slate-500 sm:text-[1.125rem] sm:leading-none">Best Time</p>
+          <p className="font-fredoka-display text-[1.55rem] leading-none text-slate-800 sm:text-[1.9rem]">{bestTimeDisplay}</p>
         </div>
-        <div className="flex min-w-[6.25rem] flex-col items-center justify-center gap-2 rounded-[1.15rem] border border-slate-200/90 bg-white/95 px-3 py-3 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur">
-          <p className="font-fredoka-strong text-[1.125rem] leading-none text-slate-500">Fewest Moves</p>
-          <p className="font-fredoka-display text-[1.9rem] leading-none text-slate-800">{bestMoves ?? "-"}</p>
+        <div className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-[1rem] border border-slate-200/90 bg-white/95 px-3 py-3 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur sm:min-w-[6.25rem] sm:gap-2 sm:rounded-[1.15rem]">
+          <p className="font-fredoka-strong text-[0.9rem] leading-tight text-slate-500 sm:text-[1.125rem] sm:leading-none">Fewest Moves</p>
+          <p className="font-fredoka-display text-[1.55rem] leading-none text-slate-800 sm:text-[1.9rem]">{bestMoves ?? "-"}</p>
         </div>
       </div>
     </section>
@@ -283,7 +285,7 @@ export function GameBoard({
   return (
     <>
       <motion.div
-        className="mx-auto aspect-square w-full max-w-[58rem] rounded-[1.2rem] bg-gradient-to-br from-white/85 via-slate-100/70 to-sky-100/65 p-px shadow-[0_28px_80px_rgba(15,23,42,0.12),0_12px_28px_rgba(15,23,42,0.07)]"
+        className="mx-auto aspect-square w-full max-w-[58rem] rounded-[1rem] bg-gradient-to-br from-white/85 via-slate-100/70 to-sky-100/65 p-px shadow-[0_22px_56px_rgba(15,23,42,0.10),0_10px_24px_rgba(15,23,42,0.06)] sm:rounded-[1.2rem] sm:shadow-[0_28px_80px_rgba(15,23,42,0.12),0_12px_28px_rgba(15,23,42,0.07)]"
         initial={false}
         animate={
           winCelebrationActive
@@ -306,7 +308,7 @@ export function GameBoard({
             : { duration: 0.2 }
         }
       >
-        <div className="relative h-full w-full overflow-hidden rounded-[calc(1.2rem-1px)] bg-[rgba(255,255,255,0.85)] p-2 backdrop-blur-[20px] sm:p-2.5">
+        <div className="relative h-full w-full overflow-hidden rounded-[calc(1rem-1px)] bg-[rgba(255,255,255,0.85)] p-1.5 backdrop-blur-[20px] sm:rounded-[calc(1.2rem-1px)] sm:p-2.5">
           {winCelebrationActive && (
             <motion.div
               aria-hidden="true"
@@ -317,7 +319,7 @@ export function GameBoard({
             />
           )}
           <div
-            className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[1.5rem]`}
+            className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[1.05rem] sm:rounded-[1.5rem]`}
             style={{
               gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
             }}
@@ -503,14 +505,14 @@ export function GameControls({
 
   return (
     <section className="flex w-full justify-center lg:w-auto">
-      <div className="flex flex-row items-center justify-center gap-2 lg:flex-col">
+      <div className="grid w-full max-w-[26rem] grid-cols-3 gap-2 sm:gap-3 lg:flex lg:w-auto lg:max-w-none lg:flex-col">
           <button
             type="button"
             onClick={() => setIsModesOpen(true)}
             aria-haspopup="dialog"
             aria-expanded={isModesOpen}
             aria-label="Open modes"
-            className="font-fredoka-strong flex h-24 w-24 items-center justify-center rounded-[1.4rem] bg-slate-800 text-center text-[0.95rem] leading-tight text-white shadow-[0_14px_26px_rgba(15,23,42,0.16)] transition hover:bg-slate-700"
+            className="font-fredoka-strong flex min-h-[4.75rem] w-full items-center justify-center rounded-[1.1rem] bg-slate-800 px-3 py-3 text-center text-[0.92rem] leading-tight text-white shadow-[0_14px_26px_rgba(15,23,42,0.16)] transition hover:bg-slate-700 sm:min-h-[5.25rem] sm:rounded-[1.25rem] sm:text-[0.95rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem]"
           >
             Modes
           </button>
@@ -518,7 +520,7 @@ export function GameControls({
           <button
             type="button"
             onClick={onShuffle}
-            className="font-fredoka-strong flex h-24 w-24 items-center justify-center rounded-[1.4rem] bg-slate-800 text-center text-[0.95rem] leading-tight text-white transition hover:bg-slate-700"
+            className="font-fredoka-strong flex min-h-[4.75rem] w-full items-center justify-center rounded-[1.1rem] bg-slate-800 px-3 py-3 text-center text-[0.92rem] leading-tight text-white transition hover:bg-slate-700 sm:min-h-[5.25rem] sm:rounded-[1.25rem] sm:text-[0.95rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem]"
           >
             Shuffle
           </button>
@@ -527,7 +529,7 @@ export function GameControls({
             <button
               type="button"
               onClick={onAutoSolve}
-              className="font-fredoka-strong flex h-24 w-24 items-center justify-center rounded-[1.4rem] bg-amber-100 text-center text-[0.95rem] leading-tight text-amber-900 transition hover:bg-amber-200"
+              className="font-fredoka-strong flex min-h-[4.75rem] w-full items-center justify-center rounded-[1.1rem] bg-amber-100 px-3 py-3 text-center text-[0.92rem] leading-tight text-amber-900 transition hover:bg-amber-200 sm:min-h-[5.25rem] sm:rounded-[1.25rem] sm:text-[0.95rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem]"
             >
               Auto Solve
             </button>
@@ -546,15 +548,15 @@ export function GameControls({
             role="dialog"
             aria-modal="true"
             aria-label="Select game mode"
-            className="relative w-full max-w-sm rounded-[1.75rem] border border-slate-200/90 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.16)]"
+            className="relative w-full max-w-sm rounded-[1.5rem] border border-slate-200/90 bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.16)] sm:rounded-[1.75rem] sm:p-6"
             initial={{ opacity: 0, y: 18, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-fredoka-strong text-sm uppercase tracking-[0.24em] text-slate-400">Modes</p>
-                <h2 className="font-fredoka-display mt-2 text-[2rem] leading-none text-slate-800">Choose a mode</h2>
+                <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-sm sm:tracking-[0.24em]">Modes</p>
+                <h2 className="font-fredoka-display mt-2 text-[1.7rem] leading-none text-slate-800 sm:text-[2rem]">Choose a mode</h2>
               </div>
               <button
                 type="button"
@@ -566,7 +568,7 @@ export function GameControls({
               </button>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3">
               {(Object.keys(DIFFICULTY_LABELS) as DifficultyKey[]).map((key) => {
                 const isActive = difficulty === key;
 
@@ -575,7 +577,7 @@ export function GameControls({
                     key={key}
                     type="button"
                     onClick={() => handleModeSelect(key)}
-                    className={`font-fredoka-strong rounded-2xl px-4 py-3 text-sm transition ${
+                    className={`font-fredoka-strong rounded-[1rem] px-3 py-3 text-sm leading-tight transition sm:rounded-2xl sm:px-4 ${
                       isActive
                         ? "bg-slate-800 text-white"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -618,16 +620,16 @@ export function CustomGameModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/18 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-[1.75rem] border border-slate-200/90 bg-white p-7 shadow-2xl">
-        <p className="font-fredoka-strong text-sm uppercase tracking-[0.28em] text-slate-400">Custom Game</p>
-        <h2 className="font-fredoka-display mt-3 text-[2.15rem] leading-none text-slate-800">Build your board</h2>
-        <p className="font-fredoka-regular mt-4 text-[1.05rem] leading-7 text-slate-500">
+      <div className="w-full max-w-md rounded-[1.5rem] border border-slate-200/90 bg-white p-5 shadow-2xl sm:rounded-[1.75rem] sm:p-7">
+        <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-sm sm:tracking-[0.28em]">Custom Game</p>
+        <h2 className="font-fredoka-display mt-3 text-[1.8rem] leading-none text-slate-800 sm:text-[2.15rem]">Build your board</h2>
+        <p className="font-fredoka-regular mt-4 text-[0.98rem] leading-6 text-slate-500 sm:text-[1.05rem] sm:leading-7">
           Choose your grid size and timer, then press Start when you are ready. The countdown waits for you.
         </p>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <label className="rounded-2xl bg-slate-50 p-4 text-base text-slate-600">
-            <span className="font-fredoka-strong mb-3 block text-[0.82rem] uppercase tracking-[0.24em] text-slate-400">
+          <label className="rounded-[1rem] bg-slate-50 p-4 text-base text-slate-600 sm:rounded-2xl">
+            <span className="font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-[0.82rem] sm:tracking-[0.24em]">
               Grid Size
             </span>
             <input
@@ -636,12 +638,12 @@ export function CustomGameModal({
               max={16}
               value={draftSize}
               onChange={(event) => onSizeChange(Number(event.target.value) || 4)}
-              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg outline-none"
+              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 outline-none sm:text-lg"
             />
           </label>
 
-          <label className="rounded-2xl bg-slate-50 p-4 text-base text-slate-600">
-            <span className="font-fredoka-strong mb-3 block text-[0.82rem] uppercase tracking-[0.24em] text-slate-400">
+          <label className="rounded-[1rem] bg-slate-50 p-4 text-base text-slate-600 sm:rounded-2xl">
+            <span className="font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-[0.82rem] sm:tracking-[0.24em]">
               Time Limit
             </span>
             <input
@@ -650,7 +652,7 @@ export function CustomGameModal({
               max={480}
               value={draftTime}
               onChange={(event) => onTimeChange(Number(event.target.value) || 10)}
-              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg outline-none"
+              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-800 outline-none sm:text-lg"
             />
           </label>
         </div>
@@ -659,14 +661,14 @@ export function CustomGameModal({
           <button
             type="button"
             onClick={onClose}
-            className="font-fredoka-regular rounded-full bg-slate-100 px-5 py-2.5 text-base text-slate-600 transition hover:bg-slate-200"
+            className="font-fredoka-regular rounded-full bg-slate-100 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-200 sm:px-5 sm:text-base"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onStart}
-            className="font-fredoka-strong rounded-full bg-slate-800 px-6 py-3 text-base text-white transition hover:bg-slate-700"
+            className="font-fredoka-strong rounded-full bg-slate-800 px-5 py-3 text-sm text-white transition hover:bg-slate-700 sm:px-6 sm:text-base"
           >
             Start
           </button>

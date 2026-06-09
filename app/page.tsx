@@ -519,18 +519,18 @@ export default function Home() {
   }, [clearDragSession, updateBoard]);
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6">
+    <main className="min-h-screen px-3 py-4 sm:px-6 sm:py-6">
      
-      <header className="fixed left-6 top-5 z-20 sm:left-8 sm:top-6 lg:left-10">
-        <div className="rounded-[1.4rem] border border-white/90 bg-white px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur">
-          <p className="font-fredoka-display text-4xl font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
+      <header className="fixed left-3 top-3 z-20 sm:left-8 sm:top-6 lg:left-10">
+        <div className="rounded-[1.15rem] border border-white/90 bg-white px-3 py-2.5 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur sm:rounded-[1.4rem] sm:px-4 sm:py-3">
+          <p className="font-fredoka-display text-[2rem] font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
             <GradientText className="px-1">ColorTile</GradientText>
           </p>
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[72rem] flex-col">
-        <div className="flex flex-1 flex-col items-center justify-center">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[72rem] flex-col pt-14 sm:min-h-[calc(100vh-3rem)] sm:pt-16">
+        <div className="flex flex-1 flex-col items-center justify-start sm:justify-center">
         <GameHud
           bestMoves={currentBest?.fewestMoves ?? null}
           bestTimeDisplay={
@@ -543,7 +543,7 @@ export default function Home() {
           timeWarning={timeLeft <= 5 && !winState && !loseState}
         />
 
-        <section className="relative mt-2 flex w-full flex-col items-center gap-5 lg:flex-row lg:items-center lg:justify-center lg:gap-6">
+        <section className="relative mt-1 flex w-full flex-col items-center gap-4 sm:mt-2 sm:gap-5 lg:flex-row lg:items-center lg:justify-center lg:gap-6">
           <div className="order-2 lg:order-1 lg:shrink-0">
             <GameControls
               difficulty={difficulty}

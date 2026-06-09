@@ -249,11 +249,15 @@ export function formatTime(seconds: number) {
 }
 
 export function getTileRadiusClass(size: number) {
-  if (size >= 10) {
+  if (size >= 12) {
+    return "rounded-md";
+  }
+
+  if (size >= 9) {
     return "rounded-lg";
   }
 
-  if (size >= 7) {
+  if (size >= 6) {
     return "rounded-xl";
   }
 

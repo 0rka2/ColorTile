@@ -75,6 +75,23 @@ select {
   --board-padding: 0.24rem;
 }
 
+@media (max-width: 640px) {
+  .board-grid--default {
+    --tile-gap: 0.36rem;
+    --board-padding: 0.34rem;
+  }
+
+  .board-grid--compact {
+    --tile-gap: 0.28rem;
+    --board-padding: 0.28rem;
+  }
+
+  .board-grid--dense {
+    --tile-gap: 0.18rem;
+    --board-padding: 0.18rem;
+  }
+}
+
 .tile-surface {
   will-change: transform, box-shadow, opacity;
   transform: translateZ(0);
