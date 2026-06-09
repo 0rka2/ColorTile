@@ -519,9 +519,9 @@ export default function Home() {
   }, [clearDragSession, updateBoard]);
 
   return (
-    <main className="min-h-screen px-3 py-4 sm:px-6 sm:py-6">
+    <main className="h-screen overflow-hidden px-3 py-4 sm:px-6 sm:py-6">
      
-      <header className="fixed left-3 top-3 z-20 sm:left-8 sm:top-6 lg:left-10">
+      <header className="fixed left-3 top-2 z-20 sm:left-8 sm:top-4 md:left-6 md:top-3 lg:left-10 lg:top-4">
         <div className="rounded-[1.15rem] border border-white/90 bg-white px-3 py-2.5 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur sm:rounded-[1.4rem] sm:px-4 sm:py-3">
           <p className="font-fredoka-display text-[2rem] font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
             <GradientText className="px-1">ColorTile</GradientText>
@@ -529,32 +529,24 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[72rem] flex-col pt-14 sm:min-h-[calc(100vh-3rem)] sm:pt-16">
-        <div className="flex flex-1 flex-col items-center justify-start sm:justify-center">
-        <GameHud
-          bestMoves={currentBest?.fewestMoves ?? null}
-          bestTimeDisplay={
-            currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft)
-          }
-          completion={completion}
-          difficultyLabel={activeConfig.label}
-          moves={moves}
-          timeDisplay={formatTime(timeLeft)}
-          timeWarning={timeLeft <= 5 && !winState && !loseState}
-        />
-
-        <section className="relative mt-1 flex w-full flex-col items-center gap-4 sm:mt-2 sm:gap-5 lg:flex-row lg:items-center lg:justify-center lg:gap-6">
-          <div className="order-2 lg:order-1 lg:shrink-0">
-            <GameControls
-              difficulty={difficulty}
-              showDevControls={process.env.NODE_ENV !== "production"}
-              onAutoSolve={handleAutoSolve}
-              onDifficultyChange={handleDifficultyChange}
-              onRestart={() => startGame(activeConfig)}
+      <div className="mx-auto flex h-full w-full max-w-[72rem] flex-col pt-11 sm:pt-14 md:pt-24 lg:pt-12">
+        <div className="flex flex-1 flex-col items-center justify-center md:justify-start lg:justify-center">
+        <section className="relative flex w-full flex-col items-center gap-2 sm:gap-3 md:gap-3 lg:mx-auto lg:-translate-y-[5vh] lg:grid lg:max-w-[58rem] lg:grid-cols-[6rem_minmax(0,42rem)_6rem] lg:items-start lg:gap-x-5 lg:gap-y-3">
+          <div className="order-1 w-full lg:col-start-2 lg:max-w-[42rem]">
+            <GameHud
+              bestMoves={currentBest?.fewestMoves ?? null}
+              bestTimeDisplay={
+                currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft)
+              }
+              completion={completion}
+              difficultyLabel={activeConfig.label}
+              moves={moves}
+              timeDisplay={formatTime(timeLeft)}
+              timeWarning={timeLeft <= 5 && !winState && !loseState}
             />
           </div>
 
-          <div className="order-1 w-full lg:order-2 lg:max-w-[58rem]">
+          <div className="order-3 w-full lg:col-start-2 lg:max-w-[42rem]">
             <GameBoard
               key={boardResetKey}
               allowHoverWhenLocked={allowHoverWhenLocked}
@@ -574,6 +566,18 @@ export default function Home() {
               onPointerDown={handlePointerDown}
             />
           </div>
+
+          <div className="order-4 w-full lg:col-start-1 lg:row-start-2 lg:self-start lg:pt-6">
+            <GameControls
+              difficulty={difficulty}
+              showDevControls={process.env.NODE_ENV !== "production"}
+              onAutoSolve={handleAutoSolve}
+              onDifficultyChange={handleDifficultyChange}
+              onRestart={() => startGame(activeConfig)}
+            />
+          </div>
+
+          <div aria-hidden="true" className="hidden lg:block lg:col-start-3 lg:row-start-2 lg:w-24" />
 
           <GameModal
             activeConfig={activeConfig}
