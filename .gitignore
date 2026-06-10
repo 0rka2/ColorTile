@@ -2,5 +2,6 @@ node_modules/
 .next/
 out/
 dist/
+unit-testing/.compiled/
 .env
 .env.local

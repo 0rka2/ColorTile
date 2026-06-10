@@ -1,21 +1,21 @@
-import { memo, PointerEvent as ReactPointerEvent, useEffect, useState } from "react";
+import { memo, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
+import Confetti from "react-confetti";
 
+import { GradientText } from "../components/ui/gradient-text";
+import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
+import { getConfettiViewportSize } from "./confetti-logic";
+import type { PersonalBestStatus } from "./personal-best";
+import { getThemeModeLabel } from "./settings-options";
+import type { ThemeMode } from "./settings-options";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
-const TILE_DRAG_SHADOW = "0 16px 34px rgba(148, 163, 184, 0.22)";
-const CELEBRATION_CONFETTI = [
-  { left: "8%", top: "12%", color: "#fb7185", delay: 0 },
-  { left: "19%", top: "6%", color: "#fbbf24", delay: 0.08 },
-  { left: "32%", top: "16%", color: "#34d399", delay: 0.16 },
-  { left: "68%", top: "9%", color: "#60a5fa", delay: 0.04 },
-  { left: "82%", top: "14%", color: "#a78bfa", delay: 0.12 },
-  { left: "91%", top: "24%", color: "#f472b6", delay: 0.2 },
-];
+const TILE_DRAG_SHADOW = "0 22px 44px rgba(148, 163, 184, 0.28)";
+const TILE_TILT_MAX_DEGREES = 4;
 const TIME_UP_QUOTES = [
   "Almost there!",
   "That gradient was fighting back.",
@@ -44,6 +44,18 @@ function renderStars(count: number) {
   return "⭐".repeat(count);
 }
 
+function renderWaveText(text: string) {
+  return Array.from(text).map((character, index) => (
+    <span
+      key={`${character}-${index}`}
+      className="gradient-complete-wave"
+      style={{ animationDelay: `${index * 0.035}s` }}
+    >
+      {character === " " ? "\u00A0" : character}
+    </span>
+  ));
+}
+
 export function CheckMark() {
   return (
     <svg
@@ -64,8 +76,8 @@ export function CheckMark() {
 type HudProps = {
   bestMoves: number | null;
   bestTimeDisplay: string;
-  completion: number;
   difficultyLabel: string;
+  gradientQuality: number;
   moves: number;
   timeDisplay: string;
   timeWarning: boolean;
@@ -74,39 +86,101 @@ type HudProps = {
 export function GameHud({
   bestMoves,
   bestTimeDisplay,
-  completion,
   difficultyLabel,
+  gradientQuality,
   moves,
   timeDisplay,
   timeWarning,
 }: Readonly<HudProps>) {
+  const [animatedQuality, setAnimatedQuality] = useState(gradientQuality);
+  const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const startValue = animatedQuality;
+    const targetValue = gradientQuality;
+
+    if (startValue === targetValue || typeof window === "undefined") {
+      setAnimatedQuality(targetValue);
+      return;
+    }
+
+    const durationMs = 520;
+    const startTime = window.performance.now();
+
+    const tick = (timestamp: number) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      const nextValue = Math.round(startValue + (targetValue - startValue) * easedProgress);
+
+      setAnimatedQuality(nextValue);
+
+      if (progress < 1) {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      } else {
+        animationFrameRef.current = null;
+      }
+    };
+
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [gradientQuality]);
+
+  const qualityFill = getGradientQualityFill(animatedQuality);
+
   return (
-    <section className="flex w-full max-w-[42rem] flex-col gap-2 sm:gap-3">
-      <div className="flex min-w-0 items-center justify-between rounded-[1.4rem] border border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur sm:flex-1 sm:rounded-[1.75rem] sm:px-5">
-        <div>
-          <p className={`font-fredoka-display text-[2.4rem] leading-none tracking-tight sm:text-5xl ${timeWarning ? "text-rose-500" : "text-slate-800"}`}>
-            {timeDisplay}
-          </p>
+    <section className="flex w-full max-w-[42rem] flex-col gap-1.5 sm:gap-2 md:gap-2.5">
+      <div className="theme-panel relative overflow-hidden rounded-[1.15rem] border px-3 py-2.5 backdrop-blur sm:rounded-[1.35rem] sm:px-4 sm:py-3 md:px-4.5 md:py-3.5 lg:rounded-[1.75rem] lg:px-5 lg:py-4">
+        <div className="flex min-w-0 items-end justify-between gap-2.5 sm:gap-3">
+          <div className="min-w-0 flex-1">
+            <p className={`font-fredoka-display text-[2rem] leading-none tracking-tight sm:text-[2.35rem] md:text-[2.75rem] lg:text-5xl ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
+              {timeDisplay}
+            </p>
+          </div>
+
+          <div className="flex items-end gap-2 sm:gap-3">
+            <div className="max-w-[7rem] text-right sm:max-w-[8.5rem] md:max-w-none">
+              <p className="theme-text-muted font-fredoka-strong text-[0.88rem] leading-none sm:text-[0.98rem] md:text-[1.05rem]">{difficultyLabel}</p>
+              <div className="theme-chip mt-1.5 inline-flex rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
+                <p className="theme-text-secondary font-fredoka-strong text-[0.88rem] leading-none sm:text-[0.98rem] md:text-[1.08rem]">{moves} moves</p>
+              </div>
+            </div>
+
+            <div className="pb-0.5 text-right">
+              <p className="theme-text-primary font-fredoka-display text-[1.95rem] leading-none tracking-[-0.05em] sm:text-[2.25rem] md:text-[2.6rem] lg:text-[3rem]">
+                {animatedQuality}%
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="max-w-[11rem] text-right sm:max-w-none">
-          <p className="font-fredoka-strong text-[0.95rem] leading-none text-slate-500 sm:text-[1.125rem]">{difficultyLabel}</p>
-          <p className="font-fredoka-strong mt-2 text-[1rem] leading-tight text-slate-800 sm:text-[1.275rem] sm:leading-none">
-            {moves} moves
-            <span className="mx-1.5 text-slate-300">|</span>
-            {completion}%
-          </p>
+        <div className="theme-progress-track relative z-10 mt-2.5 h-2.5 overflow-hidden rounded-full sm:mt-3 md:h-3 lg:mt-4">
+          <motion.div
+            className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
+            animate={{ width: `${qualityFill}%` }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 self-stretch sm:gap-3">
-        <div className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-[1rem] border border-slate-200/90 bg-white/95 px-3 py-3 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur sm:min-w-[6.25rem] sm:gap-2 sm:rounded-[1.15rem]">
-          <p className="font-fredoka-strong text-[0.9rem] leading-tight text-slate-500 sm:text-[1.125rem] sm:leading-none">Best Time</p>
-          <p className="font-fredoka-display text-[1.55rem] leading-none text-slate-800 sm:text-[1.9rem]">{bestTimeDisplay}</p>
+      <div className="grid grid-cols-2 gap-1.5 self-stretch sm:gap-2 md:gap-2.5">
+        <div className="theme-card flex min-w-0 flex-col items-center justify-center gap-1 rounded-[0.95rem] border px-2.5 py-2.5 text-center backdrop-blur sm:gap-1.5 sm:rounded-[1rem] sm:px-3 sm:py-3 md:rounded-[1.1rem] md:px-3.5 md:py-3.5">
+          <p className="theme-text-muted font-fredoka-strong text-[0.82rem] leading-tight sm:text-[0.92rem] md:text-[1rem] sm:leading-none">Best Time</p>
+          <p className="theme-text-primary font-fredoka-display text-[1.35rem] leading-none sm:text-[1.55rem] md:text-[1.72rem]">{bestTimeDisplay}</p>
         </div>
-        <div className="flex min-w-0 flex-col items-center justify-center gap-1.5 rounded-[1rem] border border-slate-200/90 bg-white/95 px-3 py-3 text-center shadow-[0_12px_28px_rgba(148,163,184,0.10)] backdrop-blur sm:min-w-[6.25rem] sm:gap-2 sm:rounded-[1.15rem]">
-          <p className="font-fredoka-strong text-[0.9rem] leading-tight text-slate-500 sm:text-[1.125rem] sm:leading-none">Fewest Moves</p>
-          <p className="font-fredoka-display text-[1.55rem] leading-none text-slate-800 sm:text-[1.9rem]">{bestMoves ?? "-"}</p>
+        <div className="theme-card flex min-w-0 flex-col items-center justify-center gap-1 rounded-[0.95rem] border px-2.5 py-2.5 text-center backdrop-blur sm:gap-1.5 sm:rounded-[1rem] sm:px-3 sm:py-3 md:rounded-[1.1rem] md:px-3.5 md:py-3.5">
+          <p className="theme-text-muted font-fredoka-strong text-[0.82rem] leading-tight sm:text-[0.92rem] md:text-[1rem] sm:leading-none">Fewest Moves</p>
+          <p className="theme-text-primary font-fredoka-display text-[1.35rem] leading-none sm:text-[1.55rem] md:text-[1.72rem]">{bestMoves ?? "-"}</p>
         </div>
       </div>
     </section>
@@ -119,20 +193,24 @@ type BoardProps = {
   boardDensityClass: string;
   dragSession: {
     color: string;
+    grabX: number;
     height: number;
     index: number;
     isCorrect: boolean;
     offsetX: number;
     offsetY: number;
+    pointerX: number;
+    pointerY: number;
     pointerId: number;
     tileId: string;
     width: number;
   } | null;
   draggedIndex: number | null;
+  confettiActive: boolean;
   getTileRef: (tileId: string) => (element: HTMLButtonElement | null) => void;
   setDragOverlayRef: (element: HTMLDivElement | null) => void;
   tileRadiusClass: string;
-  winCelebrationActive: boolean;
+  winWaveActive: boolean;
   winState: boolean;
   loseState: boolean;
   isTileCorrect: (tile: Tile, index: number) => boolean;
@@ -148,6 +226,8 @@ type TileButtonProps = {
   isDragging: boolean;
   tile: Tile;
   tileRadiusClass: string;
+  winWaveActive: boolean;
+  winWaveDelay: number;
   winState: boolean;
   loseState: boolean;
   tileRef: (element: HTMLButtonElement | null) => void;
@@ -162,11 +242,36 @@ const TileButton = memo(function TileButton({
   isDragging,
   tile,
   tileRadiusClass,
+  winWaveActive,
+  winWaveDelay,
   winState,
   loseState,
   tileRef,
   onPointerDown,
 }: Readonly<TileButtonProps>) {
+  const [isHovering, setIsHovering] = useState(false);
+  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 });
+
+  const resetTilt = () => {
+    setIsHovering(false);
+    setTilt({ rotateX: 0, rotateY: 0 });
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!canHover || isDragging) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const relativeX = (event.clientX - bounds.left) / bounds.width;
+    const relativeY = (event.clientY - bounds.top) / bounds.height;
+    const rotateY = (relativeX - 0.5) * TILE_TILT_MAX_DEGREES * 2;
+    const rotateX = (0.5 - relativeY) * TILE_TILT_MAX_DEGREES * 2;
+
+    setIsHovering(true);
+    setTilt({ rotateX, rotateY });
+  };
+
   return (
     <motion.button
       initial={false}
@@ -175,31 +280,40 @@ const TileButton = memo(function TileButton({
       data-tile-index={index}
       onPointerDown={(event) => onPointerDown(event, index)}
       disabled={winState || loseState}
-      transition={{
-        duration: 0.18,
-        ease: [0.25, 0.1, 0.25, 1],
-      }}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={resetTilt}
+      onBlur={resetTilt}
       animate={{
         opacity: isDragging ? 0 : 1,
-        scale: 1,
-        y: 0,
-        boxShadow: TILE_REST_SHADOW,
-        filter: "saturate(1) brightness(1)",
+        rotateX: winWaveActive ? 0 : tilt.rotateX,
+        rotateY: winWaveActive ? 0 : tilt.rotateY,
+        scale: winWaveActive ? [1, 1.06, 1.015, 0.992, 1] : isHovering && !isDragging ? 1.02 : 1,
+        y: winWaveActive ? [0, -5, -2, 0.5, 0] : isHovering && !isDragging ? -5 : 0,
+        boxShadow: winWaveActive
+          ? [TILE_REST_SHADOW, TILE_HOVER_SHADOW, TILE_DRAG_SHADOW, TILE_HOVER_SHADOW, TILE_REST_SHADOW]
+          : isHovering && !isDragging
+            ? TILE_HOVER_SHADOW
+            : TILE_REST_SHADOW,
+        filter: isHovering && !isDragging ? "saturate(1.04) brightness(1.02)" : "saturate(1) brightness(1)",
       }}
-      whileHover={
-        canHover && !isDragging
+      transition={
+        winWaveActive
           ? {
-              y: -5,
-              scale: 1.02,
-              boxShadow: TILE_HOVER_SHADOW,
-              filter: "saturate(1.04) brightness(1.02)",
+              duration: 0.4,
+              ease: [0.22, 1, 0.36, 1],
+              delay: winWaveDelay,
             }
-          : undefined
+          : {
+              type: "spring",
+              stiffness: 360,
+              damping: 24,
+              mass: 0.85,
+            }
       }
       whileTap={
         canDrag && !isDragging
           ? {
-              scale: 0.99,
+              scale: 1.01,
               boxShadow: TILE_DRAG_SHADOW,
               filter: "saturate(1.08) brightness(1.04)",
             }
@@ -229,6 +343,8 @@ const TileButton = memo(function TileButton({
     previousProps.isDragging === nextProps.isDragging &&
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
+    previousProps.winWaveActive === nextProps.winWaveActive &&
+    previousProps.winWaveDelay === nextProps.winWaveDelay &&
     previousProps.winState === nextProps.winState &&
     previousProps.loseState === nextProps.loseState
   );
@@ -240,10 +356,11 @@ export const GameBoard = memo(function GameBoard({
   boardDensityClass,
   dragSession,
   draggedIndex,
+  confettiActive,
   getTileRef,
   setDragOverlayRef,
   tileRadiusClass,
-  winCelebrationActive,
+  winWaveActive,
   winState,
   loseState,
   isTileCorrect,
@@ -251,6 +368,8 @@ export const GameBoard = memo(function GameBoard({
   onPointerDown,
 }: Readonly<BoardProps>) {
   const size = Math.sqrt(board.length);
+  const initialOverlayX = dragSession ? dragSession.pointerX - dragSession.offsetX : 0;
+  const initialOverlayY = dragSession ? dragSession.pointerY - dragSession.offsetY : 0;
   const dragOverlay =
     dragSession && typeof document !== "undefined"
       ? createPortal(
@@ -265,7 +384,8 @@ export const GameBoard = memo(function GameBoard({
               left: 0,
               opacity: 1,
               top: 0,
-              transform: "translate3d(0, 0, 0) scale(0.985)",
+              transform: `translate3d(${initialOverlayX}px, ${initialOverlayY}px, 0) scale(1.04) rotate(0deg)`,
+              transition: "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
               width: `${dragSession.width}px`,
               zIndex: 50,
             }}
@@ -280,41 +400,41 @@ export const GameBoard = memo(function GameBoard({
   return (
     <>
       <motion.div
-        className="mx-auto aspect-square w-full max-w-[58rem] rounded-[1rem] bg-gradient-to-br from-white/85 via-slate-100/70 to-sky-100/65 p-px shadow-[0_22px_56px_rgba(15,23,42,0.10),0_10px_24px_rgba(15,23,42,0.06)] sm:rounded-[1.2rem] sm:shadow-[0_28px_80px_rgba(15,23,42,0.12),0_12px_28px_rgba(15,23,42,0.07)]"
+        className="theme-board-frame mx-auto aspect-square w-full max-w-[42rem] rounded-[0.95rem] p-px sm:rounded-[1rem] md:rounded-[1.08rem] lg:max-w-[58rem] lg:rounded-[1.2rem]"
         initial={false}
         animate={
-          winCelebrationActive
+          confettiActive
             ? {
                 scale: [1, 1.01, 1],
                 boxShadow: [
-                  "0 28px 80px rgba(15,23,42,0.12), 0 12px 28px rgba(15,23,42,0.07)",
-                  "0 34px 96px rgba(96,165,250,0.18), 0 18px 34px rgba(52,211,153,0.12)",
-                  "0 28px 80px rgba(15,23,42,0.12), 0 12px 28px rgba(15,23,42,0.07)",
+                  "var(--board-frame-shadow)",
+                  "var(--board-win-shadow)",
+                  "var(--board-frame-shadow)",
                 ],
               }
             : {
                 scale: 1,
-                boxShadow: "0 28px 80px rgba(15,23,42,0.12), 0 12px 28px rgba(15,23,42,0.07)",
+                boxShadow: "var(--board-frame-shadow)",
               }
         }
         transition={
-          winCelebrationActive
-            ? { duration: 1.2, ease: [0.22, 1, 0.36, 1], repeat: Infinity, repeatDelay: 0.25 }
+          confettiActive
+            ? { duration: 0.8, ease: [0.22, 1, 0.36, 1] }
             : { duration: 0.2 }
         }
       >
-        <div className="relative h-full w-full overflow-hidden rounded-[calc(1rem-1px)] bg-[rgba(255,255,255,0.85)] p-1.5 backdrop-blur-[20px] sm:rounded-[calc(1.2rem-1px)] sm:p-2.5">
-          {winCelebrationActive && (
+        <div className="theme-board-shell relative h-full w-full overflow-hidden rounded-[calc(0.95rem-1px)] p-1 backdrop-blur-[20px] sm:rounded-[calc(1rem-1px)] sm:p-1.25 md:rounded-[calc(1.08rem-1px)] md:p-1.5 lg:rounded-[calc(1.2rem-1px)] lg:p-2.5">
+          {confettiActive && (
             <motion.div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+              className="theme-board-shine pointer-events-none absolute inset-y-0 -left-1/3 w-1/2"
               initial={{ x: "-30%" }}
               animate={{ x: "260%" }}
-              transition={{ duration: 1.4, ease: "linear", repeat: Infinity, repeatDelay: 0.3 }}
+              transition={{ duration: 1.1, ease: "linear" }}
             />
           )}
           <div
-            className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[1.05rem] sm:rounded-[1.5rem]`}
+            className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[0.95rem] sm:rounded-[1.05rem] md:rounded-[1.12rem] lg:rounded-[1.5rem]`}
             style={{
               gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
             }}
@@ -336,6 +456,8 @@ export const GameBoard = memo(function GameBoard({
                   isDragging={isDragging && dragSession !== null}
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
+                  winWaveActive={winWaveActive}
+                  winWaveDelay={index * 0.045}
                   winState={winState}
                   loseState={loseState}
                   tileRef={getTileRef(tile.id)}
@@ -351,6 +473,54 @@ export const GameBoard = memo(function GameBoard({
   );
 });
 
+type ConfettiProps = {
+  active: boolean;
+};
+
+export function WinConfetti({ active }: Readonly<ConfettiProps>) {
+  const [viewportSize, setViewportSize] = useState(() =>
+    typeof window === "undefined" ? { width: 0, height: 0 } : getConfettiViewportSize(window),
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateViewportSize = () => {
+      setViewportSize(getConfettiViewportSize(window));
+    };
+
+    updateViewportSize();
+    window.addEventListener("resize", updateViewportSize);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportSize);
+    };
+  }, []);
+
+  if (!active || typeof document === "undefined" || viewportSize.width === 0 || viewportSize.height === 0) {
+    return null;
+  }
+
+  return createPortal(
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[12] overflow-hidden">
+      <Confetti
+        colors={["#ff2344", "#fbbf24", "#34d399", "#60a5fa", "#a78bfa", "#f472b6"]}
+        gravity={0.18}
+        initialVelocityY={{ min: 10, max: 22 }}
+        numberOfPieces={300}
+        recycle={false}
+        run={active}
+        tweenDuration={8500}
+        width={viewportSize.width}
+        height={viewportSize.height}
+      />
+    </div>,
+    document.body,
+  );
+}
+
 type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
@@ -358,6 +528,7 @@ type ModalProps = {
   loseState: boolean;
   moves: number;
   onRestart: () => void;
+  personalBestStatus: PersonalBestStatus;
   timeDisplay: string;
   winState: boolean;
 };
@@ -369,6 +540,7 @@ export function GameModal({
   loseState,
   moves,
   onRestart,
+  personalBestStatus,
   timeDisplay,
   winState,
 }: Readonly<ModalProps>) {
@@ -378,82 +550,77 @@ export function GameModal({
 
   const timeUpQuote = TIME_UP_QUOTES[(moves + completion + activeConfig.size) % TIME_UP_QUOTES.length];
   const timeUpStars = getTimeUpStars(completion);
+  const personalBestLabel = personalBestStatus.hasNewPersonalBest ? "New Personal Best!" : null;
 
   if (typeof document === "undefined") {
     return null;
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-950/28 p-4 backdrop-blur-sm">
+    <div className="theme-overlay fixed inset-0 z-20 flex items-center justify-center p-4 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, y: 28, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-[40.5rem] overflow-hidden rounded-[2rem] border border-white/80 bg-white p-8 text-center shadow-[0_32px_90px_rgba(15,23,42,0.24),0_14px_34px_rgba(15,23,42,0.12)] sm:p-10"
+        className="theme-modal relative w-full max-w-[40.5rem] overflow-hidden rounded-[2rem] border p-8 text-center sm:p-10"
       >
-        {winState &&
-          CELEBRATION_CONFETTI.map((piece, index) => (
-            <motion.span
-              key={`${piece.left}-${piece.top}`}
-              aria-hidden="true"
-              className="absolute h-3 w-3 rounded-sm"
-              style={{ backgroundColor: piece.color, left: piece.left, top: piece.top }}
-              initial={{ opacity: 0, y: -8, rotate: -18 }}
-              animate={{ opacity: [0, 1, 1, 0], y: [0, 8, 22, 34], rotate: [-18, 12, 28] }}
-              transition={{ duration: 1.5, delay: piece.delay, repeat: Infinity, repeatDelay: 0.4 + index * 0.03 }}
-            />
-          ))}
-
         <div className="relative z-10">
           {winState ? (
             <>
-              <p className="font-fredoka-strong text-sm uppercase tracking-[0.3em] text-slate-400">Perfect Gradient</p>
-              <h2 className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] text-slate-900 sm:mt-4 sm:text-[2.35rem]">Gradient Complete!</h2>
+              <p className="theme-text-muted font-fredoka-strong text-sm uppercase tracking-[0.3em]">Perfect Gradient</p>
+              <h2 className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] sm:mt-4 sm:text-[2.35rem]">
+                <GradientText className="gradient-text--modal px-1">{renderWaveText("Gradient Complete!")}</GradientText>
+              </h2>
               <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.24em] text-amber-500 sm:mt-5 sm:text-lg">
                 {renderStars(3)}
               </div>
-              <p className="font-fredoka-regular mt-4 text-[0.98rem] leading-6 text-slate-500 sm:mt-5 sm:text-[1.05rem] sm:leading-7">
+              <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.98rem] leading-6 sm:mt-5 sm:text-[1.05rem] sm:leading-7">
                 You restored the gradient with a clean finish on {activeConfig.label.toLowerCase()}.
               </p>
+              {personalBestStatus.hasNewPersonalBest && personalBestLabel && (
+                <p className="font-fredoka-strong mt-5 text-[0.82rem] uppercase tracking-[0.22em] text-amber-600 sm:mt-6 sm:text-[0.88rem]">
+                  {personalBestLabel}
+                </p>
+              )}
               <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
-                <div className="rounded-[1rem] border border-slate-100 bg-white px-2 py-3.5 shadow-[0_16px_34px_rgba(148,163,184,0.12)] sm:rounded-[1.4rem] sm:px-4 sm:py-5">
-                  <p className="font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] text-slate-400 sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
-                  <p className="font-fredoka-strong mt-2 text-[1.3rem] leading-none text-slate-900 sm:mt-3 sm:text-[1.7rem]">{timeDisplay}</p>
+                <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                  <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
+                  <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{timeDisplay}</p>
                 </div>
-                <div className="rounded-[1rem] border border-slate-100 bg-white px-2 py-3.5 shadow-[0_16px_34px_rgba(148,163,184,0.12)] sm:rounded-[1.4rem] sm:px-4 sm:py-5">
-                  <p className="font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] text-slate-400 sm:text-[0.78rem] sm:tracking-[0.22em]">Moves</p>
-                  <p className="font-fredoka-strong mt-2 text-[1.3rem] leading-none text-slate-900 sm:mt-3 sm:text-[1.7rem]">{moves}</p>
+                <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                  <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Moves</p>
+                  <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{moves}</p>
                 </div>
-                <div className="rounded-[1rem] border border-slate-100 bg-white px-2 py-3.5 shadow-[0_16px_34px_rgba(148,163,184,0.12)] sm:rounded-[1.4rem] sm:px-4 sm:py-5">
-                  <p className="font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] text-slate-400 sm:text-[0.78rem] sm:tracking-[0.22em]">Accuracy</p>
-                  <p className="font-fredoka-strong mt-2 text-[1.3rem] leading-none text-slate-900 sm:mt-3 sm:text-[1.7rem]">{accuracy}%</p>
+                <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                  <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Accuracy</p>
+                  <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{accuracy}%</p>
                 </div>
               </div>
             </>
           ) : (
               <div className="mx-auto mt-3 max-w-lg">
-              <h2 className="font-fredoka-display text-[2.35rem] leading-none tracking-[-0.05em] text-slate-900">Time&apos;s up</h2>
+              <h2 className="theme-text-primary font-fredoka-display text-[2.35rem] leading-none tracking-[-0.05em]">Time&apos;s up</h2>
               {timeUpStars > 0 && (
                 <p className="font-fredoka-strong mt-6 text-lg leading-none tracking-[0.24em] text-amber-500">{renderStars(timeUpStars)}</p>
               )}
               <div className="mt-7 grid grid-cols-2 gap-4 sm:mt-8 sm:gap-5">
-                <div className="rounded-[1.3rem] border border-slate-100 bg-white px-4 py-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)] sm:rounded-[1.4rem] sm:px-5 sm:py-5">
-                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em] text-slate-400">Gradient Completion</p>
-                  <p className="font-fredoka-strong mt-3 text-[1.7rem] leading-none text-slate-900 sm:mt-4 sm:text-[1.9rem]">{completion}%</p>
+                <div className="theme-card rounded-[1.3rem] border px-4 py-4 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
+                  <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em]">Gradient Completion</p>
+                  <p className="theme-text-primary font-fredoka-strong mt-3 text-[1.7rem] leading-none sm:mt-4 sm:text-[1.9rem]">{completion}%</p>
                 </div>
-                <div className="rounded-[1.3rem] border border-slate-100 bg-white px-4 py-4 shadow-[0_16px_34px_rgba(148,163,184,0.12)] sm:rounded-[1.4rem] sm:px-5 sm:py-5">
-                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em] text-slate-400">Moves</p>
-                  <p className="font-fredoka-strong mt-3 text-[1.7rem] leading-none text-slate-900 sm:mt-4 sm:text-[1.9rem]">{moves}</p>
+                <div className="theme-card rounded-[1.3rem] border px-4 py-4 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
+                  <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em]">Moves</p>
+                  <p className="theme-text-primary font-fredoka-strong mt-3 text-[1.7rem] leading-none sm:mt-4 sm:text-[1.9rem]">{moves}</p>
                 </div>
               </div>
-              <p className="font-fredoka-regular mt-6 text-[1.02rem] leading-7 text-slate-500 sm:mt-7 sm:text-[1.08rem] sm:leading-8">{timeUpQuote}</p>
+              <p className="theme-text-muted font-fredoka-regular mt-6 text-[1.02rem] leading-7 sm:mt-7 sm:text-[1.08rem] sm:leading-8">{timeUpQuote}</p>
             </div>
           )}
 
           <button
             type="button"
             onClick={onRestart}
-            className="font-fredoka-strong mt-8 rounded-full bg-slate-800 px-6 py-3 text-base text-white shadow-[0_18px_34px_rgba(15,23,42,0.2)] transition hover:bg-slate-700 sm:mt-10 sm:px-7 sm:py-3.5"
+            className="theme-button-primary font-fredoka-strong mt-8 rounded-full px-6 py-3 text-base shadow-[0_18px_34px_rgba(15,23,42,0.2)] sm:mt-10 sm:px-7 sm:py-3.5"
           >
             Play Again
           </button>
@@ -468,7 +635,9 @@ type ControlsProps = {
   onAutoSolve: () => void;
   onDifficultyChange: (difficulty: DifficultyKey) => void;
   onRestart: () => void;
+  onThemeModeChange: (themeMode: ThemeMode) => void;
   showDevControls: boolean;
+  themeMode: ThemeMode;
 };
 
 export function GameControls({
@@ -476,24 +645,28 @@ export function GameControls({
   onAutoSolve,
   onDifficultyChange,
   onRestart: onShuffle,
+  onThemeModeChange,
   showDevControls,
+  themeMode,
 }: Readonly<ControlsProps>) {
   const [isModesOpen, setIsModesOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
-    if (!isModesOpen) {
+    if (!isModesOpen && !isSettingsOpen) {
       return;
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsModesOpen(false);
+        setIsSettingsOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isModesOpen]);
+  }, [isModesOpen, isSettingsOpen]);
 
   const handleModeSelect = (nextDifficulty: DifficultyKey) => {
     onDifficultyChange(nextDifficulty);
@@ -502,14 +675,14 @@ export function GameControls({
 
   return (
     <section className="flex w-full justify-center lg:w-auto">
-      <div className="grid w-full max-w-[26rem] grid-cols-3 gap-2 sm:gap-3 lg:flex lg:w-auto lg:max-w-none lg:flex-col">
+      <div className="grid w-full max-w-[42rem] grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 md:gap-2.5 lg:flex lg:w-auto lg:max-w-none lg:flex-col">
           <button
             type="button"
             onClick={() => setIsModesOpen(true)}
             aria-haspopup="dialog"
             aria-expanded={isModesOpen}
             aria-label="Open modes"
-            className="font-fredoka-strong flex min-h-[4.75rem] w-full items-center justify-center rounded-[1.1rem] bg-slate-800 px-3 py-3 text-center text-[0.92rem] leading-tight text-white shadow-[0_14px_26px_rgba(15,23,42,0.16)] transition hover:bg-slate-700 sm:min-h-[5.25rem] sm:rounded-[1.25rem] sm:text-[0.95rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem]"
+            className="theme-button-primary font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
           >
             Modes
           </button>
@@ -517,16 +690,27 @@ export function GameControls({
           <button
             type="button"
             onClick={onShuffle}
-            className="font-fredoka-strong flex min-h-[4.75rem] w-full items-center justify-center rounded-[1.1rem] bg-slate-800 px-3 py-3 text-center text-[0.92rem] leading-tight text-white transition hover:bg-slate-700 sm:min-h-[5.25rem] sm:rounded-[1.25rem] sm:text-[0.95rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem]"
+            className="theme-button-primary font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
           >
             Shuffle
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={isSettingsOpen}
+            aria-label="Open settings"
+            className="theme-button-primary font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
+          >
+            Settings
           </button>
 
           {showDevControls && (
             <button
               type="button"
               onClick={onAutoSolve}
-              className="font-fredoka-strong flex min-h-[4.75rem] w-full items-center justify-center rounded-[1.1rem] bg-amber-100 px-3 py-3 text-center text-[0.92rem] leading-tight text-amber-900 transition hover:bg-amber-200 sm:min-h-[5.25rem] sm:rounded-[1.25rem] sm:text-[0.95rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem]"
+              className="theme-button-accent font-fredoka-strong col-span-2 flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:col-span-1 sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
             >
               Auto Solve
             </button>
@@ -536,7 +720,7 @@ export function GameControls({
       {isModesOpen && typeof document !== "undefined" &&
         createPortal(
           <motion.div
-            className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/18 p-4 backdrop-blur-sm"
+            className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
@@ -546,21 +730,21 @@ export function GameControls({
               role="dialog"
               aria-modal="true"
               aria-label="Select game mode"
-              className="relative w-full max-w-[35rem] rounded-[1.5rem] border border-slate-200/90 bg-white p-7 shadow-[0_24px_60px_rgba(15,23,42,0.16)] sm:rounded-[1.75rem] sm:p-8"
+              className="theme-modal relative w-full max-w-[35rem] rounded-[1.5rem] border p-7 sm:rounded-[1.75rem] sm:p-8"
               initial={{ opacity: 0, y: 18, scale: 0.94 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-sm sm:tracking-[0.24em]">Modes</p>
-                  <h2 className="font-fredoka-display mt-2 text-[1.9rem] leading-none text-slate-800 sm:text-[2.2rem]">Choose a mode</h2>
+                  <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] sm:text-sm sm:tracking-[0.24em]">Modes</p>
+                  <h2 className="theme-text-primary font-fredoka-display mt-2 text-[1.9rem] leading-none sm:text-[2.2rem]">Choose a mode</h2>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsModesOpen(false)}
                   aria-label="Close modes window"
-                  className="font-fredoka-strong flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                  className="theme-close-button font-fredoka-strong flex h-11 w-11 items-center justify-center rounded-full"
                 >
                   {"\u00D7"}
                 </button>
@@ -580,14 +764,90 @@ export function GameControls({
                         isCustom ? "col-span-2" : ""
                       } ${
                         isActive
-                          ? "bg-slate-800 text-white"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ? "theme-button-primary"
+                          : "theme-button-secondary"
                       }`}
                     >
                       {DIFFICULTY_LABELS[key]}
                     </button>
                   );
                 })}
+              </div>
+            </motion.div>
+          </motion.div>,
+          document.body,
+        )}
+
+      {isSettingsOpen && typeof document !== "undefined" &&
+        createPortal(
+          <motion.div
+            className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="absolute inset-0" onClick={() => setIsSettingsOpen(false)} aria-hidden="true" />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Settings"
+              className="theme-modal relative w-full max-w-[35rem] rounded-[1.5rem] border p-7 sm:rounded-[1.75rem] sm:p-8"
+              initial={{ opacity: 0, y: 18, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="theme-text-muted font-fredoka-strong text-[1.2rem] uppercase tracking-[0.2em] l:text-l sm:tracking-[0.24em]">Settings</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  aria-label="Close settings window"
+                  className="theme-close-button font-fredoka-strong flex h-11 w-11 items-center justify-center rounded-full"
+                >
+                  {"\u00D7"}
+                </button>
+              </div>
+
+              <div className="theme-panel-muted mt-6 rounded-[1.25rem] border px-4 py-4 sm:px-5 sm:py-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="theme-text-secondary font-fredoka-strong text-[1.05rem] leading-none sm:text-[1.15rem]">
+                    Theme:
+                  </p>
+
+                  <div
+                    role="group"
+                    aria-label="Theme switch"
+                    className="theme-switch-track relative flex h-14 w-full items-center rounded-full border p-1.5 sm:w-[16rem]"
+                  >
+                    <motion.span
+                      aria-hidden="true"
+                      className="theme-switch-thumb absolute inset-y-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-full"
+                      animate={{ x: themeMode === "light" ? "0%" : "100%" }}
+                      transition={{ type: "spring", stiffness: 360, damping: 28, mass: 0.8 }}
+                    />
+
+                    <span className="relative z-10 grid w-full grid-cols-2">
+                      {(["light", "dark"] as const).map((mode) => {
+                        const isActive = themeMode === mode;
+
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => onThemeModeChange(mode)}
+                            className={`font-fredoka-strong flex h-11 items-center justify-center rounded-full text-base leading-none transition-colors duration-200 ${
+                              isActive ? "text-white" : "theme-text-muted"
+                            }`}
+                          >
+                            {getThemeModeLabel(mode)}
+                          </button>
+                        );
+                      })}
+                    </span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </motion.div>,
@@ -627,17 +887,17 @@ export function CustomGameModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/18 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-[40.5rem] rounded-[1.5rem] border border-slate-200/90 bg-white p-7 shadow-2xl sm:rounded-[1.75rem] sm:p-9">
-        <p className="font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-sm sm:tracking-[0.28em]">Custom Game</p>
-        <h2 className="font-fredoka-display mt-3 text-[1.95rem] leading-none text-slate-800 sm:text-[2.4rem]">Build your board</h2>
-        <p className="font-fredoka-regular mt-4 text-[0.98rem] leading-6 text-slate-500 sm:text-[1.05rem] sm:leading-7">
+    <div className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="theme-modal w-full max-w-[40.5rem] rounded-[1.5rem] border p-7 sm:rounded-[1.75rem] sm:p-9">
+        <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] sm:text-sm sm:tracking-[0.28em]">Custom Game</p>
+        <h2 className="theme-text-primary font-fredoka-display mt-3 text-[1.95rem] leading-none sm:text-[2.4rem]">Build your board</h2>
+        <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.98rem] leading-6 sm:text-[1.05rem] sm:leading-7">
           Choose your grid size and timer, then press Start when you are ready. The countdown waits for you.
         </p>
 
         <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
-          <label className="rounded-[1rem] bg-slate-50 p-4 text-base text-slate-600 sm:rounded-2xl">
-            <span className="font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-[0.82rem] sm:tracking-[0.24em]">
+          <label className="theme-panel-muted rounded-[1rem] p-4 text-base sm:rounded-2xl">
+            <span className="theme-text-muted font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] sm:text-[0.82rem] sm:tracking-[0.24em]">
               Grid Size
             </span>
             <input
@@ -646,15 +906,15 @@ export function CustomGameModal({
               max={maxSize}
               value={draftSize}
               onChange={(event) => onSizeChange(Number(event.target.value) || 4)}
-              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-800 outline-none sm:text-[1.05rem]"
+              className="theme-input font-fredoka-regular w-full rounded-xl border px-4 py-3.5 text-base outline-none sm:text-[1.05rem]"
             />
-            <span className="font-fredoka-regular mt-2 block text-sm text-slate-500">
+            <span className="theme-text-muted font-fredoka-regular mt-2 block text-sm">
               Max for this screen: {maxSize} x {maxSize}
             </span>
           </label>
 
-          <label className="rounded-[1rem] bg-slate-50 p-4 text-base text-slate-600 sm:rounded-2xl">
-            <span className="font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] text-slate-400 sm:text-[0.82rem] sm:tracking-[0.24em]">
+          <label className="theme-panel-muted rounded-[1rem] p-4 text-base sm:rounded-2xl">
+            <span className="theme-text-muted font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] sm:text-[0.82rem] sm:tracking-[0.24em]">
               Time Limit
             </span>
             <input
@@ -663,7 +923,7 @@ export function CustomGameModal({
               max={480}
               value={draftTime}
               onChange={(event) => onTimeChange(Number(event.target.value) || 10)}
-              className="font-fredoka-regular w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-800 outline-none sm:text-[1.05rem]"
+              className="theme-input font-fredoka-regular w-full rounded-xl border px-4 py-3.5 text-base outline-none sm:text-[1.05rem]"
             />
           </label>
         </div>
@@ -672,14 +932,14 @@ export function CustomGameModal({
           <button
             type="button"
             onClick={onClose}
-            className="font-fredoka-regular rounded-full bg-slate-100 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-200 sm:px-5 sm:text-base"
+            className="theme-button-secondary font-fredoka-regular rounded-full px-4 py-2.5 text-sm sm:px-5 sm:text-base"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onStart}
-            className="font-fredoka-strong rounded-full bg-slate-800 px-5 py-3 text-sm text-white transition hover:bg-slate-700 sm:px-6 sm:text-base"
+            className="theme-button-primary font-fredoka-strong rounded-full px-5 py-3 text-sm sm:px-6 sm:text-base"
           >
             Start
           </button>

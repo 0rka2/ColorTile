@@ -1,0 +1,27 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { getThemeModeLabel, resolveThemeMode, THEME_MODE_STORAGE_KEY, THEME_MODES } from "../app/settings-options";
+
+test("THEME_MODES exposes light and dark in a stable order", () => {
+  assert.deepEqual(
+    THEME_MODES,
+    ["light", "dark"],
+  );
+});
+
+test("getThemeModeLabel returns the expected switch labels", () => {
+  assert.equal(getThemeModeLabel("light"), "Light");
+  assert.equal(getThemeModeLabel("dark"), "Dark");
+});
+
+test("resolveThemeMode falls back to light for unknown stored values", () => {
+  assert.equal(resolveThemeMode("light"), "light");
+  assert.equal(resolveThemeMode("dark"), "dark");
+  assert.equal(resolveThemeMode("system"), "light");
+  assert.equal(resolveThemeMode(null), "light");
+});
+
+test("THEME_MODE_STORAGE_KEY stays stable for persistence", () => {
+  assert.equal(THEME_MODE_STORAGE_KEY, "colortile-theme-mode");
+});
