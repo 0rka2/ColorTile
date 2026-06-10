@@ -3,8 +3,8 @@ import { DifficultyConfig, DifficultyKey, PresetDifficultyKey, Tile } from "./ga
 export const PRESET_DIFFICULTIES: Record<PresetDifficultyKey, DifficultyConfig> = {
   normal: { label: "Normal", size: 4, time:  120},
   hard: { label: "Hard", size: 6, time: 180},
-  expert: { label: "Expert", size: 7, time: 240 },
-  extreme: { label: "Extreme", size: 9, time: 300 },
+  expert: { label: "Expert", size: 7, time: 360 },
+  extreme: { label: "Extreme", size: 9, time: 420 },
 };
 
 export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = {
