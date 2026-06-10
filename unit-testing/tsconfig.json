@@ -14,6 +14,7 @@
     "../app/game-logic.ts",
     "../app/game-types.ts",
     "../app/confetti-logic.ts",
+    "../app/gradient-quality.ts",
     "../app/win-sequence.ts",
     "./**/*.ts"
   ],

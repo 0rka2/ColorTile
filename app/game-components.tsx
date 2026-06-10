@@ -1,9 +1,10 @@
-import { memo, PointerEvent as ReactPointerEvent, useEffect, useState } from "react";
+import { memo, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import Confetti from "react-confetti";
 
 import { GradientText } from "../components/ui/gradient-text";
+import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
 import { getConfettiViewportSize } from "./confetti-logic";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
@@ -60,8 +61,8 @@ export function CheckMark() {
 type HudProps = {
   bestMoves: number | null;
   bestTimeDisplay: string;
-  completion: number;
   difficultyLabel: string;
+  gradientQuality: number;
   moves: number;
   timeDisplay: string;
   timeWarning: boolean;
@@ -70,28 +71,90 @@ type HudProps = {
 export function GameHud({
   bestMoves,
   bestTimeDisplay,
-  completion,
   difficultyLabel,
+  gradientQuality,
   moves,
   timeDisplay,
   timeWarning,
 }: Readonly<HudProps>) {
+  const [animatedQuality, setAnimatedQuality] = useState(gradientQuality);
+  const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const startValue = animatedQuality;
+    const targetValue = gradientQuality;
+
+    if (startValue === targetValue || typeof window === "undefined") {
+      setAnimatedQuality(targetValue);
+      return;
+    }
+
+    const durationMs = 520;
+    const startTime = window.performance.now();
+
+    const tick = (timestamp: number) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      const nextValue = Math.round(startValue + (targetValue - startValue) * easedProgress);
+
+      setAnimatedQuality(nextValue);
+
+      if (progress < 1) {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      } else {
+        animationFrameRef.current = null;
+      }
+    };
+
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [gradientQuality]);
+
+  const qualityFill = getGradientQualityFill(animatedQuality);
+
   return (
     <section className="flex w-full max-w-[42rem] flex-col gap-2 sm:gap-3">
-      <div className="flex min-w-0 items-center justify-between rounded-[1.4rem] border border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur sm:flex-1 sm:rounded-[1.75rem] sm:px-5">
-        <div>
-          <p className={`font-fredoka-display text-[2.4rem] leading-none tracking-tight sm:text-5xl ${timeWarning ? "text-rose-500" : "text-slate-800"}`}>
-            {timeDisplay}
-          </p>
+      <div className="relative overflow-hidden rounded-[1.4rem] border border-slate-200/90 bg-white/95 px-4 py-3 shadow-[0_16px_44px_rgba(148,163,184,0.12)] backdrop-blur sm:rounded-[1.75rem] sm:px-5 sm:py-4">
+        <div className="flex min-w-0 items-end justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className={`font-fredoka-display text-[2.4rem] leading-none tracking-tight sm:text-5xl ${timeWarning ? "text-rose-500" : "text-slate-800"}`}>
+              {timeDisplay}
+            </p>
+          </div>
+
+          <div className="flex items-end gap-3 sm:gap-4">
+            <div className="max-w-[9rem] text-right sm:max-w-none">
+              <p className="font-fredoka-strong text-[0.95rem] leading-none text-slate-500 sm:text-[1.125rem]">{difficultyLabel}</p>
+              <div className="mt-2 inline-flex rounded-full bg-slate-100 px-3 py-1.5 shadow-inner shadow-white/60">
+                <p className="font-fredoka-strong text-[0.98rem] leading-none text-slate-700 sm:text-[1.2rem]">{moves} moves</p>
+              </div>
+            </div>
+
+            <div className="pb-0.5 text-right">
+              <p className="font-fredoka-display text-[2.2rem] leading-none tracking-[-0.05em] text-slate-900 sm:text-[3rem]">
+                {animatedQuality}%
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="max-w-[11rem] text-right sm:max-w-none">
-          <p className="font-fredoka-strong text-[0.95rem] leading-none text-slate-500 sm:text-[1.125rem]">{difficultyLabel}</p>
-          <p className="font-fredoka-strong mt-2 text-[1rem] leading-tight text-slate-800 sm:text-[1.275rem] sm:leading-none">
-            {moves} moves
-            <span className="mx-1.5 text-slate-300">|</span>
-            {completion}%
-          </p>
+        <div className="relative z-10 mt-3 h-3 overflow-hidden rounded-full bg-slate-100 sm:mt-4">
+          <motion.div
+            className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
+            animate={{ width: `${qualityFill}%` }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          />
         </div>
       </div>
 

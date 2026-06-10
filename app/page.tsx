@@ -18,6 +18,7 @@ import {
   swapTiles,
 } from "./game-logic";
 import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal, WinConfetti } from "./game-components";
+import { getGradientQuality } from "./gradient-quality";
 import { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-types";
 import { getWinSequenceDurations, WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
@@ -117,6 +118,7 @@ export default function Home() {
   const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
+  const gradientQuality = getGradientQuality(completion);
   const winWaveActive = winPhase === "boardWave";
   const confettiActive = winPhase === "confetti" || winPhase === "modal";
   const winModalVisible = winPhase === "modal";
@@ -692,8 +694,8 @@ export default function Home() {
               bestTimeDisplay={
                 currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft)
               }
-              completion={completion}
               difficultyLabel={activeConfig.label}
+              gradientQuality={gradientQuality}
               moves={moves}
               timeDisplay={formatTime(timeLeft)}
               timeWarning={timeLeft <= 5 && !winState && !loseState}
