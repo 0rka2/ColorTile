@@ -675,20 +675,20 @@ export default function Home() {
   }, [clearDragSession, resetWinSequence, updateBoard]);
 
   return (
-    <main className="h-screen overflow-hidden px-3 py-4 sm:px-6 sm:py-6">
+    <main className="h-screen overflow-hidden px-2.5 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5 lg:px-6 lg:py-6">
      
-      <header className="fixed left-3 top-2 z-20 sm:left-8 sm:top-4 md:left-6 md:top-3 lg:left-10 lg:top-4">
-        <div className="rounded-[1.15rem] border border-white/90 bg-white px-3 py-2.5 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur sm:rounded-[1.4rem] sm:px-4 sm:py-3">
-          <p className="font-fredoka-display text-[2rem] font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-5xl">
+      <header className="fixed left-2.5 top-2 z-20 sm:left-4 sm:top-3 md:left-5 md:top-3 lg:left-10 lg:top-4">
+        <div className="rounded-[1rem] border border-white/90 bg-white px-2.5 py-2 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur sm:rounded-[1.2rem] sm:px-3 sm:py-2.5 md:px-3.5 md:py-2.5 lg:rounded-[1.4rem] lg:px-4 lg:py-3">
+          <p className="font-fredoka-display text-[1.7rem] font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
             <GradientText className="px-1">ColorTile</GradientText>
           </p>
         </div>
       </header>
 
-      <div className="mx-auto flex h-full w-full max-w-[72rem] flex-col pt-11 sm:pt-14 md:pt-24 lg:pt-12">
-        <div className="flex flex-1 flex-col items-center justify-center md:justify-start lg:justify-center">
-        <section className="relative flex w-full flex-col items-center gap-2 sm:gap-3 md:gap-3 lg:mx-auto lg:-translate-y-[5vh] lg:grid lg:max-w-[58rem] lg:grid-cols-[6rem_minmax(0,42rem)_6rem] lg:items-start lg:gap-x-5 lg:gap-y-3">
-          <div className="order-1 w-full lg:col-start-2 lg:max-w-[42rem]">
+      <div className="mx-auto flex h-full w-full max-w-[72rem] flex-col pt-9 sm:pt-11 md:pt-16 lg:pt-12">
+        <div className="flex flex-1 flex-col items-center justify-center">
+        <section className="relative flex w-full max-w-[42rem] flex-col items-center gap-1.5 sm:gap-2 md:gap-2.5 lg:mx-auto lg:max-w-[58rem] lg:grid lg:grid-cols-[5.25rem_minmax(0,42rem)_5.25rem] lg:items-start lg:gap-x-4 lg:gap-y-2.5">
+          <div className="order-1 w-full lg:col-start-2">
             <GameHud
               bestMoves={currentBest?.fewestMoves ?? null}
               bestTimeDisplay={
@@ -702,7 +702,7 @@ export default function Home() {
             />
           </div>
 
-          <div className="order-3 w-full lg:col-start-2 lg:max-w-[42rem]">
+          <div className="order-3 w-full lg:col-start-2">
             <GameBoard
               key={boardResetKey}
               allowHoverWhenLocked={allowHoverWhenLocked}
@@ -723,7 +723,7 @@ export default function Home() {
             />
           </div>
 
-          <div className="order-4 w-full lg:col-start-1 lg:row-start-2 lg:self-start lg:pt-6">
+          <div className="order-4 w-full lg:col-start-1 lg:row-start-2 lg:self-start lg:pt-4">
             <GameControls
               difficulty={difficulty}
               showDevControls={process.env.NODE_ENV !== "production"}
@@ -733,7 +733,7 @@ export default function Home() {
             />
           </div>
 
-          <div aria-hidden="true" className="hidden lg:block lg:col-start-3 lg:row-start-2 lg:w-24" />
+          <div aria-hidden="true" className="hidden lg:block lg:col-start-3 lg:row-start-2 lg:w-[5.25rem]" />
 
           <GameModal
             activeConfig={activeConfig}
