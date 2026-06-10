@@ -24,6 +24,7 @@ const TIME_UP_QUOTES = [
   "So close. Try one more run.",
 ];
 
+//logic
 function getTimeUpStars(completion: number) {
   if (completion >= 100) {
     return 3;
