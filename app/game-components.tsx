@@ -1,21 +1,17 @@
 import { memo, PointerEvent as ReactPointerEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
+import Confetti from "react-confetti";
 
+import { GradientText } from "../components/ui/gradient-text";
 import { DIFFICULTY_LABELS } from "./game-logic";
+import { getConfettiViewportSize } from "./confetti-logic";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
-const TILE_DRAG_SHADOW = "0 16px 34px rgba(148, 163, 184, 0.22)";
-const CELEBRATION_CONFETTI = [
-  { left: "8%", top: "12%", color: "#fb7185", delay: 0 },
-  { left: "19%", top: "6%", color: "#fbbf24", delay: 0.08 },
-  { left: "32%", top: "16%", color: "#34d399", delay: 0.16 },
-  { left: "68%", top: "9%", color: "#60a5fa", delay: 0.04 },
-  { left: "82%", top: "14%", color: "#a78bfa", delay: 0.12 },
-  { left: "91%", top: "24%", color: "#f472b6", delay: 0.2 },
-];
+const TILE_DRAG_SHADOW = "0 22px 44px rgba(148, 163, 184, 0.28)";
+const TILE_TILT_MAX_DEGREES = 4;
 const TIME_UP_QUOTES = [
   "Almost there!",
   "That gradient was fighting back.",
@@ -119,20 +115,24 @@ type BoardProps = {
   boardDensityClass: string;
   dragSession: {
     color: string;
+    grabX: number;
     height: number;
     index: number;
     isCorrect: boolean;
     offsetX: number;
     offsetY: number;
+    pointerX: number;
+    pointerY: number;
     pointerId: number;
     tileId: string;
     width: number;
   } | null;
   draggedIndex: number | null;
+  confettiActive: boolean;
   getTileRef: (tileId: string) => (element: HTMLButtonElement | null) => void;
   setDragOverlayRef: (element: HTMLDivElement | null) => void;
   tileRadiusClass: string;
-  winCelebrationActive: boolean;
+  winWaveActive: boolean;
   winState: boolean;
   loseState: boolean;
   isTileCorrect: (tile: Tile, index: number) => boolean;
@@ -148,6 +148,8 @@ type TileButtonProps = {
   isDragging: boolean;
   tile: Tile;
   tileRadiusClass: string;
+  winWaveActive: boolean;
+  winWaveDelay: number;
   winState: boolean;
   loseState: boolean;
   tileRef: (element: HTMLButtonElement | null) => void;
@@ -162,11 +164,36 @@ const TileButton = memo(function TileButton({
   isDragging,
   tile,
   tileRadiusClass,
+  winWaveActive,
+  winWaveDelay,
   winState,
   loseState,
   tileRef,
   onPointerDown,
 }: Readonly<TileButtonProps>) {
+  const [isHovering, setIsHovering] = useState(false);
+  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0 });
+
+  const resetTilt = () => {
+    setIsHovering(false);
+    setTilt({ rotateX: 0, rotateY: 0 });
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!canHover || isDragging) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const relativeX = (event.clientX - bounds.left) / bounds.width;
+    const relativeY = (event.clientY - bounds.top) / bounds.height;
+    const rotateY = (relativeX - 0.5) * TILE_TILT_MAX_DEGREES * 2;
+    const rotateX = (0.5 - relativeY) * TILE_TILT_MAX_DEGREES * 2;
+
+    setIsHovering(true);
+    setTilt({ rotateX, rotateY });
+  };
+
   return (
     <motion.button
       initial={false}
@@ -175,31 +202,40 @@ const TileButton = memo(function TileButton({
       data-tile-index={index}
       onPointerDown={(event) => onPointerDown(event, index)}
       disabled={winState || loseState}
-      transition={{
-        duration: 0.18,
-        ease: [0.25, 0.1, 0.25, 1],
-      }}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={resetTilt}
+      onBlur={resetTilt}
       animate={{
         opacity: isDragging ? 0 : 1,
-        scale: 1,
-        y: 0,
-        boxShadow: TILE_REST_SHADOW,
-        filter: "saturate(1) brightness(1)",
+        rotateX: winWaveActive ? 0 : tilt.rotateX,
+        rotateY: winWaveActive ? 0 : tilt.rotateY,
+        scale: winWaveActive ? [1, 1.06, 1.015, 0.992, 1] : isHovering && !isDragging ? 1.02 : 1,
+        y: winWaveActive ? [0, -5, -2, 0.5, 0] : isHovering && !isDragging ? -5 : 0,
+        boxShadow: winWaveActive
+          ? [TILE_REST_SHADOW, TILE_HOVER_SHADOW, TILE_DRAG_SHADOW, TILE_HOVER_SHADOW, TILE_REST_SHADOW]
+          : isHovering && !isDragging
+            ? TILE_HOVER_SHADOW
+            : TILE_REST_SHADOW,
+        filter: isHovering && !isDragging ? "saturate(1.04) brightness(1.02)" : "saturate(1) brightness(1)",
       }}
-      whileHover={
-        canHover && !isDragging
+      transition={
+        winWaveActive
           ? {
-              y: -5,
-              scale: 1.02,
-              boxShadow: TILE_HOVER_SHADOW,
-              filter: "saturate(1.04) brightness(1.02)",
+              duration: 0.4,
+              ease: [0.22, 1, 0.36, 1],
+              delay: winWaveDelay,
             }
-          : undefined
+          : {
+              type: "spring",
+              stiffness: 360,
+              damping: 24,
+              mass: 0.85,
+            }
       }
       whileTap={
         canDrag && !isDragging
           ? {
-              scale: 0.99,
+              scale: 1.01,
               boxShadow: TILE_DRAG_SHADOW,
               filter: "saturate(1.08) brightness(1.04)",
             }
@@ -229,6 +265,8 @@ const TileButton = memo(function TileButton({
     previousProps.isDragging === nextProps.isDragging &&
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
+    previousProps.winWaveActive === nextProps.winWaveActive &&
+    previousProps.winWaveDelay === nextProps.winWaveDelay &&
     previousProps.winState === nextProps.winState &&
     previousProps.loseState === nextProps.loseState
   );
@@ -240,10 +278,11 @@ export const GameBoard = memo(function GameBoard({
   boardDensityClass,
   dragSession,
   draggedIndex,
+  confettiActive,
   getTileRef,
   setDragOverlayRef,
   tileRadiusClass,
-  winCelebrationActive,
+  winWaveActive,
   winState,
   loseState,
   isTileCorrect,
@@ -251,6 +290,8 @@ export const GameBoard = memo(function GameBoard({
   onPointerDown,
 }: Readonly<BoardProps>) {
   const size = Math.sqrt(board.length);
+  const initialOverlayX = dragSession ? dragSession.pointerX - dragSession.offsetX : 0;
+  const initialOverlayY = dragSession ? dragSession.pointerY - dragSession.offsetY : 0;
   const dragOverlay =
     dragSession && typeof document !== "undefined"
       ? createPortal(
@@ -265,7 +306,8 @@ export const GameBoard = memo(function GameBoard({
               left: 0,
               opacity: 1,
               top: 0,
-              transform: "translate3d(0, 0, 0) scale(0.985)",
+              transform: `translate3d(${initialOverlayX}px, ${initialOverlayY}px, 0) scale(1.04) rotate(0deg)`,
+              transition: "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
               width: `${dragSession.width}px`,
               zIndex: 50,
             }}
@@ -283,7 +325,7 @@ export const GameBoard = memo(function GameBoard({
         className="mx-auto aspect-square w-full max-w-[58rem] rounded-[1rem] bg-gradient-to-br from-white/85 via-slate-100/70 to-sky-100/65 p-px shadow-[0_22px_56px_rgba(15,23,42,0.10),0_10px_24px_rgba(15,23,42,0.06)] sm:rounded-[1.2rem] sm:shadow-[0_28px_80px_rgba(15,23,42,0.12),0_12px_28px_rgba(15,23,42,0.07)]"
         initial={false}
         animate={
-          winCelebrationActive
+          confettiActive
             ? {
                 scale: [1, 1.01, 1],
                 boxShadow: [
@@ -298,19 +340,19 @@ export const GameBoard = memo(function GameBoard({
               }
         }
         transition={
-          winCelebrationActive
-            ? { duration: 1.2, ease: [0.22, 1, 0.36, 1], repeat: Infinity, repeatDelay: 0.25 }
+          confettiActive
+            ? { duration: 0.8, ease: [0.22, 1, 0.36, 1] }
             : { duration: 0.2 }
         }
       >
         <div className="relative h-full w-full overflow-hidden rounded-[calc(1rem-1px)] bg-[rgba(255,255,255,0.85)] p-1.5 backdrop-blur-[20px] sm:rounded-[calc(1.2rem-1px)] sm:p-2.5">
-          {winCelebrationActive && (
+          {confettiActive && (
             <motion.div
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent"
               initial={{ x: "-30%" }}
               animate={{ x: "260%" }}
-              transition={{ duration: 1.4, ease: "linear", repeat: Infinity, repeatDelay: 0.3 }}
+              transition={{ duration: 1.1, ease: "linear" }}
             />
           )}
           <div
@@ -336,6 +378,8 @@ export const GameBoard = memo(function GameBoard({
                   isDragging={isDragging && dragSession !== null}
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
+                  winWaveActive={winWaveActive}
+                  winWaveDelay={index * 0.045}
                   winState={winState}
                   loseState={loseState}
                   tileRef={getTileRef(tile.id)}
@@ -350,6 +394,54 @@ export const GameBoard = memo(function GameBoard({
     </>
   );
 });
+
+type ConfettiProps = {
+  active: boolean;
+};
+
+export function WinConfetti({ active }: Readonly<ConfettiProps>) {
+  const [viewportSize, setViewportSize] = useState(() =>
+    typeof window === "undefined" ? { width: 0, height: 0 } : getConfettiViewportSize(window),
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateViewportSize = () => {
+      setViewportSize(getConfettiViewportSize(window));
+    };
+
+    updateViewportSize();
+    window.addEventListener("resize", updateViewportSize);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportSize);
+    };
+  }, []);
+
+  if (!active || typeof document === "undefined" || viewportSize.width === 0 || viewportSize.height === 0) {
+    return null;
+  }
+
+  return createPortal(
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[12] overflow-hidden">
+      <Confetti
+        colors={["#ff2344", "#fbbf24", "#34d399", "#60a5fa", "#a78bfa", "#f472b6"]}
+        gravity={0.18}
+        initialVelocityY={{ min: 10, max: 22 }}
+        numberOfPieces={300}
+        recycle={false}
+        run={active}
+        tweenDuration={8500}
+        width={viewportSize.width}
+        height={viewportSize.height}
+      />
+    </div>,
+    document.body,
+  );
+}
 
 type ModalProps = {
   activeConfig: DifficultyConfig;
@@ -384,31 +476,23 @@ export function GameModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-slate-950/28 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/28 p-4 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, y: 28, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-[40.5rem] overflow-hidden rounded-[2rem] border border-white/80 bg-white p-8 text-center shadow-[0_32px_90px_rgba(15,23,42,0.24),0_14px_34px_rgba(15,23,42,0.12)] sm:p-10"
       >
-        {winState &&
-          CELEBRATION_CONFETTI.map((piece, index) => (
-            <motion.span
-              key={`${piece.left}-${piece.top}`}
-              aria-hidden="true"
-              className="absolute h-3 w-3 rounded-sm"
-              style={{ backgroundColor: piece.color, left: piece.left, top: piece.top }}
-              initial={{ opacity: 0, y: -8, rotate: -18 }}
-              animate={{ opacity: [0, 1, 1, 0], y: [0, 8, 22, 34], rotate: [-18, 12, 28] }}
-              transition={{ duration: 1.5, delay: piece.delay, repeat: Infinity, repeatDelay: 0.4 + index * 0.03 }}
-            />
-          ))}
-
         <div className="relative z-10">
           {winState ? (
             <>
               <p className="font-fredoka-strong text-sm uppercase tracking-[0.3em] text-slate-400">Perfect Gradient</p>
-              <h2 className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] text-slate-900 sm:mt-4 sm:text-[2.35rem]">Gradient Complete!</h2>
+              <GradientText
+                as="h2"
+                className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] sm:mt-4 sm:text-[2.35rem]"
+              >
+                Gradient Complete!
+              </GradientText>
               <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.24em] text-amber-500 sm:mt-5 sm:text-lg">
                 {renderStars(3)}
               </div>

@@ -17,13 +17,15 @@ import {
   scrambleBoard,
   swapTiles,
 } from "./game-logic";
-import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal } from "./game-components";
+import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal, WinConfetti } from "./game-components";
 import { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-types";
+import { getWinSequenceDurations, WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
 
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
-const TILE_SWAP_ANIMATION_DURATION_MS = 180;
-const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.25, 0.1, 0.25, 1)";
+const TILE_SWAP_ANIMATION_DURATION_MS = 220;
+const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const DRAG_ROTATION_MAX_DEGREES = 3;
 const DROP_TARGET_RING_CLASSES = [
   "ring-2",
   "ring-slate-300/70",
@@ -56,9 +58,12 @@ function getAccuracyScore(size: number, moves: number) {
 
 type DragSession = {
   color: string;
+  grabX: number;
   height: number;
   index: number;
   isCorrect: boolean;
+  pointerX: number;
+  pointerY: number;
   pointerId: number;
   offsetX: number;
   offsetY: number;
@@ -81,6 +86,7 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState(PRESET_DIFFICULTIES.normal.time);
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
+  const [winPhase, setWinPhase] = useState<WinPhase>("idle");
   const [loseState, setLoseState] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
@@ -94,6 +100,7 @@ export default function Home() {
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const latestBoardRef = useRef<Tile[]>([]);
+  const winSequenceTimeoutsRef = useRef<number[]>([]);
 
   const activeConfig =
     difficulty === "custom"
@@ -110,7 +117,9 @@ export default function Home() {
   const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
-  const winCelebrationActive = winState;
+  const winWaveActive = winPhase === "boardWave";
+  const confettiActive = winPhase === "confetti" || winPhase === "modal";
+  const winModalVisible = winPhase === "modal";
   const allowHoverWhenLocked = false;
 
   const getTileRef = useCallback(
@@ -143,6 +152,15 @@ export default function Home() {
     }
   }, []);
 
+  const clearWinSequenceTimeouts = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    winSequenceTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    winSequenceTimeoutsRef.current = [];
+  }, []);
+
   const updateDragOverlayPosition = useCallback(() => {
     dragAnimationFrameRef.current = null;
 
@@ -156,7 +174,8 @@ export default function Home() {
 
     const nextX = pointerPosition.x - currentDragSession.offsetX;
     const nextY = pointerPosition.y - currentDragSession.offsetY;
-    overlayElement.style.transform = `translate3d(${nextX}px, ${nextY}px, 0) scale(0.985)`;
+    const rotate = clamp((pointerPosition.x - currentDragSession.grabX) / 14, -DRAG_ROTATION_MAX_DEGREES, DRAG_ROTATION_MAX_DEGREES);
+    overlayElement.style.transform = `translate3d(${nextX}px, ${nextY}px, 0) scale(1.04) rotate(${rotate}deg)`;
   }, [dragSession]);
 
   const scheduleDragOverlayPositionUpdate = useCallback(() => {
@@ -221,6 +240,11 @@ export default function Home() {
     updateHoveredDropTarget(null);
     setDragSession(null);
   }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
+
+  const resetWinSequence = useCallback(() => {
+    clearWinSequenceTimeouts();
+    setWinPhase("idle");
+  }, [clearWinSequenceTimeouts]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
     if (typeof document === "undefined") {
@@ -338,6 +362,7 @@ export default function Home() {
     const nextBoard = scrambleBoard(nextSolvedBoard);
 
     clearDragSession();
+    resetWinSequence();
     setBoardResetKey((currentKey) => currentKey + 1);
     pendingSwapAnimationRef.current = null;
     updateBoard(nextBoard);
@@ -367,6 +392,7 @@ export default function Home() {
 
     if (nextCompletion === 100) {
       setWinState(true);
+      setWinPhase("boardWave");
       clearDragSession();
 
       setBestStats((current) => {
@@ -389,7 +415,36 @@ export default function Home() {
         };
       });
     }
-  }, [board, clearDragSession, difficulty, moves, timeLeft]);
+  }, [board, clearDragSession, difficulty, moves, timeLeft, winState]);
+
+  useEffect(() => {
+    if (winPhase !== "boardWave" && winPhase !== "confetti") {
+      return;
+    }
+
+    clearWinSequenceTimeouts();
+
+    const { boardWaveDurationMs, confettiLeadInMs } = getWinSequenceDurations(board.length);
+
+    if (winPhase === "boardWave") {
+      winSequenceTimeoutsRef.current.push(
+        window.setTimeout(() => {
+          setWinPhase("confetti");
+        }, boardWaveDurationMs),
+      );
+      return;
+    }
+
+    winSequenceTimeoutsRef.current.push(
+      window.setTimeout(() => {
+        setWinPhase("modal");
+      }, confettiLeadInMs),
+    );
+
+    return () => {
+      clearWinSequenceTimeouts();
+    };
+  }, [board.length, clearWinSequenceTimeouts, winPhase]);
 
   useEffect(() => {
     if (!board.length || winState || loseState || customModalOpen || !timerStarted) {
@@ -415,6 +470,7 @@ export default function Home() {
             };
           });
           setCompletion(finalCompletion);
+          resetWinSequence();
           setLoseState(true);
           clearDragSession();
           return 0;
@@ -425,7 +481,7 @@ export default function Home() {
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [board.length, clearDragSession, difficulty, winState, loseState, customModalOpen, timerStarted]);
+  }, [board.length, clearDragSession, difficulty, winState, loseState, customModalOpen, resetWinSequence, timerStarted]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -524,6 +580,12 @@ export default function Home() {
     };
   }, [cancelDragAnimationFrame]);
 
+  useEffect(() => {
+    return () => {
+      clearWinSequenceTimeouts();
+    };
+  }, [clearWinSequenceTimeouts]);
+
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, index: number) => {
     if (winState || loseState) {
       return;
@@ -547,11 +609,14 @@ export default function Home() {
 
     setDragSession({
       color: tile.color,
+      grabX: event.clientX,
       height: tileRect.height,
       index,
       isCorrect: isTileCorrect(tile, index),
       offsetX: event.clientX - tileRect.left,
       offsetY: event.clientY - tileRect.top,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
       pointerId: event.pointerId,
       tileId: tile.id,
       width: tileRect.width,
@@ -561,6 +626,7 @@ export default function Home() {
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
     if (nextDifficulty === "custom") {
       clearDragSession();
+      resetWinSequence();
       setCustomDraftSize(customSize);
       setCustomDraftTime(customTime);
       setCustomModalOpen(true);
@@ -570,6 +636,7 @@ export default function Home() {
 
     setCustomModalOpen(false);
     clearDragSession();
+    resetWinSequence();
     setDifficulty(nextDifficulty);
   };
 
@@ -591,17 +658,19 @@ export default function Home() {
     setCustomModalOpen(false);
     setTimerStarted(true);
     clearDragSession();
+    resetWinSequence();
   };
 
   const handleAutoSolve = useCallback(() => {
     clearDragSession();
+    resetWinSequence();
     pendingSwapAnimationRef.current = null;
     updateBoard((currentBoard) =>
       [...currentBoard]
         .sort((firstTile, secondTile) => firstTile.correctIndex - secondTile.correctIndex)
         .map((tile, index) => ({ ...tile, currentIndex: index })),
     );
-  }, [clearDragSession, updateBoard]);
+  }, [clearDragSession, resetWinSequence, updateBoard]);
 
   return (
     <main className="h-screen overflow-hidden px-3 py-4 sm:px-6 sm:py-6">
@@ -642,7 +711,8 @@ export default function Home() {
               getTileRef={getTileRef}
               setDragOverlayRef={setDragOverlayRef}
               tileRadiusClass={tileRadiusClass}
-              winCelebrationActive={winCelebrationActive}
+              confettiActive={confettiActive}
+              winWaveActive={winWaveActive}
               winState={winState}
               loseState={loseState}
               isTileCorrect={isTileCorrect}
@@ -671,12 +741,13 @@ export default function Home() {
             moves={moves}
             onRestart={() => startGame(activeConfig)}
             timeDisplay={formatTime(timeLeft)}
-            winState={winState}
+            winState={winModalVisible}
           />
         </section>
         </div>
       </div>
 
+      <WinConfetti active={confettiActive} />
       <CustomGameModal
         draftSize={customDraftSize}
         draftTime={customDraftTime}
