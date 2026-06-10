@@ -19,8 +19,11 @@ import {
 } from "./game-logic";
 import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal, WinConfetti } from "./game-components";
 import { getGradientQuality } from "./gradient-quality";
-import { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-types";
-import { getWinSequenceDurations, WinPhase } from "./win-sequence";
+import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./personal-best";
+import type { PersonalBestStatus } from "./personal-best";
+import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-types";
+import { getWinSequenceDurations } from "./win-sequence";
+import type { WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
 
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
@@ -92,6 +95,7 @@ export default function Home() {
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
   const [bestStats, setBestStats] = useState<BestStats>({});
+  const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
   const [boardResetKey, setBoardResetKey] = useState(0);
   const tileElementsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
@@ -246,6 +250,7 @@ export default function Home() {
   const resetWinSequence = useCallback(() => {
     clearWinSequenceTimeouts();
     setWinPhase("idle");
+    setPersonalBestStatus(EMPTY_PERSONAL_BEST_STATUS);
   }, [clearWinSequenceTimeouts]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
@@ -393,6 +398,12 @@ export default function Home() {
     setCompletion(nextCompletion);
 
     if (nextCompletion === 100) {
+      setPersonalBestStatus(
+        getPersonalBestStatus(currentBest, {
+          moves,
+          timeLeft,
+        }),
+      );
       setWinState(true);
       setWinPhase("boardWave");
       clearDragSession();
@@ -417,7 +428,7 @@ export default function Home() {
         };
       });
     }
-  }, [board, clearDragSession, difficulty, moves, timeLeft, winState]);
+  }, [board, clearDragSession, currentBest, difficulty, moves, timeLeft, winState]);
 
   useEffect(() => {
     if (winPhase !== "boardWave" && winPhase !== "confetti") {
@@ -742,6 +753,7 @@ export default function Home() {
             loseState={loseState}
             moves={moves}
             onRestart={() => startGame(activeConfig)}
+            personalBestStatus={personalBestStatus}
             timeDisplay={formatTime(timeLeft)}
             winState={winModalVisible}
           />

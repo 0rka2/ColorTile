@@ -7,6 +7,7 @@ import { GradientText } from "../components/ui/gradient-text";
 import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
 import { getConfettiViewportSize } from "./confetti-logic";
+import type { PersonalBestStatus } from "./personal-best";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
@@ -513,6 +514,7 @@ type ModalProps = {
   loseState: boolean;
   moves: number;
   onRestart: () => void;
+  personalBestStatus: PersonalBestStatus;
   timeDisplay: string;
   winState: boolean;
 };
@@ -524,6 +526,7 @@ export function GameModal({
   loseState,
   moves,
   onRestart,
+  personalBestStatus,
   timeDisplay,
   winState,
 }: Readonly<ModalProps>) {
@@ -533,6 +536,7 @@ export function GameModal({
 
   const timeUpQuote = TIME_UP_QUOTES[(moves + completion + activeConfig.size) % TIME_UP_QUOTES.length];
   const timeUpStars = getTimeUpStars(completion);
+  const personalBestLabel = personalBestStatus.hasNewPersonalBest ? "New Personal Best!" : null;
 
   if (typeof document === "undefined") {
     return null;
@@ -562,6 +566,11 @@ export function GameModal({
               <p className="font-fredoka-regular mt-4 text-[0.98rem] leading-6 text-slate-500 sm:mt-5 sm:text-[1.05rem] sm:leading-7">
                 You restored the gradient with a clean finish on {activeConfig.label.toLowerCase()}.
               </p>
+              {personalBestStatus.hasNewPersonalBest && personalBestLabel && (
+                <p className="font-fredoka-strong mt-5 text-[0.82rem] uppercase tracking-[0.22em] text-amber-600 sm:mt-6 sm:text-[0.88rem]">
+                  {personalBestLabel}
+                </p>
+              )}
               <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
                 <div className="rounded-[1rem] border border-slate-100 bg-white px-2 py-3.5 shadow-[0_16px_34px_rgba(148,163,184,0.12)] sm:rounded-[1.4rem] sm:px-4 sm:py-5">
                   <p className="font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] text-slate-400 sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
