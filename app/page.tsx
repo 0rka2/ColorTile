@@ -21,6 +21,8 @@ import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal, WinConfet
 import { getGradientQuality } from "./gradient-quality";
 import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./personal-best";
 import type { PersonalBestStatus } from "./personal-best";
+import { resolveThemeMode, THEME_MODE_STORAGE_KEY } from "./settings-options";
+import type { ThemeMode } from "./settings-options";
 import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-types";
 import { getWinSequenceDurations } from "./win-sequence";
 import type { WinPhase } from "./win-sequence";
@@ -96,6 +98,7 @@ export default function Home() {
   const [timerStarted, setTimerStarted] = useState(true);
   const [bestStats, setBestStats] = useState<BestStats>({});
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
+  const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [boardResetKey, setBoardResetKey] = useState(0);
   const tileElementsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
@@ -118,6 +121,28 @@ export default function Home() {
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      setThemeMode(resolveThemeMode(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)));
+    } catch {
+      setThemeMode("light");
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+
+    try {
+      window.localStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode);
+    } catch {
+      // Ignore storage failures and keep the in-memory theme.
+    }
+  }, [themeMode]);
   const currentBest = bestStats[difficulty];
   const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
   const draggedIndex = dragSession?.index ?? null;
@@ -686,11 +711,11 @@ export default function Home() {
   }, [clearDragSession, resetWinSequence, updateBoard]);
 
   return (
-    <main className="h-screen overflow-hidden px-2.5 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5 lg:px-6 lg:py-6">
+    <main className="theme-page-bg h-screen overflow-hidden px-2.5 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5 lg:px-6 lg:py-6">
      
       <header className="fixed left-2.5 top-2 z-20 sm:left-4 sm:top-3 md:left-5 md:top-3 lg:left-10 lg:top-4">
-        <div className="rounded-[1rem] border border-white/90 bg-white px-2.5 py-2 shadow-[0_16px_40px_rgba(15,23,42,0.10),0_6px_18px_rgba(15,23,42,0.05)] backdrop-blur sm:rounded-[1.2rem] sm:px-3 sm:py-2.5 md:px-3.5 md:py-2.5 lg:rounded-[1.4rem] lg:px-4 lg:py-3">
-          <p className="font-fredoka-display text-[1.7rem] font-black leading-none tracking-[-0.05em] text-slate-800 sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
+        <div className="theme-header-surface rounded-[1rem] border px-2.5 py-2 backdrop-blur sm:rounded-[1.2rem] sm:px-3 sm:py-2.5 md:px-3.5 md:py-2.5 lg:rounded-[1.4rem] lg:px-4 lg:py-3">
+          <p className="font-fredoka-display theme-text-primary text-[1.7rem] font-black leading-none tracking-[-0.05em] sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
             <GradientText className="px-1">ColorTile</GradientText>
           </p>
         </div>
@@ -741,6 +766,8 @@ export default function Home() {
               onAutoSolve={handleAutoSolve}
               onDifficultyChange={handleDifficultyChange}
               onRestart={() => startGame(activeConfig)}
+              onThemeModeChange={setThemeMode}
+              themeMode={themeMode}
             />
           </div>
 
