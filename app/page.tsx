@@ -17,7 +17,7 @@ import {
   scrambleBoard,
   swapTiles,
 } from "./game-logic";
-import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal, WinConfetti } from "./game-components";
+import { CustomGameModal, GameBoard, GameControls, GameDrawer, GameHud, GameModal, GameModeModal, ThemeToggle, WinConfetti } from "./game-components";
 import { getGradientQuality } from "./gradient-quality";
 import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./personal-best";
 import type { PersonalBestStatus } from "./personal-best";
@@ -95,6 +95,8 @@ export default function Home() {
   const [winPhase, setWinPhase] = useState<WinPhase>("idle");
   const [loseState, setLoseState] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [modeModalOpen, setModeModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
   const [bestStats, setBestStats] = useState<BestStats>({});
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
@@ -522,6 +524,22 @@ export default function Home() {
   }, [board.length, clearDragSession, difficulty, winState, loseState, customModalOpen, resetWinSequence, timerStarted]);
 
   useEffect(() => {
+    if (!drawerOpen && !modeModalOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+        setModeModalOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [drawerOpen, modeModalOpen]);
+
+  useEffect(() => {
     if (!dragSession) {
       return;
     }
@@ -699,6 +717,21 @@ export default function Home() {
     resetWinSequence();
   };
 
+  const handleOpenCustomFromDrawer = () => {
+    setDrawerOpen(false);
+    clearDragSession();
+    resetWinSequence();
+    setCustomDraftSize(customSize);
+    setCustomDraftTime(customTime);
+    setCustomModalOpen(true);
+    setTimerStarted(false);
+  };
+
+  const handleOpenModesFromDrawer = () => {
+    setDrawerOpen(false);
+    setModeModalOpen(true);
+  };
+
   const handleAutoSolve = useCallback(() => {
     clearDragSession();
     resetWinSequence();
@@ -715,11 +748,44 @@ export default function Home() {
      
       <header className="fixed left-2.5 top-2 z-20 sm:left-4 sm:top-3 md:left-5 md:top-3 lg:left-10 lg:top-4">
         <div className="theme-header-surface rounded-[1rem] border px-2.5 py-2 backdrop-blur sm:rounded-[1.2rem] sm:px-3 sm:py-2.5 md:px-3.5 md:py-2.5 lg:rounded-[1.4rem] lg:px-4 lg:py-3">
-          <p className="font-fredoka-display theme-text-primary text-[1.7rem] font-black leading-none tracking-[-0.05em] sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
-            <GradientText className="px-1">ColorTile</GradientText>
-          </p>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open navigation menu"
+            className="flex items-center gap-2.5 sm:gap-3"
+          >
+            <span aria-hidden="true" className="theme-text-primary text-[1.35rem] leading-none sm:text-[1.6rem]">
+              {"\u2630"}
+            </span>
+            <p className="font-fredoka-display theme-text-primary text-[1.7rem] font-black leading-none tracking-[-0.05em] sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
+              <GradientText className="px-1">ColorTile</GradientText>
+            </p>
+          </button>
         </div>
       </header>
+
+      <div className="fixed left-1/2 top-2 z-20 -translate-x-1/2 sm:top-3 md:top-3 lg:top-4">
+        <button
+          type="button"
+          onClick={() => setModeModalOpen(true)}
+          aria-label="Open modes"
+          className="theme-header-surface flex min-h-[3.15rem] items-center gap-2.5 rounded-full border px-4 py-2.5 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[3.45rem] sm:gap-3 sm:px-5 sm:py-3"
+        >
+          <span aria-hidden="true" className="text-[1.1rem] leading-none sm:text-[1.25rem]">
+            {"\uD83C\uDFAE"}
+          </span>
+          <span className="theme-text-primary font-fredoka-strong text-[1rem] leading-none sm:text-[1.08rem]">
+            {activeConfig.label}
+          </span>
+          <span aria-hidden="true" className="theme-text-muted text-[0.92rem] leading-none sm:text-[1rem]">
+            {"\u25BE"}
+          </span>
+        </button>
+      </div>
+
+      <div className="fixed right-2.5 top-2 z-20 sm:right-4 sm:top-3 md:right-5 md:top-3 lg:right-10 lg:top-4">
+        <ThemeToggle onThemeModeChange={setThemeMode} themeMode={themeMode} />
+      </div>
 
       <div className="mx-auto flex h-full w-full max-w-[72rem] flex-col pt-9 sm:pt-11 md:pt-16 lg:pt-12">
         <div className="flex flex-1 flex-col items-center justify-center">
@@ -761,13 +827,9 @@ export default function Home() {
 
           <div className="order-4 w-full lg:col-start-1 lg:row-start-2 lg:self-start lg:pt-4">
             <GameControls
-              difficulty={difficulty}
               showDevControls={process.env.NODE_ENV !== "production"}
               onAutoSolve={handleAutoSolve}
-              onDifficultyChange={handleDifficultyChange}
               onRestart={() => startGame(activeConfig)}
-              onThemeModeChange={setThemeMode}
-              themeMode={themeMode}
             />
           </div>
 
@@ -789,6 +851,18 @@ export default function Home() {
       </div>
 
       <WinConfetti active={confettiActive} />
+      <GameDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onOpenCustom={handleOpenCustomFromDrawer}
+        onOpenModes={handleOpenModesFromDrawer}
+      />
+      <GameModeModal
+        difficulty={difficulty}
+        isOpen={modeModalOpen}
+        onClose={() => setModeModalOpen(false)}
+        onDifficultyChange={handleDifficultyChange}
+      />
       <CustomGameModal
         draftSize={customDraftSize}
         draftTime={customDraftTime}

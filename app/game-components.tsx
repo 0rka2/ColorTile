@@ -8,7 +8,6 @@ import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
 import { getConfettiViewportSize } from "./confetti-logic";
 import type { PersonalBestStatus } from "./personal-best";
-import { getThemeModeLabel } from "./settings-options";
 import type { ThemeMode } from "./settings-options";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
 
@@ -150,11 +149,10 @@ export function GameHud({
           </div>
 
           <div className="flex items-end gap-2 sm:gap-3">
-            <div className="max-w-[7rem] text-right sm:max-w-[8.5rem] md:max-w-none">
-              <p className="theme-text-muted font-fredoka-strong text-[0.88rem] leading-none sm:text-[0.98rem] md:text-[1.05rem]">{difficultyLabel}</p>
-              <div className="theme-chip mt-1.5 inline-flex rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
-                <p className="theme-text-secondary font-fredoka-strong text-[0.88rem] leading-none sm:text-[0.98rem] md:text-[1.08rem]">{moves} moves</p>
-              </div>
+            <div className="theme-chip inline-flex rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
+              <p className="theme-text-secondary font-fredoka-strong text-[0.88rem] leading-none sm:text-[0.98rem] md:text-[1.08rem]">
+                {moves} moves
+              </p>
             </div>
 
             <div className="pb-0.5 text-right">
@@ -632,62 +630,264 @@ export function GameModal({
   );
 }
 type ControlsProps = {
-  difficulty: DifficultyKey;
   onAutoSolve: () => void;
-  onDifficultyChange: (difficulty: DifficultyKey) => void;
   onRestart: () => void;
-  onThemeModeChange: (themeMode: ThemeMode) => void;
   showDevControls: boolean;
-  themeMode: ThemeMode;
 };
 
-export function GameControls({
-  difficulty,
-  onAutoSolve,
-  onDifficultyChange,
-  onRestart: onShuffle,
-  onThemeModeChange,
-  showDevControls,
-  themeMode,
-}: Readonly<ControlsProps>) {
-  const [isModesOpen, setIsModesOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isModesOpen && !isSettingsOpen) {
-      return;
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsModesOpen(false);
-        setIsSettingsOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [isModesOpen, isSettingsOpen]);
-
-  const handleModeSelect = (nextDifficulty: DifficultyKey) => {
-    onDifficultyChange(nextDifficulty);
-    setIsModesOpen(false);
-  };
-
+function HamburgerIcon() {
   return (
-    <section className="flex w-full justify-center lg:w-auto">
-      <div className="grid w-full max-w-[42rem] grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 md:gap-2.5 lg:flex lg:w-auto lg:max-w-none lg:flex-col">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5 sm:h-6 sm:w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+function PaletteIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h4a5 5 0 0 0 0-10h-4Z" />
+      <circle cx="7.5" cy="10.5" r=".8" fill="currentColor" stroke="none" />
+      <circle cx="10.5" cy="7.5" r=".8" fill="currentColor" stroke="none" />
+      <circle cx="16.5" cy="8.5" r=".8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function WrenchIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M14.5 6.5a4 4 0 0 0-5.35 5.35L4 17v3h3l5.15-5.15A4 4 0 0 0 17.5 9l-2 2-2.5-2.5 1.5-2Z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+    </svg>
+  );
+}
+
+export function ThemeToggle({
+  onThemeModeChange,
+  themeMode,
+}: Readonly<{
+  onThemeModeChange: (themeMode: ThemeMode) => void;
+  themeMode: ThemeMode;
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={() => onThemeModeChange(themeMode === "light" ? "dark" : "light")}
+      aria-label={`Switch to ${themeMode === "light" ? "dark" : "light"} theme`}
+      className="theme-header-surface flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-14 sm:w-14"
+    >
+      <motion.span
+        key={themeMode}
+        initial={{ rotate: -90, opacity: 0, scale: 0.5 }}
+        animate={{ rotate: 0, opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        {themeMode === "dark" ? <MoonIcon /> : <SunIcon />}
+      </motion.span>
+    </button>
+  );
+}
+
+type GameDrawerProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onOpenCustom: () => void;
+  onOpenModes: () => void;
+};
+
+export function GameDrawer({
+  isOpen,
+  onClose,
+  onOpenCustom,
+  onOpenModes,
+}: Readonly<GameDrawerProps>) {
+  if (!isOpen || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <motion.div
+      className="theme-overlay fixed inset-0 z-40"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <motion.aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation drawer"
+        className="theme-modal absolute left-2.5 top-[4.6rem] w-[16.5rem] max-w-[calc(100vw-1.25rem)] rounded-[1.35rem] border p-4 shadow-[0_22px_48px_rgba(15,23,42,0.18)] sm:left-4 sm:top-[5.2rem] sm:w-[17.5rem] md:left-5 md:top-[5.45rem] lg:left-10 lg:top-[6.1rem]"
+        initial={{ opacity: 0, y: -10, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={onOpenModes}
+              className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
+            >
+              <span className="theme-text-secondary">
+                <PaletteIcon />
+              </span>
+              <span className="font-fredoka-strong text-[1rem] leading-none">Classic</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenCustom}
+              className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
+            >
+              <span className="theme-text-secondary">
+                <WrenchIcon />
+              </span>
+              <span className="font-fredoka-strong text-[1rem] leading-none">Custom</span>
+            </button>
+          </div>
+        </div>
+      </motion.aside>
+    </motion.div>,
+    document.body,
+  );
+}
+
+type GameModeModalProps = {
+  difficulty: DifficultyKey;
+  isOpen: boolean;
+  onClose: () => void;
+  onDifficultyChange: (difficulty: DifficultyKey) => void;
+};
+
+export function GameModeModal({
+  difficulty,
+  isOpen,
+  onClose,
+  onDifficultyChange,
+}: Readonly<GameModeModalProps>) {
+  if (!isOpen || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <motion.div
+      className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Select game mode"
+        className="theme-modal relative w-full max-w-[35rem] rounded-[1.5rem] border p-7 sm:rounded-[1.75rem] sm:p-8"
+        initial={{ opacity: 0, y: 18, scale: 0.94 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] sm:text-sm sm:tracking-[0.24em]">
+              Modes
+            </p>
+            <h2 className="theme-text-primary font-fredoka-display mt-2 text-[1.9rem] leading-none sm:text-[2.2rem]">
+              Choose a mode
+            </h2>
+          </div>
           <button
             type="button"
-            onClick={() => setIsModesOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={isModesOpen}
-            aria-label="Open modes"
-            className="theme-button-primary font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
+            onClick={onClose}
+            aria-label="Close modes window"
+            className="theme-close-button font-fredoka-strong flex h-11 w-11 items-center justify-center rounded-full"
           >
-            Modes
+            {"\u00D7"}
           </button>
+        </div>
 
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-3.5">
+          {(Object.keys(DIFFICULTY_LABELS) as DifficultyKey[]).map((key) => {
+            const isActive = difficulty === key;
+            const isCustom = key === "custom";
+
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  onDifficultyChange(key);
+                  onClose();
+                }}
+                className={`font-fredoka-strong rounded-[1rem] px-4 py-3.5 text-base leading-tight transition sm:rounded-2xl sm:px-4 ${
+                  isCustom ? "col-span-2" : ""
+                } ${
+                  isActive ? "theme-button-primary" : "theme-button-secondary"
+                }`}
+              >
+                {DIFFICULTY_LABELS[key]}
+              </button>
+            );
+          })}
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
+
+export function GameControls({
+  onAutoSolve,
+  onRestart: onShuffle,
+  showDevControls,
+}: Readonly<ControlsProps>) {
+  return (
+    <section className="flex w-full justify-center lg:w-auto">
+      <div className="grid w-full max-w-[42rem] grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 md:gap-2.5 lg:flex lg:w-auto lg:max-w-none lg:flex-col">
           <button
             type="button"
             onClick={onShuffle}
@@ -696,164 +896,16 @@ export function GameControls({
             Shuffle
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={isSettingsOpen}
-            aria-label="Open settings"
-            className="theme-button-primary font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
-          >
-            Settings
-          </button>
-
           {showDevControls && (
             <button
               type="button"
               onClick={onAutoSolve}
-              className="theme-button-accent font-fredoka-strong col-span-2 flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:col-span-1 sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
+              className="theme-button-accent font-fredoka-strong col-span-2 flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:col-span-2 sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
             >
               Auto Solve
             </button>
           )}
       </div>
-
-      {isModesOpen && typeof document !== "undefined" &&
-        createPortal(
-          <motion.div
-            className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="absolute inset-0" onClick={() => setIsModesOpen(false)} aria-hidden="true" />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Select game mode"
-              className="theme-modal relative w-full max-w-[35rem] rounded-[1.5rem] border p-7 sm:rounded-[1.75rem] sm:p-8"
-              initial={{ opacity: 0, y: 18, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] sm:text-sm sm:tracking-[0.24em]">Modes</p>
-                  <h2 className="theme-text-primary font-fredoka-display mt-2 text-[1.9rem] leading-none sm:text-[2.2rem]">Choose a mode</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsModesOpen(false)}
-                  aria-label="Close modes window"
-                  className="theme-close-button font-fredoka-strong flex h-11 w-11 items-center justify-center rounded-full"
-                >
-                  {"\u00D7"}
-                </button>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-3.5">
-                {(Object.keys(DIFFICULTY_LABELS) as DifficultyKey[]).map((key) => {
-                  const isActive = difficulty === key;
-                  const isCustom = key === "custom";
-
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleModeSelect(key)}
-                      className={`font-fredoka-strong rounded-[1rem] px-4 py-3.5 text-base leading-tight transition sm:rounded-2xl sm:px-4 ${
-                        isCustom ? "col-span-2" : ""
-                      } ${
-                        isActive
-                          ? "theme-button-primary"
-                          : "theme-button-secondary"
-                      }`}
-                    >
-                      {DIFFICULTY_LABELS[key]}
-                    </button>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </motion.div>,
-          document.body,
-        )}
-
-      {isSettingsOpen && typeof document !== "undefined" &&
-        createPortal(
-          <motion.div
-            className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="absolute inset-0" onClick={() => setIsSettingsOpen(false)} aria-hidden="true" />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Settings"
-              className="theme-modal relative w-full max-w-[35rem] rounded-[1.5rem] border p-7 sm:rounded-[1.75rem] sm:p-8"
-              initial={{ opacity: 0, y: 18, scale: 0.94 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="theme-text-muted font-fredoka-strong text-[1.2rem] uppercase tracking-[0.2em] l:text-l sm:tracking-[0.24em]">Settings</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsOpen(false)}
-                  aria-label="Close settings window"
-                  className="theme-close-button font-fredoka-strong flex h-11 w-11 items-center justify-center rounded-full"
-                >
-                  {"\u00D7"}
-                </button>
-              </div>
-
-              <div className="theme-panel-muted mt-6 rounded-[1.25rem] border px-4 py-4 sm:px-5 sm:py-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="theme-text-secondary font-fredoka-strong text-[1.05rem] leading-none sm:text-[1.15rem]">
-                    Theme:
-                  </p>
-
-                  <div
-                    role="group"
-                    aria-label="Theme switch"
-                    className="theme-switch-track relative flex h-14 w-full items-center rounded-full border p-1.5 sm:w-[16rem]"
-                  >
-                    <motion.span
-                      aria-hidden="true"
-                      className="theme-switch-thumb absolute inset-y-1.5 left-1.5 w-[calc(50%-0.375rem)] rounded-full"
-                      animate={{ x: themeMode === "light" ? "0%" : "100%" }}
-                      transition={{ type: "spring", stiffness: 360, damping: 28, mass: 0.8 }}
-                    />
-
-                    <span className="relative z-10 grid w-full grid-cols-2">
-                      {(["light", "dark"] as const).map((mode) => {
-                        const isActive = themeMode === mode;
-
-                        return (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={() => onThemeModeChange(mode)}
-                            className={`font-fredoka-strong flex h-11 items-center justify-center rounded-full text-base leading-none transition-colors duration-200 ${
-                              isActive ? "text-white" : "theme-text-muted"
-                            }`}
-                          >
-                            {getThemeModeLabel(mode)}
-                          </button>
-                        );
-                      })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>,
-          document.body,
-        )}
     </section>
   );
 }
