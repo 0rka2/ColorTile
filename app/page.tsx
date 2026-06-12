@@ -459,7 +459,7 @@ export default function Home() {
 
     clearWinSequenceTimeouts();
 
-    const { boardWaveDurationMs, confettiLeadInMs } = getWinSequenceDurations(board.length);
+    const { boardWaveDurationMs, modalDelayMs } = getWinSequenceDurations(board.length);
 
     if (winPhase === "boardWave") {
       winSequenceTimeoutsRef.current.push(
@@ -473,7 +473,7 @@ export default function Home() {
     winSequenceTimeoutsRef.current.push(
       window.setTimeout(() => {
         setWinPhase("modal");
-      }, confettiLeadInMs),
+      }, modalDelayMs - boardWaveDurationMs),
     );
 
     return () => {

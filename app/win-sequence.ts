@@ -3,6 +3,7 @@ export type WinPhase = "idle" | "boardWave" | "confetti" | "modal";
 export const WIN_TILE_WAVE_STAGGER_MS = 45;
 export const WIN_TILE_POP_DURATION_MS = 240;
 export const WIN_CONFETTI_LEAD_IN_MS = 320;
+export const WIN_MODAL_EXTRA_DELAY_MS = 250;
 
 export function getWinWaveDuration(tileCount: number) {
   if (tileCount <= 0) {
@@ -18,6 +19,6 @@ export function getWinSequenceDurations(tileCount: number) {
   return {
     boardWaveDurationMs,
     confettiLeadInMs: WIN_CONFETTI_LEAD_IN_MS,
-    modalDelayMs: boardWaveDurationMs + WIN_CONFETTI_LEAD_IN_MS,
+    modalDelayMs: boardWaveDurationMs + WIN_CONFETTI_LEAD_IN_MS + WIN_MODAL_EXTRA_DELAY_MS,
   };
 }
