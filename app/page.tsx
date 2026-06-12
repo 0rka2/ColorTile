@@ -427,7 +427,6 @@ export default function Home() {
     if (nextCompletion === 100) {
       setPersonalBestStatus(
         getPersonalBestStatus(currentBest, {
-          moves,
           timeLeft,
         }),
       );
@@ -443,10 +442,6 @@ export default function Home() {
             currentRecord.bestTimeLeft === undefined
               ? timeLeft
               : Math.max(currentRecord.bestTimeLeft, timeLeft),
-          fewestMoves:
-            currentRecord.fewestMoves === undefined
-              ? moves
-              : Math.min(currentRecord.fewestMoves, moves),
         };
 
         return {
@@ -764,7 +759,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="fixed left-1/2 top-2 z-20 -translate-x-1/2 sm:top-3 md:top-3 lg:top-4">
+      <div className="fixed right-2.5 top-2 z-20 flex items-center gap-2 sm:right-4 sm:top-3 sm:gap-2.5 md:right-5 md:top-3 lg:right-10 lg:top-4">
         <button
           type="button"
           onClick={() => setModeModalOpen(true)}
@@ -781,9 +776,14 @@ export default function Home() {
             {"\u25BE"}
           </span>
         </button>
-      </div>
-
-      <div className="fixed right-2.5 top-2 z-20 sm:right-4 sm:top-3 md:right-5 md:top-3 lg:right-10 lg:top-4">
+        <div className="theme-header-surface flex min-h-[3.15rem] items-center gap-2 rounded-full border px-3.5 py-2 shadow-[0_14px_26px_rgba(15,23,42,0.12)] sm:min-h-[3.45rem] sm:gap-2.5 sm:px-4 sm:py-2.5">
+          <span aria-hidden="true" className="text-[1rem] leading-none sm:text-[1.1rem]">
+            {"\uD83C\uDFC6"}
+          </span>
+          <p className="theme-text-primary font-fredoka-display text-[1.1rem] leading-none tracking-[-0.04em] sm:text-[1.3rem]">
+            {bestTimeDisplay}
+          </p>
+        </div>
         <ThemeToggle onThemeModeChange={setThemeMode} themeMode={themeMode} />
       </div>
 
@@ -792,11 +792,6 @@ export default function Home() {
         <section className="relative flex w-full max-w-[42rem] flex-col items-center gap-1.5 sm:gap-2 md:gap-2.5 lg:mx-auto lg:max-w-[58rem] lg:grid lg:grid-cols-[5.25rem_minmax(0,42rem)_5.25rem] lg:items-start lg:gap-x-4 lg:gap-y-2.5">
           <div className="order-1 w-full lg:col-start-2">
             <GameHud
-              bestMoves={currentBest?.fewestMoves ?? null}
-              bestTimeDisplay={
-                currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft)
-              }
-              difficultyLabel={activeConfig.label}
               gradientQuality={gradientQuality}
               moves={moves}
               timeDisplay={formatTime(timeLeft)}

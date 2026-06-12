@@ -74,9 +74,6 @@ export function CheckMark() {
 }
 
 type HudProps = {
-  bestMoves: number | null;
-  bestTimeDisplay: string;
-  difficultyLabel: string;
   gradientQuality: number;
   moves: number;
   timeDisplay: string;
@@ -84,9 +81,6 @@ type HudProps = {
 };
 
 export function GameHud({
-  bestMoves,
-  bestTimeDisplay,
-  difficultyLabel,
   gradientQuality,
   moves,
   timeDisplay,
@@ -169,17 +163,6 @@ export function GameHud({
             animate={{ width: `${qualityFill}%` }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-1.5 self-stretch sm:gap-2 md:gap-2.5">
-        <div className="theme-card flex min-w-0 flex-col items-center justify-center gap-1 rounded-[0.95rem] border px-2.5 py-2.5 text-center backdrop-blur sm:gap-1.5 sm:rounded-[1rem] sm:px-3 sm:py-3 md:rounded-[1.1rem] md:px-3.5 md:py-3.5">
-          <p className="theme-text-muted font-fredoka-strong text-[0.82rem] leading-tight sm:text-[0.92rem] md:text-[1rem] sm:leading-none">Best Time</p>
-          <p className="theme-text-primary font-fredoka-display text-[1.35rem] leading-none sm:text-[1.55rem] md:text-[1.72rem]">{bestTimeDisplay}</p>
-        </div>
-        <div className="theme-card flex min-w-0 flex-col items-center justify-center gap-1 rounded-[0.95rem] border px-2.5 py-2.5 text-center backdrop-blur sm:gap-1.5 sm:rounded-[1rem] sm:px-3 sm:py-3 md:rounded-[1.1rem] md:px-3.5 md:py-3.5">
-          <p className="theme-text-muted font-fredoka-strong text-[0.82rem] leading-tight sm:text-[0.92rem] md:text-[1rem] sm:leading-none">Fewest Moves</p>
-          <p className="theme-text-primary font-fredoka-display text-[1.35rem] leading-none sm:text-[1.55rem] md:text-[1.72rem]">{bestMoves ?? "-"}</p>
         </div>
       </div>
     </section>
@@ -567,9 +550,17 @@ export function GameModal({
           {winState ? (
             <>
               <p className="theme-text-muted font-fredoka-strong text-sm uppercase tracking-[0.3em]">Perfect Gradient</p>
-              <h2 className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] sm:mt-4 sm:text-[2.35rem]">
-                <GradientText className="gradient-text--modal px-1">{renderWaveText("Gradient Complete!")}</GradientText>
-              </h2>
+              <motion.h2
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+                className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] sm:mt-4 sm:text-[2.35rem]"
+              >
+                <GradientText className="gradient-text--modal px-1 sm:hidden">Gradient Complete!</GradientText>
+                <GradientText className="gradient-text--modal hidden px-1 sm:inline-flex">
+                  {renderWaveText("Gradient Complete!")}
+                </GradientText>
+              </motion.h2>
               <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.24em] text-amber-500 sm:mt-5 sm:text-lg">
                 {renderStars(3)}
               </div>
@@ -689,6 +680,59 @@ function WrenchIcon() {
   );
 }
 
+function InfoIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 10v6M12 7h.01" />
+    </svg>
+  );
+}
+
+function MessageIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />
+    </svg>
+  );
+}
+
+function BookIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+    </svg>
+  );
+}
+
 function SunIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -770,24 +814,35 @@ export function GameDrawer({
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={onOpenModes}
+              onClick={onClose}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
               <span className="theme-text-secondary">
-                <PaletteIcon />
+                <InfoIcon />
               </span>
-              <span className="font-fredoka-strong text-[1rem] leading-none">Classic</span>
+              <span className="font-fredoka-strong text-[1rem] leading-none">About</span>
             </button>
 
             <button
               type="button"
-              onClick={onOpenCustom}
+              onClick={onClose}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
               <span className="theme-text-secondary">
-                <WrenchIcon />
+                <MessageIcon />
               </span>
-              <span className="font-fredoka-strong text-[1rem] leading-none">Custom</span>
+              <span className="font-fredoka-strong text-[1rem] leading-none">Give Feedback</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
+            >
+              <span className="theme-text-secondary">
+                <BookIcon />
+              </span>
+              <span className="font-fredoka-strong text-[1rem] leading-none">Tutorial</span>
             </button>
           </div>
         </div>
@@ -893,7 +948,7 @@ export function GameControls({
             onClick={onShuffle}
             className="theme-button-primary font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
           >
-            Shuffle
+            Restart
           </button>
 
           {showDevControls && (

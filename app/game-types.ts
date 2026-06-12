@@ -19,7 +19,6 @@ export type PresetDifficultyKey = Exclude<DifficultyKey, "custom">;
 export type BestRecord = {
   bestCompletion?: number;
   bestTimeLeft?: number;
-  fewestMoves?: number;
 };
 
 export type BestStats = Partial<Record<DifficultyKey, BestRecord>>;
