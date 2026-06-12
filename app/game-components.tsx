@@ -632,7 +632,6 @@ export function GameModal({
 }
 type ControlsProps = {
   onAutoSolve: () => void;
-  onRestart: () => void;
   showDevControls: boolean;
 };
 
@@ -947,25 +946,16 @@ export function GameModeModal({
 
 export function GameControls({
   onAutoSolve,
-  onRestart: onShuffle,
   showDevControls,
 }: Readonly<ControlsProps>) {
   return (
     <section className="flex w-full justify-center lg:w-auto">
       <div className="grid w-full max-w-[42rem] grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 md:gap-2.5 lg:flex lg:w-auto lg:max-w-none lg:flex-col">
-          <button
-            type="button"
-            onClick={onShuffle}
-            className="theme-button-primary font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
-          >
-            Restart
-          </button>
-
           {showDevControls && (
             <button
               type="button"
               onClick={onAutoSolve}
-              className="theme-button-accent font-fredoka-strong col-span-2 flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:col-span-2 sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
+              className="theme-button-accent font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
             >
               Auto Solve
             </button>

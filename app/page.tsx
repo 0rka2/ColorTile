@@ -841,6 +841,19 @@ export default function Home() {
             {bestTimeDisplay}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => startGame(activeConfig)}
+          aria-label="Restart game"
+          className="theme-header-surface flex h-12 items-center justify-center gap-2 rounded-full border px-3.5 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-14 sm:px-4"
+        >
+          <span aria-hidden="true" className="theme-text-primary text-[1rem] leading-none sm:text-[1.1rem]">
+            {"\u21BB"}
+          </span>
+          <span className="theme-text-primary font-fredoka-strong hidden text-[0.98rem] leading-none md:inline">
+            Restart
+          </span>
+        </button>
         <ThemeToggle onThemeModeChange={setThemeMode} themeMode={themeMode} />
       </div>
 
@@ -882,7 +895,6 @@ export default function Home() {
             <GameControls
               showDevControls={process.env.NODE_ENV !== "production"}
               onAutoSolve={handleAutoSolve}
-              onRestart={() => startGame(activeConfig)}
             />
           </div>
 
