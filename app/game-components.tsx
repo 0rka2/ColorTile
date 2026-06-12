@@ -74,6 +74,8 @@ export function CheckMark() {
 }
 
 type HudProps = {
+  bestMoves: number | null;
+  bestTimeDisplay: string;
   gradientQuality: number;
   moves: number;
   timeDisplay: string;
@@ -81,6 +83,8 @@ type HudProps = {
 };
 
 export function GameHud({
+  bestMoves,
+  bestTimeDisplay,
   gradientQuality,
   moves,
   timeDisplay,
@@ -134,26 +138,52 @@ export function GameHud({
 
   return (
     <section className="flex w-full max-w-[42rem] flex-col gap-1.5 sm:gap-2 md:gap-2.5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+        <div className="theme-card rounded-[0.95rem] border px-3 py-2 text-center backdrop-blur sm:rounded-[1rem] sm:px-3.5 sm:py-2.5">
+          <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase leading-none tracking-[0.14em] sm:text-[1rem]">
+            Time Record
+          </p>
+          <p className="theme-text-primary mt-1 font-fredoka-display text-[1.3rem] leading-none tracking-tight sm:text-[1.5rem] md:text-[1.7rem]">
+            {bestTimeDisplay}
+          </p>
+        </div>
+        <div className="theme-card rounded-[0.95rem] border px-3 py-2 text-center backdrop-blur sm:rounded-[1rem] sm:px-3.5 sm:py-2.5">
+          <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase leading-none tracking-[0.14em] sm:text-[1rem]">
+            Move Record
+          </p>
+          <p className="theme-text-primary mt-1 font-fredoka-display text-[1.3rem] leading-none tracking-tight sm:text-[1.5rem] md:text-[1.7rem]">
+            {bestMoves ?? "-"}
+          </p>
+        </div>
+      </div>
+
       <div className="theme-panel relative overflow-hidden rounded-[1.15rem] border px-3 py-2.5 backdrop-blur sm:rounded-[1.35rem] sm:px-4 sm:py-3 md:px-4.5 md:py-3.5 lg:rounded-[1.75rem] lg:px-5 lg:py-4">
-        <div className="flex min-w-0 items-end justify-between gap-2.5 sm:gap-3">
-          <div className="min-w-0 flex-1">
-            <p className={`font-fredoka-display text-[2rem] leading-none tracking-tight sm:text-[2.35rem] md:text-[2.75rem] lg:text-5xl ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
+        <div className="grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
+          <div className="min-w-0 text-left">
+            <p className="theme-text-muted font-fredoka-strong text-[0.74rem] uppercase leading-none tracking-[0.14em] sm:text-[1.2rem]">
+              Time
+            </p>
+            <p className={`mt-1 font-fredoka-display text-[2rem] leading-none tracking-tight sm:text-[2.35rem] md:text-[2.75rem] lg:text-5xl ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
               {timeDisplay}
             </p>
           </div>
 
-          <div className="flex items-end gap-2 sm:gap-3">
-            <div className="theme-chip inline-flex rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5">
-              <p className="theme-text-secondary font-fredoka-strong text-[0.88rem] leading-none sm:text-[0.98rem] md:text-[1.08rem]">
-                {moves} moves
-              </p>
-            </div>
+          <div className="min-w-0 text-center">
+            <p className="theme-text-muted font-fredoka-strong text-[0.74rem] uppercase leading-none tracking-[0.14em] sm:text-[1.2rem]">
+              Moves
+            </p>
+            <p className="theme-text-primary mt-1 font-fredoka-display text-[2rem] leading-none tracking-tight sm:text-[2.2rem] md:text-[2.5rem] lg:text-[2.85rem]">
+              {moves}
+            </p>
+          </div>
 
-            <div className="pb-0.5 text-right">
-              <p className="theme-text-primary font-fredoka-display text-[1.95rem] leading-none tracking-[-0.05em] sm:text-[2.25rem] md:text-[2.6rem] lg:text-[3rem]">
-                {animatedQuality}%
-              </p>
-            </div>
+          <div className="min-w-0 text-right">
+            <p className="theme-text-muted font-fredoka-strong text-[0.74rem] uppercase leading-none tracking-[0.14em] sm:text-[1.2rem]">
+              Progress
+            </p>
+            <p className="theme-text-primary mt-1 font-fredoka-display text-[1.95rem] leading-none tracking-[-0.05em] sm:text-[2.25rem] md:text-[2.6rem] lg:text-[3rem]">
+              {animatedQuality}%
+            </p>
           </div>
         </div>
 

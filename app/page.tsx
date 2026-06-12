@@ -432,6 +432,7 @@ export default function Home() {
     if (nextCompletion === 100) {
       setPersonalBestStatus(
         getPersonalBestStatus(currentBest, {
+          moves,
           timeLeft,
         }),
       );
@@ -447,6 +448,10 @@ export default function Home() {
             currentRecord.bestTimeLeft === undefined
               ? timeLeft
               : Math.max(currentRecord.bestTimeLeft, timeLeft),
+          fewestMoves:
+            currentRecord.fewestMoves === undefined
+              ? moves
+              : Math.min(currentRecord.fewestMoves, moves),
         };
 
         return {
@@ -799,48 +804,42 @@ export default function Home() {
     <main className="theme-page-bg h-screen overflow-hidden px-2.5 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5 lg:px-6 lg:py-6">
      
       <header className="fixed left-2.5 top-2 z-20 sm:left-4 sm:top-3 md:left-5 md:top-3 lg:left-10 lg:top-4">
-        <div className="theme-header-surface rounded-[1rem] border px-2.5 py-2 backdrop-blur sm:rounded-[1.2rem] sm:px-3 sm:py-2.5 md:px-3.5 md:py-2.5 lg:rounded-[1.4rem] lg:px-4 lg:py-3">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="theme-header-surface rounded-[1rem] border px-2.5 py-2 backdrop-blur sm:rounded-[1.2rem] sm:px-3 sm:py-2.5 md:px-3.5 md:py-2.5 lg:rounded-[1.4rem] lg:px-4 lg:py-3">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open navigation menu"
+              className="flex items-center gap-2.5 sm:gap-3"
+            >
+              <span aria-hidden="true" className="theme-text-primary text-[1.35rem] leading-none sm:text-[1.6rem]">
+                {"\u2630"}
+              </span>
+              <p className="font-fredoka-display theme-text-primary text-[1.7rem] font-black leading-none tracking-[-0.05em] sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
+                <GradientText className="px-1">ColorTile</GradientText>
+              </p>
+            </button>
+          </div>
           <button
             type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="Open navigation menu"
-            className="flex items-center gap-2.5 sm:gap-3"
+            onClick={() => setModeModalOpen(true)}
+            aria-label="Open modes"
+            className="theme-header-surface flex min-h-[3.15rem] items-center gap-2.5 rounded-full border px-4 py-2.5 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[3.45rem] sm:gap-3 sm:px-5 sm:py-3"
           >
-            <span aria-hidden="true" className="theme-text-primary text-[1.35rem] leading-none sm:text-[1.6rem]">
-              {"\u2630"}
+            <span aria-hidden="true" className="text-[1.1rem] leading-none sm:text-[1.25rem]">
+              {"\uD83C\uDFAE"}
             </span>
-            <p className="font-fredoka-display theme-text-primary text-[1.7rem] font-black leading-none tracking-[-0.05em] sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
-              <GradientText className="px-1">ColorTile</GradientText>
-            </p>
+            <span className="theme-text-primary font-fredoka-strong text-[1rem] leading-none sm:text-[1.08rem]">
+              {activeConfig.label}
+            </span>
+            <span aria-hidden="true" className="theme-text-muted text-[0.92rem] leading-none sm:text-[1rem]">
+              {"\u25BE"}
+            </span>
           </button>
         </div>
       </header>
 
       <div className="fixed right-2.5 top-2 z-20 flex items-center gap-2 sm:right-4 sm:top-3 sm:gap-2.5 md:right-5 md:top-3 lg:right-10 lg:top-4">
-        <button
-          type="button"
-          onClick={() => setModeModalOpen(true)}
-          aria-label="Open modes"
-          className="theme-header-surface flex min-h-[3.15rem] items-center gap-2.5 rounded-full border px-4 py-2.5 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[3.45rem] sm:gap-3 sm:px-5 sm:py-3"
-        >
-          <span aria-hidden="true" className="text-[1.1rem] leading-none sm:text-[1.25rem]">
-            {"\uD83C\uDFAE"}
-          </span>
-          <span className="theme-text-primary font-fredoka-strong text-[1rem] leading-none sm:text-[1.08rem]">
-            {activeConfig.label}
-          </span>
-          <span aria-hidden="true" className="theme-text-muted text-[0.92rem] leading-none sm:text-[1rem]">
-            {"\u25BE"}
-          </span>
-        </button>
-        <div className="theme-header-surface flex min-h-[3.15rem] items-center gap-2 rounded-full border px-3.5 py-2 shadow-[0_14px_26px_rgba(15,23,42,0.12)] sm:min-h-[3.45rem] sm:gap-2.5 sm:px-4 sm:py-2.5">
-          <span aria-hidden="true" className="text-[1rem] leading-none sm:text-[1.1rem]">
-            {"\uD83C\uDFC6"}
-          </span>
-          <p className="theme-text-primary font-fredoka-display text-[1.1rem] leading-none tracking-[-0.04em] sm:text-[1.3rem]">
-            {bestTimeDisplay}
-          </p>
-        </div>
         <button
           type="button"
           onClick={() => startGame(activeConfig)}
@@ -862,6 +861,8 @@ export default function Home() {
         <section className="relative flex w-full max-w-[42rem] flex-col items-center gap-1.5 sm:gap-2 md:gap-2.5 lg:mx-auto lg:max-w-[58rem] lg:grid lg:grid-cols-[5.25rem_minmax(0,42rem)_5.25rem] lg:items-start lg:gap-x-4 lg:gap-y-2.5">
           <div className="order-1 w-full lg:col-start-2">
             <GameHud
+              bestMoves={currentBest?.fewestMoves ?? null}
+              bestTimeDisplay={bestTimeDisplay}
               gradientQuality={gradientQuality}
               moves={moves}
               timeDisplay={formatTime(timeLeft)}
