@@ -21,24 +21,30 @@
   --board-frame-bg: linear-gradient(135deg, rgba(255,255,255,0.85) 0%, rgba(241,245,249,0.7) 52%, rgba(224,242,254,0.68) 100%);
   --board-frame-shadow: 0 28px 80px rgba(15, 23, 42, 0.12), 0 12px 28px rgba(15, 23, 42, 0.07);
   --board-win-shadow:
-    0 30px 84px rgba(15, 23, 42, 0.16),
-    0 0 0 1px rgba(255, 255, 255, 0.72),
-    0 0 34px rgba(255, 95, 109, 0.28),
-    0 0 50px rgba(251, 191, 36, 0.28),
-    0 0 66px rgba(52, 211, 153, 0.26),
-    0 0 82px rgba(96, 165, 250, 0.26),
-    0 0 96px rgba(167, 139, 250, 0.22);
+    0 34px 92px rgba(15, 23, 42, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.76),
+    0 0 40px rgba(255, 95, 109, 0.34),
+    0 0 58px rgba(251, 191, 36, 0.34),
+    0 0 78px rgba(52, 211, 153, 0.32),
+    0 0 96px rgba(96, 165, 250, 0.32),
+    0 0 116px rgba(167, 139, 250, 0.28);
   --board-shine-color: rgba(15, 23, 42, 0.08);
   --board-shine-gradient: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 95, 109, 0.12) 10%,
-    rgba(251, 191, 36, 0.26) 28%,
-    rgba(52, 211, 153, 0.32) 50%,
-    rgba(96, 165, 250, 0.28) 72%,
-    rgba(167, 139, 250, 0.2) 90%,
+    rgba(255, 95, 109, 0.18) 8%,
+    rgba(251, 191, 36, 0.34) 26%,
+    rgba(52, 211, 153, 0.42) 50%,
+    rgba(96, 165, 250, 0.38) 74%,
+    rgba(167, 139, 250, 0.28) 92%,
     transparent 100%
   );
+  --board-glow-gradient:
+    radial-gradient(circle at 18% 32%, rgba(255, 95, 109, 0.24), transparent 34%),
+    radial-gradient(circle at 50% 18%, rgba(251, 191, 36, 0.22), transparent 36%),
+    radial-gradient(circle at 50% 82%, rgba(52, 211, 153, 0.24), transparent 38%),
+    radial-gradient(circle at 82% 36%, rgba(96, 165, 250, 0.24), transparent 34%),
+    radial-gradient(circle at 78% 74%, rgba(167, 139, 250, 0.22), transparent 34%);
   --tile-edge: rgba(255, 255, 255, 0.75);
   --progress-track: #e2e8f0;
   --button-primary-bg: #1e293b;
@@ -73,9 +79,24 @@ html[data-theme="dark"] {
   --board-shell-bg: rgba(15, 23, 42, 0.72);
   --board-frame-bg: linear-gradient(135deg, rgba(30,41,59,0.96) 0%, rgba(37,52,77,0.9) 45%, rgba(19,78,74,0.78) 100%);
   --board-frame-shadow: 0 30px 82px rgba(2, 6, 23, 0.56), 0 12px 28px rgba(8, 47, 73, 0.28);
-  --board-win-shadow: 0 34px 96px rgba(96, 165, 250, 0.18), 0 18px 34px rgba(52, 211, 153, 0.12);
+  --board-win-shadow:
+    0 38px 104px rgba(96, 165, 250, 0.22),
+    0 18px 36px rgba(52, 211, 153, 0.16),
+    0 0 44px rgba(96, 165, 250, 0.12);
   --board-shine-color: rgba(255, 255, 255, 0.15);
-  --board-shine-gradient: linear-gradient(90deg, transparent, var(--board-shine-color), transparent);
+  --board-shine-gradient: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 18%,
+    rgba(125, 211, 252, 0.22) 46%,
+    rgba(110, 231, 183, 0.18) 62%,
+    rgba(255, 255, 255, 0.08) 82%,
+    transparent 100%
+  );
+  --board-glow-gradient:
+    radial-gradient(circle at 22% 34%, rgba(96, 165, 250, 0.2), transparent 36%),
+    radial-gradient(circle at 76% 34%, rgba(56, 189, 248, 0.18), transparent 34%),
+    radial-gradient(circle at 52% 78%, rgba(52, 211, 153, 0.18), transparent 38%);
   --tile-edge: rgba(148, 163, 184, 0.34);
   --progress-track: #23324b;
   --button-primary-bg: #e2e8f0;
@@ -214,6 +235,11 @@ select {
 .theme-board-frame {
   background: var(--board-frame-bg);
   box-shadow: var(--board-frame-shadow);
+}
+
+.theme-board-glow {
+  background: var(--board-glow-gradient);
+  filter: blur(24px);
 }
 
 .theme-board-shine {

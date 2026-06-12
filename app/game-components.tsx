@@ -198,6 +198,7 @@ type BoardProps = {
   isTileCorrect: (tile: Tile, index: number) => boolean;
   isTileLocked: (tile: Tile, index: number) => boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, index: number) => void;
+  pressedTileIndex: number | null;
 };
 
 type TileButtonProps = {
@@ -206,6 +207,7 @@ type TileButtonProps = {
   index: number;
   isCorrect: boolean;
   isDragging: boolean;
+  isPressed: boolean;
   tile: Tile;
   tileRadiusClass: string;
   winWaveActive: boolean;
@@ -222,6 +224,7 @@ const TileButton = memo(function TileButton({
   index,
   isCorrect,
   isDragging,
+  isPressed,
   tile,
   tileRadiusClass,
   winWaveActive,
@@ -269,37 +272,36 @@ const TileButton = memo(function TileButton({
         opacity: isDragging ? 0 : 1,
         rotateX: winWaveActive ? 0 : tilt.rotateX,
         rotateY: winWaveActive ? 0 : tilt.rotateY,
-        scale: winWaveActive ? [1, 1.06, 1.015, 0.992, 1] : isHovering && !isDragging ? 1.02 : 1,
-        y: winWaveActive ? [0, -5, -2, 0.5, 0] : isHovering && !isDragging ? -5 : 0,
+        scale: winWaveActive ? [1, 1.08, 1.03, 1] : isPressed ? 1.10 : isHovering && !isDragging ? 1.02 : 1,
+        y: winWaveActive ? [0, -8, -3, 0] : isPressed ? -8 : isHovering && !isDragging ? -5 : 0,
         boxShadow: winWaveActive
-          ? [TILE_REST_SHADOW, TILE_HOVER_SHADOW, TILE_DRAG_SHADOW, TILE_HOVER_SHADOW, TILE_REST_SHADOW]
+          ? [TILE_REST_SHADOW, TILE_HOVER_SHADOW, TILE_DRAG_SHADOW, TILE_REST_SHADOW]
+          : isPressed
+            ? TILE_DRAG_SHADOW
           : isHovering && !isDragging
             ? TILE_HOVER_SHADOW
             : TILE_REST_SHADOW,
-        filter: isHovering && !isDragging ? "saturate(1.04) brightness(1.02)" : "saturate(1) brightness(1)",
+        filter: winWaveActive
+          ? ["saturate(1) brightness(1)", "saturate(1.18) brightness(1.08)", "saturate(1.08) brightness(1.03)", "saturate(1) brightness(1)"]
+          : isPressed
+            ? "saturate(1.12) brightness(1.04)"
+          : isHovering && !isDragging
+            ? "saturate(1.04) brightness(1.02)"
+            : "saturate(1) brightness(1)",
       }}
       transition={
         winWaveActive
           ? {
-              duration: 0.4,
+              duration: 0.46,
               ease: [0.22, 1, 0.36, 1],
               delay: winWaveDelay,
             }
           : {
               type: "spring",
-              stiffness: 360,
+              stiffness: 420,
               damping: 24,
-              mass: 0.85,
+              mass: 0.7,
             }
-      }
-      whileTap={
-        canDrag && !isDragging
-          ? {
-              scale: 1.01,
-              boxShadow: TILE_DRAG_SHADOW,
-              filter: "saturate(1.08) brightness(1.04)",
-            }
-          : undefined
       }
       className={`tile-surface relative aspect-square border border-white/75 ${tileRadiusClass} ${
         isDragging ? "pointer-events-none" : ""
@@ -323,6 +325,7 @@ const TileButton = memo(function TileButton({
     previousProps.index === nextProps.index &&
     previousProps.isCorrect === nextProps.isCorrect &&
     previousProps.isDragging === nextProps.isDragging &&
+    previousProps.isPressed === nextProps.isPressed &&
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
     previousProps.winWaveActive === nextProps.winWaveActive &&
@@ -348,6 +351,7 @@ export const GameBoard = memo(function GameBoard({
   isTileCorrect,
   isTileLocked,
   onPointerDown,
+  pressedTileIndex,
 }: Readonly<BoardProps>) {
   const size = Math.sqrt(board.length);
   const initialOverlayX = dragSession ? dragSession.pointerX - dragSession.offsetX : 0;
@@ -382,17 +386,12 @@ export const GameBoard = memo(function GameBoard({
   return (
     <>
       <motion.div
-        className="theme-board-frame mx-auto aspect-square w-full max-w-[42rem] rounded-[0.95rem] p-px sm:rounded-[1rem] md:rounded-[1.08rem] lg:max-w-[58rem] lg:rounded-[1.2rem]"
+        className="theme-board-frame relative mx-auto aspect-square w-full max-w-[42rem] rounded-[0.95rem] p-px sm:rounded-[1rem] md:rounded-[1.08rem] lg:max-w-[58rem] lg:rounded-[1.2rem]"
         initial={false}
         animate={
           confettiActive
             ? {
-                scale: [1, 1.01, 1],
-                boxShadow: [
-                  "var(--board-frame-shadow)",
-                  "var(--board-win-shadow)",
-                  "var(--board-frame-shadow)",
-                ],
+                scale: [1, 1.018, 1.006, 1],
               }
             : {
                 scale: 1,
@@ -401,18 +400,27 @@ export const GameBoard = memo(function GameBoard({
         }
         transition={
           confettiActive
-            ? { duration: 0.8, ease: [0.22, 1, 0.36, 1] }
+            ? { duration: 1.45, ease: [0.22, 1, 0.36, 1] }
             : { duration: 0.2 }
         }
       >
+        {confettiActive && (
+          <motion.div
+            aria-hidden="true"
+            className="theme-board-glow pointer-events-none absolute -inset-5 rounded-[1.6rem] sm:-inset-6 sm:rounded-[1.9rem] md:-inset-7 md:rounded-[2.1rem] lg:-inset-8 lg:rounded-[2.5rem]"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: [0, 0.75, 0.9, 0.2], scale: [0.96, 1, 1.035, 1.04] }}
+            transition={{ duration: 1.85, ease: [0.16, 1, 0.3, 1] }}
+          />
+        )}
         <div className="theme-board-shell relative h-full w-full overflow-hidden rounded-[calc(0.95rem-1px)] p-1 backdrop-blur-[20px] sm:rounded-[calc(1rem-1px)] sm:p-1.25 md:rounded-[calc(1.08rem-1px)] md:p-1.5 lg:rounded-[calc(1.2rem-1px)] lg:p-2.5">
           {confettiActive && (
             <motion.div
               aria-hidden="true"
-              className="theme-board-shine pointer-events-none absolute inset-y-0 -left-1/3 w-1/2"
-              initial={{ x: "-30%" }}
-              animate={{ x: "260%" }}
-              transition={{ duration: 1.1, ease: "linear" }}
+              className="theme-board-shine pointer-events-none absolute inset-y-0 -left-1/2 w-[72%]"
+              initial={{ x: "-22%", opacity: 0 }}
+              animate={{ x: "230%", opacity: [0, 1, 1, 0] }}
+              transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
             />
           )}
           <div
@@ -427,6 +435,7 @@ export const GameBoard = memo(function GameBoard({
               const isLocked = isTileLocked(tile, index);
               const canDrag = !isLocked && !winState && !loseState;
               const canHover = allowHoverWhenLocked || (!winState && !loseState && (canDrag || isCorrect));
+              const columnIndex = index % size;
 
               return (
                 <TileButton
@@ -436,10 +445,11 @@ export const GameBoard = memo(function GameBoard({
                   index={index}
                   isCorrect={isCorrect}
                   isDragging={isDragging && dragSession !== null}
+                  isPressed={pressedTileIndex === index}
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
                   winWaveActive={winWaveActive}
-                  winWaveDelay={index * 0.045}
+                  winWaveDelay={columnIndex * 0.045}
                   winState={winState}
                   loseState={loseState}
                   tileRef={getTileRef(tile.id)}

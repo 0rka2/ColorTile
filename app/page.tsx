@@ -32,6 +32,7 @@ const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
 const TILE_SWAP_ANIMATION_DURATION_MS = 220;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const DRAG_ROTATION_MAX_DEGREES = 3;
+const DRAG_START_DISTANCE_PX = 6;
 const DROP_TARGET_RING_CLASSES = [
   "ring-2",
   "ring-slate-300/70",
@@ -88,6 +89,7 @@ export default function Home() {
   const [customDraftTime, setCustomDraftTime] = useState(35);
   const [board, setBoard] = useState<Tile[]>([]);
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
+  const [pressedTileIndex, setPressedTileIndex] = useState<number | null>(null);
   const [moves, setMoves] = useState(0);
   const [timeLeft, setTimeLeft] = useState(PRESET_DIFFICULTIES.normal.time);
   const [completion, setCompletion] = useState(0);
@@ -106,6 +108,7 @@ export default function Home() {
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
   const dragPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
   const dragPointerTargetRef = useRef<HTMLButtonElement | null>(null);
+  const pendingDragStartRef = useRef<DragSession | null>(null);
   const dragOverlayElementRef = useRef<HTMLDivElement | null>(null);
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
@@ -257,11 +260,11 @@ export default function Home() {
     cancelDragAnimationFrame();
 
     const currentPointerTarget = dragPointerTargetRef.current;
-    const currentDragSession = dragSession;
-    if (currentPointerTarget && currentDragSession?.pointerId !== undefined) {
+    const activePointerId = dragSession?.pointerId ?? pendingDragStartRef.current?.pointerId;
+    if (currentPointerTarget && activePointerId !== undefined) {
       try {
-        if (currentPointerTarget.hasPointerCapture(currentDragSession.pointerId)) {
-          currentPointerTarget.releasePointerCapture(currentDragSession.pointerId);
+        if (currentPointerTarget.hasPointerCapture(activePointerId)) {
+          currentPointerTarget.releasePointerCapture(activePointerId);
         }
       } catch {
         // Ignore stale capture cleanup errors.
@@ -270,6 +273,8 @@ export default function Home() {
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
+    pendingDragStartRef.current = null;
+    setPressedTileIndex(null);
     updateHoveredDropTarget(null);
     setDragSession(null);
   }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
@@ -626,6 +631,57 @@ export default function Home() {
   }, [cancelDragAnimationFrame, dragSession, scheduleDragOverlayPositionUpdate]);
 
   useEffect(() => {
+    if (dragSession || pressedTileIndex === null) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const pendingDragStart = pendingDragStartRef.current;
+      if (!pendingDragStart || event.pointerId !== pendingDragStart.pointerId) {
+        return;
+      }
+
+      dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
+
+      const distance = Math.hypot(
+        event.clientX - pendingDragStart.pointerX,
+        event.clientY - pendingDragStart.pointerY,
+      );
+
+      if (distance < DRAG_START_DISTANCE_PX) {
+        return;
+      }
+
+      pendingDragStartRef.current = null;
+      setPressedTileIndex(null);
+      setDragSession({
+        ...pendingDragStart,
+        pointerX: event.clientX,
+        pointerY: event.clientY,
+      });
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      const pendingDragStart = pendingDragStartRef.current;
+      if (!pendingDragStart || event.pointerId !== pendingDragStart.pointerId) {
+        return;
+      }
+
+      clearDragSession();
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerEnd);
+    window.addEventListener("pointercancel", handlePointerEnd);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+    };
+  }, [clearDragSession, dragSession, pressedTileIndex]);
+
+  useEffect(() => {
     return () => {
       cancelDragAnimationFrame();
     };
@@ -658,7 +714,7 @@ export default function Home() {
     dragPointerTargetRef.current = event.currentTarget;
     dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
 
-    setDragSession({
+    pendingDragStartRef.current = {
       color: tile.color,
       grabX: event.clientX,
       height: tileRect.height,
@@ -671,7 +727,8 @@ export default function Home() {
       pointerId: event.pointerId,
       tileId: tile.id,
       width: tileRect.width,
-    });
+    };
+    setPressedTileIndex(index);
   }, [board, loseState, winState]);
 
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
@@ -817,6 +874,7 @@ export default function Home() {
               isTileCorrect={isTileCorrect}
               isTileLocked={isTileLocked}
               onPointerDown={handlePointerDown}
+              pressedTileIndex={pressedTileIndex}
             />
           </div>
 

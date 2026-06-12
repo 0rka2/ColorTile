@@ -10,7 +10,8 @@ export function getWinWaveDuration(tileCount: number) {
     return 0;
   }
 
-  return (tileCount - 1) * WIN_TILE_WAVE_STAGGER_MS + WIN_TILE_POP_DURATION_MS;
+  const columnCount = Math.max(1, Math.round(Math.sqrt(tileCount)));
+  return (columnCount - 1) * WIN_TILE_WAVE_STAGGER_MS + WIN_TILE_POP_DURATION_MS;
 }
 
 export function getWinSequenceDurations(tileCount: number) {
