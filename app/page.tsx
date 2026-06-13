@@ -840,19 +840,6 @@ export default function Home() {
       </header>
 
       <div className="fixed right-2.5 top-2 z-20 flex items-center gap-2 sm:right-4 sm:top-3 sm:gap-2.5 md:right-5 md:top-3 lg:right-10 lg:top-4">
-        <button
-          type="button"
-          onClick={() => startGame(activeConfig)}
-          aria-label="Restart game"
-          className="theme-header-surface flex h-12 items-center justify-center gap-2 rounded-full border px-3.5 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-14 sm:px-4"
-        >
-          <span aria-hidden="true" className="theme-text-primary text-[1rem] leading-none sm:text-[1.1rem]">
-            {"\u21BB"}
-          </span>
-          <span className="theme-text-primary font-fredoka-strong hidden text-[0.98rem] leading-none md:inline">
-            Restart
-          </span>
-        </button>
         <ThemeToggle onThemeModeChange={setThemeMode} themeMode={themeMode} />
       </div>
 
@@ -897,6 +884,20 @@ export default function Home() {
               showDevControls={process.env.NODE_ENV !== "production"}
               onAutoSolve={handleAutoSolve}
             />
+          </div>
+
+          <div className="order-5 flex w-full justify-center lg:col-start-2">
+            <button
+              type="button"
+              onClick={() => startGame(activeConfig)}
+              aria-label="Restart game"
+              className="theme-button-primary font-fredoka-strong flex min-h-[3.35rem] items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.98rem] shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[3.6rem] sm:px-7 sm:text-[1.02rem]"
+            >
+              <span aria-hidden="true" className="text-[1rem] leading-none sm:text-[1.1rem]">
+                {"\u21BB"}
+              </span>
+              <span>Restart</span>
+            </button>
           </div>
 
           <div aria-hidden="true" className="hidden lg:block lg:col-start-3 lg:row-start-2 lg:w-[5.25rem]" />
