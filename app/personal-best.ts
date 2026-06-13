@@ -14,10 +14,10 @@ export const EMPTY_PERSONAL_BEST_STATUS: PersonalBestStatus = {
 
 export function getPersonalBestStatus(
   currentRecord: BestRecord | undefined,
-  result: { moves: number; timeLeft: number },
+  result: { moves: number; solveTime: number },
 ): PersonalBestStatus {
   const isNewBestTime =
-    currentRecord?.bestTimeLeft === undefined || result.timeLeft > currentRecord.bestTimeLeft;
+    currentRecord?.bestSolveTime === undefined || result.solveTime < currentRecord.bestSolveTime;
   const isNewBestMoves =
     currentRecord?.fewestMoves === undefined || result.moves < currentRecord.fewestMoves;
 

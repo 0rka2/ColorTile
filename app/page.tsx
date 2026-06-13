@@ -33,6 +33,8 @@ const TILE_SWAP_ANIMATION_DURATION_MS = 220;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const DRAG_ROTATION_MAX_DEGREES = 3;
 const DRAG_START_DISTANCE_PX = 6;
+const TILE_DRAG_SCALE = 1.065;
+const GAME_AREA_MAX_WIDTH_PX = 600;
 const DROP_TARGET_RING_CLASSES = [
   "ring-2",
   "ring-slate-300/70",
@@ -63,6 +65,18 @@ function getAccuracyScore(size: number, moves: number) {
   return Math.max(75, Math.min(100, rawScore));
 }
 
+function getBestSolveTime(record: BestStats[DifficultyKey], totalTime: number) {
+  if (record?.bestSolveTime !== undefined) {
+    return record.bestSolveTime;
+  }
+
+  if (record?.bestTimeLeft !== undefined) {
+    return Math.max(0, totalTime - record.bestTimeLeft);
+  }
+
+  return undefined;
+}
+
 type DragSession = {
   color: string;
   grabX: number;
@@ -81,6 +95,12 @@ type DragSession = {
 type BoardStateUpdater = Tile[] | ((currentBoard: Tile[]) => Tile[]);
 
 export default function Home() {
+  const pageShellRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const hudRef = useRef<HTMLDivElement | null>(null);
+  const controlsRef = useRef<HTMLDivElement | null>(null);
+  const restartRef = useRef<HTMLDivElement | null>(null);
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
   const [customSizeMax, setCustomSizeMax] = useState(14);
   const [customSize, setCustomSize] = useState(8);
@@ -104,6 +124,7 @@ export default function Home() {
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [boardResetKey, setBoardResetKey] = useState(0);
+  const [boardSize, setBoardSize] = useState(0);
   const tileElementsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
   const dragPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -114,6 +135,10 @@ export default function Home() {
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const latestBoardRef = useRef<Tile[]>([]);
   const winSequenceTimeoutsRef = useRef<number[]>([]);
+  const dragSessionActiveRef = useRef(false);
+  const timerEffectRunCountRef = useRef(0);
+  const clearDragSessionRef = useRef<() => void>(() => {});
+  const resetWinSequenceRef = useRef<() => void>(() => {});
 
   const activeConfig =
     difficulty === "custom"
@@ -148,8 +173,71 @@ export default function Home() {
       // Ignore storage failures and keep the in-memory theme.
     }
   }, [themeMode]);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const measureBoardSize = () => {
+      const shellElement = pageShellRef.current;
+      const contentElement = contentRef.current;
+      const headerElement = headerRef.current;
+      const hudElement = hudRef.current;
+      const controlsElement = controlsRef.current;
+      const restartElement = restartRef.current;
+
+      if (!shellElement || !contentElement || !headerElement || !hudElement || !controlsElement || !restartElement) {
+        return;
+      }
+
+      const shellGap = Number.parseFloat(window.getComputedStyle(shellElement).rowGap || "0");
+      const contentGap = Number.parseFloat(window.getComputedStyle(contentElement).rowGap || "0");
+      const paddingLeft = Number.parseFloat(window.getComputedStyle(shellElement).paddingLeft || "0");
+      const paddingRight = Number.parseFloat(window.getComputedStyle(shellElement).paddingRight || "0");
+      const paddingTop = Number.parseFloat(window.getComputedStyle(shellElement).paddingTop || "0");
+      const paddingBottom = Number.parseFloat(window.getComputedStyle(shellElement).paddingBottom || "0");
+      const contentPaddingBottom = Number.parseFloat(window.getComputedStyle(contentElement).paddingBottom || "0");
+
+      const availableWidth = window.innerWidth - paddingLeft - paddingRight;
+      const reservedHeight =
+        headerElement.getBoundingClientRect().height +
+        hudElement.getBoundingClientRect().height +
+        controlsElement.getBoundingClientRect().height +
+        restartElement.getBoundingClientRect().height +
+        shellGap +
+        contentGap * 3 +
+        paddingTop +
+        paddingBottom +
+        contentPaddingBottom;
+      const availableHeight = window.innerHeight - reservedHeight;
+
+      const measuredBoardSize = Math.max(0, Math.floor(Math.min(availableWidth, availableHeight)));
+      const minimumBoardSize = window.innerWidth < 360 ? 240 : 280;
+      const nextBoardSize = Math.min(availableWidth, GAME_AREA_MAX_WIDTH_PX, Math.max(minimumBoardSize, measuredBoardSize));
+      setBoardSize(nextBoardSize);
+    };
+
+    measureBoardSize();
+
+    const resizeObserver = new ResizeObserver(measureBoardSize);
+    [pageShellRef.current, headerRef.current, contentRef.current, hudRef.current, controlsRef.current, restartRef.current].forEach((element) => {
+      if (element) {
+        resizeObserver.observe(element);
+      }
+    });
+
+    window.addEventListener("resize", measureBoardSize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measureBoardSize);
+    };
+  }, [activeConfig.time, activeConfig.size, board.length, boardResetKey, completion, difficulty, loseState, moves, themeMode, timeLeft, winState]);
   const currentBest = bestStats[difficulty];
-  const bestTimeDisplay = currentBest?.bestTimeLeft === undefined ? "-" : formatTime(currentBest.bestTimeLeft);
+  const bestSolveTime = getBestSolveTime(currentBest, activeConfig.time);
+  const bestTimeDisplay = bestSolveTime === undefined ? "-" : formatTime(bestSolveTime);
+  const solveTime = Math.max(0, activeConfig.time - timeLeft);
   const draggedIndex = dragSession?.index ?? null;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
   const gradientQuality = getGradientQuality(completion);
@@ -211,7 +299,7 @@ export default function Home() {
     const nextX = pointerPosition.x - currentDragSession.offsetX;
     const nextY = pointerPosition.y - currentDragSession.offsetY;
     const rotate = clamp((pointerPosition.x - currentDragSession.grabX) / 14, -DRAG_ROTATION_MAX_DEGREES, DRAG_ROTATION_MAX_DEGREES);
-    overlayElement.style.transform = `translate3d(${nextX}px, ${nextY}px, 0) scale(1.04) rotate(${rotate}deg)`;
+    overlayElement.style.transform = `translate3d(${nextX}px, ${nextY}px, 0) scale(${TILE_DRAG_SCALE}) rotate(${rotate}deg)`;
   }, [dragSession]);
 
   const scheduleDragOverlayPositionUpdate = useCallback(() => {
@@ -284,6 +372,11 @@ export default function Home() {
     setWinPhase("idle");
     setPersonalBestStatus(EMPTY_PERSONAL_BEST_STATUS);
   }, [clearWinSequenceTimeouts]);
+
+  useEffect(() => {
+    clearDragSessionRef.current = clearDragSession;
+    resetWinSequenceRef.current = resetWinSequence;
+  }, [clearDragSession, resetWinSequence]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
     if (typeof document === "undefined") {
@@ -414,6 +507,25 @@ export default function Home() {
   };
 
   useEffect(() => {
+    dragSessionActiveRef.current = dragSession !== null;
+    // #region agent log
+    fetch("http://127.0.0.1:7759/ingest/373885ff-b644-4d4e-bd29-b3b11ded9295", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2cb712" },
+      body: JSON.stringify({
+        sessionId: "2cb712",
+        runId: "pre-fix",
+        hypothesisId: "A",
+        location: "page.tsx:dragSession-effect",
+        message: "dragSession changed",
+        data: { dragActive: dragSession !== null, pressedTileIndex },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [dragSession, pressedTileIndex]);
+
+  useEffect(() => {
     if (difficulty === "custom") {
       return;
     }
@@ -430,10 +542,16 @@ export default function Home() {
     setCompletion(nextCompletion);
 
     if (nextCompletion === 100) {
+      const solveTime = activeConfig.time - timeLeft;
+      const currentBestWithSolveTime = {
+        ...currentBest,
+        bestSolveTime: getBestSolveTime(currentBest, activeConfig.time),
+      };
+
       setPersonalBestStatus(
-        getPersonalBestStatus(currentBest, {
+        getPersonalBestStatus(currentBestWithSolveTime, {
           moves,
-          timeLeft,
+          solveTime,
         }),
       );
       setWinState(true);
@@ -442,12 +560,13 @@ export default function Home() {
 
       setBestStats((current) => {
         const currentRecord = current[difficulty] ?? {};
+        const currentBestSolveTime = getBestSolveTime(currentRecord, activeConfig.time);
         const nextRecord = {
           bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
-          bestTimeLeft:
-            currentRecord.bestTimeLeft === undefined
-              ? timeLeft
-              : Math.max(currentRecord.bestTimeLeft, timeLeft),
+          bestSolveTime:
+            currentBestSolveTime === undefined
+              ? solveTime
+              : Math.min(currentBestSolveTime, solveTime),
           fewestMoves:
             currentRecord.fewestMoves === undefined
               ? moves
@@ -460,7 +579,7 @@ export default function Home() {
         };
       });
     }
-  }, [board, clearDragSession, currentBest, difficulty, moves, timeLeft, winState]);
+  }, [activeConfig.time, board, clearDragSession, currentBest, difficulty, moves, timeLeft, winState]);
 
   useEffect(() => {
     if (winPhase !== "boardWave" && winPhase !== "confetti") {
@@ -493,11 +612,59 @@ export default function Home() {
 
   useEffect(() => {
     if (!board.length || winState || loseState || customModalOpen || !timerStarted) {
+      // #region agent log
+      fetch("http://127.0.0.1:7759/ingest/373885ff-b644-4d4e-bd29-b3b11ded9295", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2cb712" },
+        body: JSON.stringify({
+          sessionId: "2cb712",
+        runId: "post-fix",
+        hypothesisId: "B",
+        location: "page.tsx:timer-effect-guard",
+          message: "Timer effect blocked",
+          data: { boardLength: board.length, winState, loseState, customModalOpen, timerStarted, dragActive: dragSessionActiveRef.current },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return;
     }
 
+    timerEffectRunCountRef.current += 1;
+    const effectRunId = timerEffectRunCountRef.current;
+    // #region agent log
+    fetch("http://127.0.0.1:7759/ingest/373885ff-b644-4d4e-bd29-b3b11ded9295", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2cb712" },
+      body: JSON.stringify({
+        sessionId: "2cb712",
+        runId: "post-fix",
+        hypothesisId: "A",
+        location: "page.tsx:timer-effect-setup",
+        message: "Timer interval created",
+        data: { effectRunId, timerStarted, dragActive: dragSessionActiveRef.current, timeLeft },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     const interval = window.setInterval(() => {
       setTimeLeft((current) => {
+        // #region agent log
+        fetch("http://127.0.0.1:7759/ingest/373885ff-b644-4d4e-bd29-b3b11ded9295", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2cb712" },
+          body: JSON.stringify({
+            sessionId: "2cb712",
+            runId: "post-fix",
+            hypothesisId: "C",
+            location: "page.tsx:timer-tick",
+            message: "Timer tick fired",
+            data: { effectRunId, current, next: current <= 1 ? 0 : current - 1, dragActive: dragSessionActiveRef.current },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         if (current <= 1) {
           window.clearInterval(interval);
           const finalBoard = latestBoardRef.current;
@@ -515,9 +682,9 @@ export default function Home() {
             };
           });
           setCompletion(finalCompletion);
-          resetWinSequence();
+          resetWinSequenceRef.current();
           setLoseState(true);
-          clearDragSession();
+          clearDragSessionRef.current();
           return 0;
         }
 
@@ -525,8 +692,25 @@ export default function Home() {
       });
     }, 1000);
 
-    return () => window.clearInterval(interval);
-  }, [board.length, clearDragSession, difficulty, winState, loseState, customModalOpen, resetWinSequence, timerStarted]);
+    return () => {
+      // #region agent log
+      fetch("http://127.0.0.1:7759/ingest/373885ff-b644-4d4e-bd29-b3b11ded9295", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "2cb712" },
+        body: JSON.stringify({
+          sessionId: "2cb712",
+          runId: "post-fix",
+          hypothesisId: "A",
+          location: "page.tsx:timer-effect-cleanup",
+          message: "Timer interval cleared",
+          data: { effectRunId, dragActive: dragSessionActiveRef.current },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      window.clearInterval(interval);
+    };
+  }, [board.length, difficulty, winState, loseState, customModalOpen, timerStarted]);
 
   useEffect(() => {
     if (!drawerOpen && !modeModalOpen) {
@@ -801,52 +985,60 @@ export default function Home() {
   }, [clearDragSession, resetWinSequence, updateBoard]);
 
   return (
-    <main className="theme-page-bg h-screen overflow-hidden px-2.5 py-3 sm:px-4 sm:py-4 md:px-5 md:py-5 lg:px-6 lg:py-6">
-     
-      <header className="fixed left-2.5 top-2 z-20 sm:left-4 sm:top-3 md:left-5 md:top-3 lg:left-10 lg:top-4">
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          <div className="theme-header-surface rounded-[1rem] border px-2.5 py-2 backdrop-blur sm:rounded-[1.2rem] sm:px-3 sm:py-2.5 md:px-3.5 md:py-2.5 lg:rounded-[1.4rem] lg:px-4 lg:py-3">
+    <main className="theme-page-bg min-h-dvh overflow-x-hidden overflow-y-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-0">
+      <div ref={pageShellRef} className="mx-auto flex min-h-[100dvh] w-full max-w-[72rem] flex-col gap-[clamp(0.35rem,0.9vw,0.7rem)]">
+        <header ref={headerRef} className="flex items-start justify-between gap-[clamp(0.55rem,1.2vw,0.9rem)]">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            <div className="relative">
+              <div className="theme-header-surface rounded-[clamp(0.85rem,1.5vw,1.3rem)] border px-[clamp(0.65rem,1.4vw,0.95rem)] py-[clamp(0.45rem,1vw,0.75rem)] backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(true)}
+                  aria-label="Open navigation menu"
+                  aria-expanded={drawerOpen}
+                  className="flex items-center gap-2 sm:gap-2.5"
+                >
+                  <span aria-hidden="true" className="theme-text-primary text-[clamp(1.1rem,1.8vw,1.45rem)] leading-none">
+                    {"\u2630"}
+                  </span>
+                  <p className="font-fredoka-display theme-text-primary text-[clamp(1.35rem,2.4vw,2.1rem)] font-black leading-none tracking-[-0.05em]">
+                    <GradientText className="px-1">ColorTile</GradientText>
+                  </p>
+                </button>
+              </div>
+              <GameDrawer
+                isOpen={drawerOpen}
+                onClose={() => setDrawerOpen(false)}
+                onOpenCustom={handleOpenCustomFromDrawer}
+                onOpenModes={handleOpenModesFromDrawer}
+              />
+            </div>
             <button
               type="button"
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open navigation menu"
-              className="flex items-center gap-2.5 sm:gap-3"
+              onClick={() => setModeModalOpen(true)}
+              aria-label="Open modes"
+              className="theme-header-surface flex min-h-[clamp(2.55rem,4.8vw,3.25rem)] items-center gap-2 rounded-full border px-[clamp(0.8rem,1.8vw,1.15rem)] py-[clamp(0.45rem,1vw,0.75rem)] shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
             >
-              <span aria-hidden="true" className="theme-text-primary text-[1.35rem] leading-none sm:text-[1.6rem]">
-                {"\u2630"}
+              <span className="theme-text-primary font-fredoka-strong text-[clamp(0.9rem,1.45vw,1.08rem)] leading-none">
+                {activeConfig.label}
               </span>
-              <p className="font-fredoka-display theme-text-primary text-[1.7rem] font-black leading-none tracking-[-0.05em] sm:text-[2rem] md:text-[2.35rem] lg:text-5xl">
-                <GradientText className="px-1">ColorTile</GradientText>
-              </p>
+              <span aria-hidden="true" className="theme-text-muted text-[clamp(0.75rem,1vw,0.9rem)] leading-none">
+                {"\u25BE"}
+              </span>
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setModeModalOpen(true)}
-            aria-label="Open modes"
-            className="theme-header-surface flex min-h-[3.15rem] items-center gap-2.5 rounded-full border px-4 py-2.5 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[3.45rem] sm:gap-3 sm:px-5 sm:py-3"
+
+          <div className="shrink-0">
+            <ThemeToggle onThemeModeChange={setThemeMode} themeMode={themeMode} />
+          </div>
+        </header>
+
+        <section ref={contentRef} className="flex flex-1 min-h-0 flex-col items-center justify-start gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)] mt-[10vh]">
+          <div
+            ref={hudRef}
+            className="w-full max-w-full"
+            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
           >
-            <span aria-hidden="true" className="text-[1.1rem] leading-none sm:text-[1.25rem]">
-              {"\uD83C\uDFAE"}
-            </span>
-            <span className="theme-text-primary font-fredoka-strong text-[1rem] leading-none sm:text-[1.08rem]">
-              {activeConfig.label}
-            </span>
-            <span aria-hidden="true" className="theme-text-muted text-[0.92rem] leading-none sm:text-[1rem]">
-              {"\u25BE"}
-            </span>
-          </button>
-        </div>
-      </header>
-
-      <div className="fixed right-2.5 top-2 z-20 flex items-center gap-2 sm:right-4 sm:top-3 sm:gap-2.5 md:right-5 md:top-3 lg:right-10 lg:top-4">
-        <ThemeToggle onThemeModeChange={setThemeMode} themeMode={themeMode} />
-      </div>
-
-      <div className="mx-auto flex h-full w-full max-w-[72rem] flex-col pt-9 sm:pt-11 md:pt-16 lg:pt-12">
-        <div className="flex flex-1 flex-col items-center justify-center">
-        <section className="relative flex w-full max-w-[42rem] flex-col items-center gap-1.5 sm:gap-2 md:gap-2.5 lg:mx-auto lg:max-w-[58rem] lg:grid lg:grid-cols-[5.25rem_minmax(0,42rem)_5.25rem] lg:items-start lg:gap-x-4 lg:gap-y-2.5">
-          <div className="order-1 w-full lg:col-start-2">
             <GameHud
               bestMoves={currentBest?.fewestMoves ?? null}
               bestTimeDisplay={bestTimeDisplay}
@@ -857,7 +1049,10 @@ export default function Home() {
             />
           </div>
 
-          <div className="order-3 w-full lg:col-start-2">
+          <div
+            className="flex w-full max-w-full justify-center"
+            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
+          >
             <GameBoard
               key={boardResetKey}
               allowHoverWhenLocked={allowHoverWhenLocked}
@@ -879,51 +1074,49 @@ export default function Home() {
             />
           </div>
 
-          <div className="order-4 w-full lg:col-start-1 lg:row-start-2 lg:self-start lg:pt-4">
+          <div
+            ref={controlsRef}
+            className="w-full max-w-full"
+            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
+          >
             <GameControls
               showDevControls={process.env.NODE_ENV !== "production"}
               onAutoSolve={handleAutoSolve}
             />
           </div>
 
-          <div className="order-5 flex w-full justify-center lg:col-start-2">
+          <div
+            ref={restartRef}
+            className="relative z-10 flex w-full justify-center"
+            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
+          >
             <button
               type="button"
               onClick={() => startGame(activeConfig)}
               aria-label="Restart game"
-              className="theme-button-primary font-fredoka-strong flex min-h-[3.35rem] items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.98rem] shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:min-h-[3.6rem] sm:px-7 sm:text-[1.02rem]"
+              className="theme-button-primary restart-button font-fredoka-strong flex min-h-[clamp(2.5rem,4.5vw,3.2rem)] items-center justify-center gap-2 rounded-full px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.45rem,0.85vw,0.65rem)] text-[clamp(0.92rem,1.45vw,1.05rem)] shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
             >
-              <span aria-hidden="true" className="text-[1rem] leading-none sm:text-[1.1rem]">
+              <span aria-hidden="true" className="text-[clamp(0.95rem,1.5vw,1.1rem)] leading-none">
                 {"\u21BB"}
               </span>
               <span>Restart</span>
             </button>
           </div>
-
-          <div aria-hidden="true" className="hidden lg:block lg:col-start-3 lg:row-start-2 lg:w-[5.25rem]" />
-
-          <GameModal
-            activeConfig={activeConfig}
-            accuracy={accuracy}
-            completion={completion}
-            loseState={loseState}
-            moves={moves}
-            onRestart={() => startGame(activeConfig)}
-            personalBestStatus={personalBestStatus}
-            timeDisplay={formatTime(timeLeft)}
-            winState={winModalVisible}
-          />
         </section>
-        </div>
       </div>
 
-      <WinConfetti active={confettiActive} />
-      <GameDrawer
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onOpenCustom={handleOpenCustomFromDrawer}
-        onOpenModes={handleOpenModesFromDrawer}
+      <GameModal
+        activeConfig={activeConfig}
+        accuracy={accuracy}
+        completion={completion}
+        loseState={loseState}
+        moves={moves}
+        onRestart={() => startGame(activeConfig)}
+        personalBestStatus={personalBestStatus}
+        timeDisplay={formatTime(solveTime)}
+        winState={winModalVisible}
       />
+      <WinConfetti active={confettiActive} />
       <GameModeModal
         difficulty={difficulty}
         isOpen={modeModalOpen}

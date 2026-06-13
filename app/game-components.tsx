@@ -15,6 +15,17 @@ const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
 const TILE_DRAG_SHADOW = "0 22px 44px rgba(148, 163, 184, 0.28)";
 const TILE_TILT_MAX_DEGREES = 4;
+const TILE_HOVER_SCALE = 1.015;
+const TILE_PRESS_SCALE = 1.065;
+const TILE_DRAG_SCALE = TILE_PRESS_SCALE;
+const TILE_HOVER_LIFT_PX = -4;
+const TILE_PRESS_LIFT_PX = -6;
+const TILE_INTERACTION_SPRING = {
+  type: "spring" as const,
+  stiffness: 560,
+  damping: 30,
+  mass: 0.58,
+};
 const TIME_UP_QUOTES = [
   "Almost there!",
   "That gradient was fighting back.",
@@ -137,62 +148,105 @@ export function GameHud({
   const qualityFill = getGradientQualityFill(animatedQuality);
 
   return (
-    <section className="flex w-full max-w-[42rem] flex-col gap-1.5 sm:gap-2 md:gap-2.5">
-      <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        <div className="theme-card rounded-[0.95rem] border px-3 py-2 text-center backdrop-blur sm:rounded-[1rem] sm:px-3.5 sm:py-2.5">
-          <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase leading-none tracking-[0.14em] sm:text-[1rem]">
-            Time Record
-          </p>
-          <p className="theme-text-primary mt-1 font-fredoka-display text-[1.3rem] leading-none tracking-tight sm:text-[1.5rem] md:text-[1.7rem]">
-            {bestTimeDisplay}
-          </p>
-        </div>
-        <div className="theme-card rounded-[0.95rem] border px-3 py-2 text-center backdrop-blur sm:rounded-[1rem] sm:px-3.5 sm:py-2.5">
-          <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase leading-none tracking-[0.14em] sm:text-[1rem]">
-            Move Record
-          </p>
-          <p className="theme-text-primary mt-1 font-fredoka-display text-[1.3rem] leading-none tracking-tight sm:text-[1.5rem] md:text-[1.7rem]">
-            {bestMoves ?? "-"}
-          </p>
-        </div>
-      </div>
-
-      <div className="theme-panel relative overflow-hidden rounded-[1.15rem] border px-3 py-2.5 backdrop-blur sm:rounded-[1.35rem] sm:px-4 sm:py-3 md:px-4.5 md:py-3.5 lg:rounded-[1.75rem] lg:px-5 lg:py-4">
-        <div className="grid min-w-0 grid-cols-3 gap-2 sm:gap-3">
-          <div className="min-w-0 text-left">
-            <p className="theme-text-muted font-fredoka-strong text-[0.74rem] uppercase leading-none tracking-[0.14em] sm:text-[1.2rem]">
+    <section className="flex w-full max-w-none flex-col gap-[clamp(0.3rem,0.7vw,0.75rem)]">
+      <div className="game-hud-compact theme-panel relative overflow-hidden rounded-[clamp(1rem,2vw,1.5rem)] border px-[clamp(0.65rem,1.25vw,1rem)] py-[clamp(0.45rem,1vw,0.8rem)] backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
               Time
             </p>
-            <p className={`mt-1 font-fredoka-display text-[2rem] leading-none tracking-tight sm:text-[2.35rem] md:text-[2.75rem] lg:text-5xl ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
+            <p className={`mt-1 font-fredoka-display text-[1.3rem] leading-none tracking-tight ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
               {timeDisplay}
             </p>
           </div>
 
-          <div className="min-w-0 text-center">
-            <p className="theme-text-muted font-fredoka-strong text-[0.74rem] uppercase leading-none tracking-[0.14em] sm:text-[1.2rem]">
-              Moves
-            </p>
-            <p className="theme-text-primary mt-1 font-fredoka-display text-[2rem] leading-none tracking-tight sm:text-[2.2rem] md:text-[2.5rem] lg:text-[2.85rem]">
-              {moves}
-            </p>
-          </div>
-
-          <div className="min-w-0 text-right">
-            <p className="theme-text-muted font-fredoka-strong text-[0.74rem] uppercase leading-none tracking-[0.14em] sm:text-[1.2rem]">
-              Progress
-            </p>
-            <p className="theme-text-primary mt-1 font-fredoka-display text-[1.95rem] leading-none tracking-[-0.05em] sm:text-[2.25rem] md:text-[2.6rem] lg:text-[3rem]">
-              {animatedQuality}%
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="text-center">
+              <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
+                Moves
+              </p>
+              <p className="theme-text-primary mt-1 font-fredoka-display text-[1.15rem] leading-none tracking-tight">
+                {moves}
+              </p>
+            </div>
+            <div className="h-9 w-px bg-[var(--border-soft)]" aria-hidden="true" />
+            <div className="text-right">
+              <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
+                Progress
+              </p>
+              <p className="theme-text-primary mt-1 font-fredoka-display text-[1.15rem] leading-none tracking-[-0.05em]">
+                {animatedQuality}%
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="theme-progress-track relative z-10 mt-2.5 h-2.5 overflow-hidden rounded-full sm:mt-3 md:h-3 lg:mt-4">
+        <div className="theme-progress-track relative z-10 mt-2 h-1.5 overflow-hidden rounded-full">
           <motion.div
             className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
             animate={{ width: `${qualityFill}%` }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
+        </div>
+      </div>
+
+      <div className="game-hud-full flex flex-col gap-[clamp(0.25rem,0.55vw,0.55rem)]">
+        <div className="grid grid-cols-2 gap-[clamp(0.25rem,0.6vw,0.55rem)]">
+          <div className="theme-card rounded-[clamp(0.75rem,1.2vw,0.9rem)] border px-[clamp(0.55rem,0.9vw,0.8rem)] py-[clamp(0.3rem,0.6vw,0.55rem)] text-center backdrop-blur">
+            <p className="theme-text-muted font-fredoka-strong text-[clamp(0.52rem,0.85vw,0.72rem)] uppercase leading-none tracking-[0.14em]">
+              Time Record
+            </p>
+            <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(0.85rem,1.8vw,1.2rem)] leading-none tracking-tight">
+              {bestTimeDisplay}
+            </p>
+          </div>
+          <div className="theme-card rounded-[clamp(0.75rem,1.2vw,0.9rem)] border px-[clamp(0.55rem,0.9vw,0.8rem)] py-[clamp(0.3rem,0.6vw,0.55rem)] text-center backdrop-blur">
+            <p className="theme-text-muted font-fredoka-strong text-[clamp(0.52rem,0.85vw,0.72rem)] uppercase leading-none tracking-[0.14em]">
+              Move Record
+            </p>
+            <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(0.85rem,1.8vw,1.2rem)] leading-none tracking-tight">
+              {bestMoves ?? "-"}
+            </p>
+          </div>
+        </div>
+
+        <div className="theme-panel relative overflow-hidden rounded-[clamp(0.9rem,1.7vw,1.25rem)] border px-[clamp(0.55rem,1vw,0.85rem)] py-[clamp(0.35rem,0.75vw,0.6rem)] backdrop-blur">
+          <div className="grid min-w-0 grid-cols-3 gap-[clamp(0.25rem,0.6vw,0.55rem)]">
+            <div className="min-w-0 text-left">
+              <p className="theme-text-muted font-fredoka-strong text-[clamp(0.5rem,0.8vw,0.68rem)] uppercase leading-none tracking-[0.14em]">
+                Time
+              </p>
+              <p className={`mt-0.5 font-fredoka-display text-[clamp(1.15rem,2.8vw,2rem)] leading-none tracking-tight ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
+                {timeDisplay}
+              </p>
+            </div>
+
+            <div className="min-w-0 text-center">
+              <p className="theme-text-muted font-fredoka-strong text-[clamp(0.5rem,0.8vw,0.68rem)] uppercase leading-none tracking-[0.14em]">
+                Moves
+              </p>
+              <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(1.15rem,2.8vw,1.95rem)] leading-none tracking-tight">
+                {moves}
+              </p>
+            </div>
+
+            <div className="min-w-0 text-right">
+              <p className="theme-text-muted font-fredoka-strong text-[clamp(0.5rem,0.8vw,0.68rem)] uppercase leading-none tracking-[0.14em]">
+                Progress
+              </p>
+              <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(1.1rem,2.65vw,1.9rem)] leading-none tracking-[-0.05em]">
+                {animatedQuality}%
+              </p>
+            </div>
+          </div>
+
+          <div className="theme-progress-track relative z-10 mt-[clamp(0.3rem,0.65vw,0.6rem)] h-[clamp(0.28rem,0.55vw,0.52rem)] overflow-hidden rounded-full">
+            <motion.div
+              className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
+              animate={{ width: `${qualityFill}%` }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -302,8 +356,8 @@ const TileButton = memo(function TileButton({
         opacity: isDragging ? 0 : 1,
         rotateX: winWaveActive ? 0 : tilt.rotateX,
         rotateY: winWaveActive ? 0 : tilt.rotateY,
-        scale: winWaveActive ? [1, 1.08, 1.03, 1] : isPressed ? 1.10 : isHovering && !isDragging ? 1.02 : 1,
-        y: winWaveActive ? [0, -8, -3, 0] : isPressed ? -8 : isHovering && !isDragging ? -5 : 0,
+        scale: winWaveActive ? [1, 1.08, 1.03, 1] : isPressed ? TILE_PRESS_SCALE : isHovering && !isDragging ? TILE_HOVER_SCALE : 1,
+        y: winWaveActive ? [0, -8, -3, 0] : isPressed ? TILE_PRESS_LIFT_PX : isHovering && !isDragging ? TILE_HOVER_LIFT_PX : 0,
         boxShadow: winWaveActive
           ? [TILE_REST_SHADOW, TILE_HOVER_SHADOW, TILE_DRAG_SHADOW, TILE_REST_SHADOW]
           : isPressed
@@ -327,10 +381,7 @@ const TileButton = memo(function TileButton({
               delay: winWaveDelay,
             }
           : {
-              type: "spring",
-              stiffness: 420,
-              damping: 24,
-              mass: 0.7,
+              ...TILE_INTERACTION_SPRING,
             }
       }
       className={`tile-surface relative aspect-square border border-white/75 ${tileRadiusClass} ${
@@ -400,8 +451,8 @@ export const GameBoard = memo(function GameBoard({
               left: 0,
               opacity: 1,
               top: 0,
-              transform: `translate3d(${initialOverlayX}px, ${initialOverlayY}px, 0) scale(1.04) rotate(0deg)`,
-              transition: "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+              transform: `translate3d(${initialOverlayX}px, ${initialOverlayY}px, 0) scale(${TILE_DRAG_SCALE}) rotate(0deg)`,
+              transition: "transform 110ms cubic-bezier(0.22, 1, 0.36, 1)",
               width: `${dragSession.width}px`,
               zIndex: 50,
             }}
@@ -416,7 +467,7 @@ export const GameBoard = memo(function GameBoard({
   return (
     <>
       <motion.div
-        className="theme-board-frame relative mx-auto aspect-square w-full max-w-[42rem] rounded-[0.95rem] p-px sm:rounded-[1rem] md:rounded-[1.08rem] lg:max-w-[58rem] lg:rounded-[1.2rem]"
+        className="theme-board-frame relative mx-auto aspect-square w-full rounded-[clamp(0.9rem,1.8vw,1.2rem)] p-px"
         initial={false}
         animate={
           confettiActive
@@ -443,7 +494,7 @@ export const GameBoard = memo(function GameBoard({
             transition={{ duration: 1.85, ease: [0.16, 1, 0.3, 1] }}
           />
         )}
-        <div className="theme-board-shell relative h-full w-full overflow-hidden rounded-[calc(0.95rem-1px)] p-1 backdrop-blur-[20px] sm:rounded-[calc(1rem-1px)] sm:p-1.25 md:rounded-[calc(1.08rem-1px)] md:p-1.5 lg:rounded-[calc(1.2rem-1px)] lg:p-2.5">
+        <div className="theme-board-shell relative h-full w-full overflow-hidden rounded-[calc(clamp(0.9rem,1.8vw,1.2rem)-1px)] p-[clamp(0.2rem,0.45vw,0.4rem)] backdrop-blur-[20px]">
           {confettiActive && (
             <motion.div
               aria-hidden="true"
@@ -454,7 +505,7 @@ export const GameBoard = memo(function GameBoard({
             />
           )}
           <div
-            className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[0.95rem] sm:rounded-[1.05rem] md:rounded-[1.12rem] lg:rounded-[1.5rem]`}
+            className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[clamp(0.9rem,1.6vw,1.35rem)]`}
             style={{
               gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
             }}
@@ -579,32 +630,29 @@ export function GameModal({
   }
 
   return createPortal(
-    <div className="theme-overlay fixed inset-0 z-20 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="theme-overlay fixed inset-0 z-20 flex items-center justify-center p-3 backdrop-blur-sm sm:p-4">
       <motion.div
         initial={{ opacity: 0, y: 28, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-        className="theme-modal relative w-full max-w-[40.5rem] overflow-hidden rounded-[2rem] border p-8 text-center sm:p-10"
+        className="theme-modal relative w-full max-w-[40.5rem] max-h-[calc(100dvh-1.5rem)] overflow-y-auto overflow-x-hidden rounded-[clamp(1.25rem,3vw,2rem)] border p-[clamp(1rem,3vw,2rem)] text-center sm:max-h-[calc(100dvh-2rem)] sm:p-10"
       >
-        <div className="relative z-10">
+        <div className="relative z-10 flex flex-col">
           {winState ? (
             <>
-              <p className="theme-text-muted font-fredoka-strong text-sm uppercase tracking-[0.3em]">Perfect Gradient</p>
+              <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Perfect Gradient</p>
               <motion.h2
                 initial={{ opacity: 0, y: 10, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-                className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] sm:mt-4 sm:text-[2.35rem]"
+                className="font-fredoka-display mt-3 text-[1.9rem] leading-none tracking-[-0.05em] sm:mt-4 sm:text-[2.35rem]"
               >
-                <GradientText className="gradient-text--modal px-1 sm:hidden">Gradient Complete!</GradientText>
-                <GradientText className="gradient-text--modal hidden px-1 sm:inline-flex">
-                  {renderWaveText("Gradient Complete!")}
-                </GradientText>
+                <GradientText className="gradient-text--modal px-1">{renderWaveText("Gradient Complete!")}</GradientText>
               </motion.h2>
               <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.24em] text-amber-500 sm:mt-5 sm:text-lg">
                 {renderStars(3)}
               </div>
-              <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.98rem] leading-6 sm:mt-5 sm:text-[1.05rem] sm:leading-7">
+              <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.95rem] leading-6 sm:mt-5 sm:text-[1.05rem] sm:leading-7">
                 You restored the gradient with a clean finish on {activeConfig.label.toLowerCase()}.
               </p>
               {personalBestStatus.hasNewPersonalBest && personalBestLabel && (
@@ -628,22 +676,28 @@ export function GameModal({
               </div>
             </>
           ) : (
-              <div className="mx-auto mt-3 max-w-lg">
-              <h2 className="theme-text-primary font-fredoka-display text-[2.35rem] leading-none tracking-[-0.05em]">Time&apos;s up</h2>
+            <div className="mx-auto mt-3 max-w-lg">
+              <h2 className="theme-text-primary font-fredoka-display text-[2rem] leading-none tracking-[-0.05em] sm:text-[2.35rem]">
+                Time&apos;s up
+              </h2>
               {timeUpStars > 0 && (
-                <p className="font-fredoka-strong mt-6 text-lg leading-none tracking-[0.24em] text-amber-500">{renderStars(timeUpStars)}</p>
+                <p className="font-fredoka-strong mt-5 text-base leading-none tracking-[0.24em] text-amber-500 sm:mt-6 sm:text-lg">
+                  {renderStars(timeUpStars)}
+                </p>
               )}
-              <div className="mt-7 grid grid-cols-2 gap-4 sm:mt-8 sm:gap-5">
-                <div className="theme-card rounded-[1.3rem] border px-4 py-4 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
-                  <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em]">Gradient Completion</p>
-                  <p className="theme-text-primary font-fredoka-strong mt-3 text-[1.7rem] leading-none sm:mt-4 sm:text-[1.9rem]">{completion}%</p>
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-5">
+                <div className="theme-card rounded-[1.2rem] border px-3 py-3 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
+                  <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.22em] sm:text-[0.78rem]">Gradient Completion</p>
+                  <p className="theme-text-primary font-fredoka-strong mt-2.5 text-[1.5rem] leading-none sm:mt-4 sm:text-[1.9rem]">{completion}%</p>
                 </div>
-                <div className="theme-card rounded-[1.3rem] border px-4 py-4 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
-                  <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.22em]">Moves</p>
-                  <p className="theme-text-primary font-fredoka-strong mt-3 text-[1.7rem] leading-none sm:mt-4 sm:text-[1.9rem]">{moves}</p>
+                <div className="theme-card rounded-[1.2rem] border px-3 py-3 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
+                  <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.22em] sm:text-[0.78rem]">Moves</p>
+                  <p className="theme-text-primary font-fredoka-strong mt-2.5 text-[1.5rem] leading-none sm:mt-4 sm:text-[1.9rem]">{moves}</p>
                 </div>
               </div>
-              <p className="theme-text-muted font-fredoka-regular mt-6 text-[1.02rem] leading-7 sm:mt-7 sm:text-[1.08rem] sm:leading-8">{timeUpQuote}</p>
+              <p className="theme-text-muted font-fredoka-regular mt-5 text-[0.98rem] leading-7 sm:mt-7 sm:text-[1.08rem] sm:leading-8">
+                {timeUpQuote}
+              </p>
             </div>
           )}
 
@@ -664,60 +718,6 @@ type ControlsProps = {
   onAutoSolve: () => void;
   showDevControls: boolean;
 };
-
-function HamburgerIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5 sm:h-6 sm:w-6"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 7h16M4 12h16M4 17h16" />
-    </svg>
-  );
-}
-
-function PaletteIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h4a5 5 0 0 0 0-10h-4Z" />
-      <circle cx="7.5" cy="10.5" r=".8" fill="currentColor" stroke="none" />
-      <circle cx="10.5" cy="7.5" r=".8" fill="currentColor" stroke="none" />
-      <circle cx="16.5" cy="8.5" r=".8" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function WrenchIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M14.5 6.5a4 4 0 0 0-5.35 5.35L4 17v3h3l5.15-5.15A4 4 0 0 0 17.5 9l-2 2-2.5-2.5 1.5-2Z" />
-    </svg>
-  );
-}
 
 function InfoIcon() {
   return (
@@ -832,19 +832,24 @@ export function GameDrawer({
     return null;
   }
 
-  return createPortal(
-    <motion.div
-      className="theme-overlay fixed inset-0 z-40"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+  return (
+    <>
+      {createPortal(
+        <motion.div
+          className="theme-overlay fixed inset-0 z-40"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          onClick={onClose}
+          aria-hidden="true"
+        />,
+        document.body,
+      )}
       <motion.aside
         role="dialog"
         aria-modal="true"
         aria-label="Navigation drawer"
-        className="theme-modal absolute left-2.5 top-[4.6rem] w-[16.5rem] max-w-[calc(100vw-1.25rem)] rounded-[1.35rem] border p-4 shadow-[0_22px_48px_rgba(15,23,42,0.18)] sm:left-4 sm:top-[5.2rem] sm:w-[17.5rem] md:left-5 md:top-[5.45rem] lg:left-10 lg:top-[6.1rem]"
+        className="theme-modal absolute left-0 top-full z-50 mt-2 w-[16.5rem] max-w-[calc(100vw-1.25rem)] rounded-[1.35rem] border p-4 shadow-[0_22px_48px_rgba(15,23,42,0.18)] sm:w-[17.5rem]"
         initial={{ opacity: 0, y: -10, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
@@ -886,8 +891,7 @@ export function GameDrawer({
           </div>
         </div>
       </motion.aside>
-    </motion.div>,
-    document.body,
+    </>
   );
 }
 
@@ -979,13 +983,13 @@ export function GameControls({
   showDevControls,
 }: Readonly<ControlsProps>) {
   return (
-    <section className="flex w-full justify-center lg:w-auto">
-      <div className="grid w-full max-w-[42rem] grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 md:gap-2.5 lg:flex lg:w-auto lg:max-w-none lg:flex-col">
+    <section className="flex w-full justify-center">
+      <div className="flex w-full max-w-[42rem] flex-col gap-[clamp(0.5rem,1.2vw,0.85rem)] sm:flex-row sm:justify-center">
           {showDevControls && (
             <button
               type="button"
               onClick={onAutoSolve}
-              className="theme-button-accent font-fredoka-strong flex min-h-[3.8rem] w-full items-center justify-center rounded-[0.95rem] px-2 py-2.5 text-center text-[0.84rem] leading-tight sm:min-h-[4rem] sm:rounded-[1rem] sm:text-[0.88rem] md:min-h-[4.25rem] md:text-[0.92rem] lg:h-24 lg:w-24 lg:rounded-[1.4rem] lg:px-3 lg:py-3 lg:text-[0.95rem]"
+              className="theme-button-accent font-fredoka-strong flex min-h-[clamp(3rem,5vw,4rem)] w-full items-center justify-center rounded-[clamp(0.9rem,1.8vw,1.25rem)] px-[clamp(0.8rem,1.6vw,1.1rem)] py-[clamp(0.7rem,1.2vw,0.95rem)] text-center text-[clamp(0.8rem,1.35vw,0.92rem)] leading-tight transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:w-auto sm:min-w-[clamp(7.5rem,13vw,9.5rem)]"
             >
               Auto Solve
             </button>

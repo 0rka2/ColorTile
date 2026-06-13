@@ -118,7 +118,8 @@ html[data-theme="dark"] {
 body {
   min-height: 100vh;
   margin: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background-color: var(--app-bg);
   color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
@@ -205,9 +206,9 @@ select {
 }
 
 .theme-header-surface {
-  background-color: var(--surface-solid);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-panel);
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .theme-panel {
@@ -250,6 +251,14 @@ select {
   background-color: var(--surface-muted);
 }
 
+.game-hud-compact {
+  display: none;
+}
+
+.game-hud-full {
+  display: flex;
+}
+
 .theme-progress-track {
   background-color: var(--progress-track);
 }
@@ -282,6 +291,16 @@ select {
 
 .theme-button-primary:hover {
   background-color: var(--button-primary-hover);
+}
+
+html[data-theme="dark"] .restart-button {
+  background-color: #ffffff;
+  color: #020617;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .restart-button:hover {
+  background-color: #f8fafc;
 }
 
 .theme-button-accent {
@@ -317,58 +336,68 @@ select {
 }
 
 .board-grid {
-  --tile-gap: 0.48rem;
-  --board-padding: 0.48rem;
+  --tile-gap: 1.25%;
+  --board-padding: clamp(0.2rem, 0.5vw, 0.42rem);
   gap: var(--tile-gap);
   padding: var(--board-padding);
 }
 
 .board-grid--default {
-  --tile-gap: 0.58rem;
-  --board-padding: 0.56rem;
+  --tile-gap: 1.45%;
+  --board-padding: clamp(0.22rem, 0.55vw, 0.46rem);
 }
 
 .board-grid--compact {
-  --tile-gap: 0.38rem;
-  --board-padding: 0.4rem;
+  --tile-gap: 1.1%;
+  --board-padding: clamp(0.18rem, 0.45vw, 0.38rem);
 }
 
 .board-grid--dense {
-  --tile-gap: 0.26rem;
-  --board-padding: 0.24rem;
+  --tile-gap: 0.82%;
+  --board-padding: clamp(0.16rem, 0.38vw, 0.32rem);
+}
+
+@media (max-width: 1366px), (max-height: 768px) {
+  .game-hud-compact {
+    display: block;
+  }
+
+  .game-hud-full {
+    display: none;
+  }
 }
 
 @media (max-width: 900px) {
   .board-grid--default {
-    --tile-gap: 0.46rem;
-    --board-padding: 0.44rem;
+    --tile-gap: 1.25%;
+    --board-padding: clamp(0.2rem, 0.5vw, 0.42rem);
   }
 
   .board-grid--compact {
-    --tile-gap: 0.32rem;
-    --board-padding: 0.32rem;
+    --tile-gap: 0.98%;
+    --board-padding: clamp(0.17rem, 0.44vw, 0.36rem);
   }
 
   .board-grid--dense {
-    --tile-gap: 0.22rem;
-    --board-padding: 0.22rem;
+    --tile-gap: 0.74%;
+    --board-padding: clamp(0.14rem, 0.36vw, 0.3rem);
   }
 }
 
 @media (max-width: 640px) {
   .board-grid--default {
-    --tile-gap: 0.36rem;
-    --board-padding: 0.34rem;
+    --tile-gap: 1.05%;
+    --board-padding: clamp(0.16rem, 0.42vw, 0.34rem);
   }
 
   .board-grid--compact {
-    --tile-gap: 0.28rem;
-    --board-padding: 0.28rem;
+    --tile-gap: 0.86%;
+    --board-padding: clamp(0.13rem, 0.35vw, 0.28rem);
   }
 
   .board-grid--dense {
-    --tile-gap: 0.18rem;
-    --board-padding: 0.18rem;
+    --tile-gap: 0.66%;
+    --board-padding: clamp(0.1rem, 0.28vw, 0.22rem);
   }
 }
 
@@ -389,7 +418,7 @@ select {
   display: inline-flex;
   overflow: hidden;
   color: #111827;
-  background: #ffffff;
+  background: var(--app-bg);
   --gradient-red: #ff4040;
   --gradient-blue: #2d87ff;
   --gradient-green: #23d773;
@@ -449,7 +478,7 @@ select {
 
 html[data-theme="dark"] .gradient-text {
   color: #f8fbff;
-  background: transparent;
+  background: var(--app-bg);
 }
 
 html[data-theme="dark"] .gradient-text__content {
@@ -473,22 +502,34 @@ html[data-theme="dark"] .gradient-text__blob {
   background: transparent;
 }
 
+html[data-theme="dark"] .gradient-text--modal {
+  background: transparent;
+}
+
 .gradient-text--modal .gradient-text__content,
 html[data-theme="dark"] .gradient-text--modal .gradient-text__content {
   display: inline-block;
-  background:
-    radial-gradient(circle at 14% 45%, #ff6b8a 0 12%, transparent 27%),
-    radial-gradient(circle at 35% 48%, #fbbf24 0 14%, transparent 30%),
-    radial-gradient(circle at 58% 44%, #4ade80 0 15%, transparent 31%),
-    radial-gradient(circle at 82% 52%, #93c5fd 0 15%, transparent 32%),
-    linear-gradient(90deg, #ff6b8a 0%, #fbbf24 30%, #4ade80 62%, #93c5fd 100%);
-  background-size: 180% 180%;
-  background-position: 0% 50%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: gradient-modal-mesh 5.5s ease-in-out infinite alternate;
+  color: currentColor;
+  -webkit-text-fill-color: currentColor;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .gradient-text--modal .gradient-text__content,
+  html[data-theme="dark"] .gradient-text--modal .gradient-text__content {
+    background:
+      radial-gradient(circle at 14% 45%, #ff6b8a 0 12%, transparent 27%),
+      radial-gradient(circle at 35% 48%, #fbbf24 0 14%, transparent 30%),
+      radial-gradient(circle at 58% 44%, #4ade80 0 15%, transparent 31%),
+      radial-gradient(circle at 82% 52%, #93c5fd 0 15%, transparent 32%),
+      linear-gradient(90deg, #ff6b8a 0%, #fbbf24 30%, #4ade80 62%, #93c5fd 100%);
+    background-size: 180% 180%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: gradient-modal-mesh 5.5s ease-in-out infinite alternate;
+  }
 }
 
 .gradient-text--modal .gradient-text__blend {

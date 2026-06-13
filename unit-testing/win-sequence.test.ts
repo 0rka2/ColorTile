@@ -5,7 +5,7 @@ import {
   getWinSequenceDurations,
   getWinWaveDuration,
   WIN_CONFETTI_LEAD_IN_MS,
-  WIN_MODAL_EXTRA_DELAY_MS,
+  WIN_MODAL_TOTAL_DELAY_MS,
   WIN_TILE_POP_DURATION_MS,
   WIN_TILE_WAVE_STAGGER_MS,
 } from "../app/win-sequence";
@@ -30,13 +30,10 @@ test("getWinWaveDuration applies one pop plus stagger per additional column", ()
   );
 });
 
-test("getWinSequenceDurations derives the modal delay from wave, confetti lead-in, and extra pause", () => {
+test("getWinSequenceDurations uses the configured modal delay", () => {
   const durations = getWinSequenceDurations(16);
 
   assert.equal(durations.boardWaveDurationMs, getWinWaveDuration(16));
   assert.equal(durations.confettiLeadInMs, WIN_CONFETTI_LEAD_IN_MS);
-  assert.equal(
-    durations.modalDelayMs,
-    durations.boardWaveDurationMs + WIN_CONFETTI_LEAD_IN_MS + WIN_MODAL_EXTRA_DELAY_MS,
-  );
+  assert.equal(durations.modalDelayMs, WIN_MODAL_TOTAL_DELAY_MS);
 });
