@@ -417,7 +417,7 @@ html[data-theme="dark"] .restart-button:hover {
   position: relative;
   display: inline-flex;
   overflow: hidden;
-  color: #111827;
+  color: #38538f;
   background: var(--app-bg);
   --gradient-red: #ff4040;
   --gradient-blue: #2d87ff;

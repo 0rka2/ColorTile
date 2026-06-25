@@ -104,7 +104,7 @@ function renderWaveText(text: string) {
     return (
       <span
         key={`${character}-${index}`}
-        className="gradient-complete-wave"
+        className="gradient-complete-wave mr-[0.02em]"
         style={{ animationDelay: `${index * 0.035}s`, color }}
       >
         {isSpace ? "\u00A0" : character}
@@ -783,6 +783,24 @@ function InfoIcon() {
   );
 }
 
+function PrivacyIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" />
+      <path d="M9.5 12l2 2 3-4" />
+    </svg>
+  );
+}
+
 function MessageIcon() {
   return (
     <svg
@@ -935,7 +953,7 @@ export function GameDrawer({
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
               <span className="theme-text-secondary">
-                <InfoIcon />
+                <PrivacyIcon />
               </span>
               <span className="font-fredoka-strong text-[1rem] leading-none">Privacy Policy</span>
             </Link>
@@ -943,8 +961,8 @@ export function GameDrawer({
             
 
 
-            <button
-              type="button"
+            <Link
+              href="/tutorial"
               onClick={onClose}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
@@ -952,7 +970,7 @@ export function GameDrawer({
                 <BookIcon />
               </span>
               <span className="font-fredoka-strong text-[1rem] leading-none">Tutorial</span>
-            </button>
+            </Link>
 
          <a
   href="https://ko-fi.com/orka67"
