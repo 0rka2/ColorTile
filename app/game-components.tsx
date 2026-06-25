@@ -1,9 +1,10 @@
 import { memo, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { motion } from "motion/react";
 import Confetti from "react-confetti";
+import { FiHeart } from "react-icons/fi";
 
-import { GradientText } from "../components/ui/gradient-text";
 import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
 import { getConfettiViewportSize } from "./confetti-logic";
@@ -33,6 +34,15 @@ const TIME_UP_QUOTES = [
   "The colors aren't blending yet.",
   "So close. Try one more run.",
 ];
+const COMPLETE_TITLE_RAINBOW = [
+  "#ef4444",
+  "#f97316",
+  "#facc15",
+  "#22c55e",
+  "#3b82f6",
+  "#4f46e5",
+  "#a855f7",
+];
 
 //logic
 function getTimeUpStars(completion: number) {
@@ -55,16 +65,52 @@ function renderStars(count: number) {
   return "⭐".repeat(count);
 }
 
+function interpolateColor(start: string, end: string, progress: number) {
+  const startValue = Number.parseInt(start.slice(1), 16);
+  const endValue = Number.parseInt(end.slice(1), 16);
+  const startRgb = [(startValue >> 16) & 255, (startValue >> 8) & 255, startValue & 255];
+  const endRgb = [(endValue >> 16) & 255, (endValue >> 8) & 255, endValue & 255];
+  const mixedRgb = startRgb.map((channel, index) => Math.round(channel + (endRgb[index] - channel) * progress));
+
+  return `rgb(${mixedRgb.join(" ")})`;
+}
+
+function getCompleteTitleColor(position: number, total: number) {
+  const progress = total > 1 ? position / (total - 1) : 0;
+  const scaledProgress = progress * (COMPLETE_TITLE_RAINBOW.length - 1);
+  const colorIndex = Math.min(Math.floor(scaledProgress), COMPLETE_TITLE_RAINBOW.length - 2);
+  const colorProgress = scaledProgress - colorIndex;
+
+  return interpolateColor(
+    COMPLETE_TITLE_RAINBOW[colorIndex],
+    COMPLETE_TITLE_RAINBOW[colorIndex + 1],
+    colorProgress,
+  );
+}
+
 function renderWaveText(text: string) {
-  return Array.from(text).map((character, index) => (
-    <span
-      key={`${character}-${index}`}
-      className="gradient-complete-wave"
-      style={{ animationDelay: `${index * 0.035}s` }}
-    >
-      {character === " " ? "\u00A0" : character}
-    </span>
-  ));
+  const characters = Array.from(text);
+  const letterCount = characters.filter((character) => character !== " ").length;
+  let letterPosition = 0;
+
+  return characters.map((character, index) => {
+    const isSpace = character === " ";
+    const color = isSpace ? undefined : getCompleteTitleColor(letterPosition, letterCount);
+
+    if (!isSpace) {
+      letterPosition += 1;
+    }
+
+    return (
+      <span
+        key={`${character}-${index}`}
+        className="gradient-complete-wave"
+        style={{ animationDelay: `${index * 0.035}s`, color }}
+      >
+        {isSpace ? "\u00A0" : character}
+      </span>
+    );
+  });
 }
 
 export function CheckMark() {
@@ -647,7 +693,7 @@ export function GameModal({
                 transition={{ duration: 0.45, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
                 className="font-fredoka-display mt-3 text-[1.9rem] leading-none tracking-[-0.05em] sm:mt-4 sm:text-[2.35rem]"
               >
-                <GradientText className="gradient-text--modal px-1">{renderWaveText("Gradient Complete!")}</GradientText>
+                <span className="theme-text-primary px-1">{renderWaveText("Gradient Complete!")}</span>
               </motion.h2>
               <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.24em] text-amber-500 sm:mt-5 sm:text-lg">
                 {renderStars(3)}
@@ -856,8 +902,24 @@ export function GameDrawer({
       >
         <div>
           <div className="flex flex-col gap-2">
-            <button
-              type="button"
+           <a
+  href="https://docs.google.com/forms/d/e/1FAIpQLSdp1wH5CwgKNMWrRGUOHGrHrMTOM2mpm2Q69OkaxSFPpn_8Ng/viewform"
+  target="_blank"
+  rel="noopener noreferrer"
+  onClick={onClose}
+  className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
+>
+  <span className="theme-text-secondary">
+    <MessageIcon />
+  </span>
+  <span className="font-fredoka-strong text-[1rem] leading-none">
+    Give Feedback
+  </span>
+</a>
+
+
+            <Link
+              href="/about"
               onClick={onClose}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
@@ -865,18 +927,21 @@ export function GameDrawer({
                 <InfoIcon />
               </span>
               <span className="font-fredoka-strong text-[1rem] leading-none">About</span>
-            </button>
+            </Link>
 
-            <button
-              type="button"
+            <Link
+              href="/privacy"
               onClick={onClose}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
               <span className="theme-text-secondary">
-                <MessageIcon />
+                <InfoIcon />
               </span>
-              <span className="font-fredoka-strong text-[1rem] leading-none">Give Feedback</span>
-            </button>
+              <span className="font-fredoka-strong text-[1rem] leading-none">Privacy Policy</span>
+            </Link>
+
+            
+
 
             <button
               type="button"
@@ -888,6 +953,20 @@ export function GameDrawer({
               </span>
               <span className="font-fredoka-strong text-[1rem] leading-none">Tutorial</span>
             </button>
+
+         <a
+  href="https://ko-fi.com/orka67"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
+>
+  <span className="theme-text-secondary">
+    <FiHeart />
+  </span>
+  <span className="font-fredoka-strong text-[1rem] leading-none">
+    Buy me a coffee
+  </span>
+</a>
           </div>
         </div>
       </motion.aside>
