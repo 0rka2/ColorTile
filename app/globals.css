@@ -417,7 +417,7 @@ html[data-theme="dark"] .restart-button:hover {
   position: relative;
   display: inline-flex;
   overflow: hidden;
-  color: #111827;
+  color: #38538f;
   background: var(--app-bg);
   --gradient-red: #ff4040;
   --gradient-blue: #2d87ff;
@@ -496,60 +496,10 @@ html[data-theme="dark"] .gradient-text__blob {
   filter: blur(1rem) saturate(1.08) brightness(1.02);
 }
 
-.gradient-text--modal {
-  display: inline-block;
-  overflow: visible;
-  background: transparent;
-}
-
-html[data-theme="dark"] .gradient-text--modal {
-  background: transparent;
-}
-
-.gradient-text--modal .gradient-text__content,
-html[data-theme="dark"] .gradient-text--modal .gradient-text__content {
-  display: inline-block;
-  color: currentColor;
-  -webkit-text-fill-color: currentColor;
-}
-
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .gradient-text--modal .gradient-text__content,
-  html[data-theme="dark"] .gradient-text--modal .gradient-text__content {
-    background:
-      radial-gradient(circle at 14% 45%, #ff6b8a 0 12%, transparent 27%),
-      radial-gradient(circle at 35% 48%, #fbbf24 0 14%, transparent 30%),
-      radial-gradient(circle at 58% 44%, #4ade80 0 15%, transparent 31%),
-      radial-gradient(circle at 82% 52%, #93c5fd 0 15%, transparent 32%),
-      linear-gradient(90deg, #ff6b8a 0%, #fbbf24 30%, #4ade80 62%, #93c5fd 100%);
-    background-size: 180% 180%;
-    background-position: 0% 50%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-    animation: gradient-modal-mesh 5.5s ease-in-out infinite alternate;
-  }
-}
-
-.gradient-text--modal .gradient-text__blend {
-  display: none;
-}
-
 .gradient-complete-wave {
   display: inline-block;
   transform-origin: 50% 80%;
   animation: gradient-complete-wave 0.78s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes gradient-modal-mesh {
-  from {
-    background-position: 0% 45%;
-  }
-
-  to {
-    background-position: 100% 55%;
-  }
 }
 
 @keyframes gradient-complete-wave {
