@@ -27,6 +27,8 @@ import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-ty
 import { getWinSequenceDurations } from "./win-sequence";
 import type { WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
+import { swapSound } from "./lib/sounds";
+
 
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
 const TILE_SWAP_ANIMATION_DURATION_MS = 220;
@@ -139,6 +141,7 @@ export default function Home() {
   const timerEffectRunCountRef = useRef(0);
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
+  const swapSoundRef = useRef<HTMLAudioElement | null>(null);
 
   const activeConfig =
     difficulty === "custom"
@@ -151,6 +154,10 @@ export default function Home() {
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
+
+  useEffect(() => {
+  swapSoundRef.current = new Audio("./sfx/swap1.mp3");
+}, []);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") {
@@ -405,7 +412,7 @@ export default function Home() {
     }
 
     pendingSwapAnimationRef.current = null;
-
+swapSoundRef.current?.play().catch(() => {});
     previousPositions.forEach((previousRect, tileId) => {
       const element = tileElementsRef.current[tileId];
       if (!element) {

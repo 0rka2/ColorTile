@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import Confetti from "react-confetti";
 import { FiHeart } from "react-icons/fi";
+import { hoverSound } from "./lib/sounds";
 
 import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
@@ -380,8 +381,8 @@ const TileButton = memo(function TileButton({
     const bounds = event.currentTarget.getBoundingClientRect();
     const relativeX = (event.clientX - bounds.left) / bounds.width;
     const relativeY = (event.clientY - bounds.top) / bounds.height;
-    const rotateY = (relativeX - 0.5) * TILE_TILT_MAX_DEGREES * 2;
-    const rotateX = (0.5 - relativeY) * TILE_TILT_MAX_DEGREES * 2;
+    const rotateY = (relativeX - 0.5) * TILE_TILT_MAX_DEGREES * 1.2;
+    const rotateX = (0.5 - relativeY) * TILE_TILT_MAX_DEGREES * 1.2;
 
     setIsHovering(true);
     setTilt({ rotateX, rotateY });
@@ -392,6 +393,13 @@ const TileButton = memo(function TileButton({
       initial={false}
       ref={tileRef}
       type="button"
+
+      onPointerEnter={() => {
+  if (!isDragging && canHover) {
+    hoverSound.play();
+  }
+}}
+
       data-tile-index={index}
       onPointerDown={(event) => onPointerDown(event, index)}
       disabled={winState || loseState}
