@@ -27,7 +27,7 @@ import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-ty
 import { getWinSequenceDurations } from "./win-sequence";
 import type { WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
-import { swapSound } from "./lib/sounds";
+import { boardCompleteSound, completeSound, swapSound, timeUpSound } from "./lib/sounds";
 
 
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
@@ -141,7 +141,7 @@ export default function Home() {
   const timerEffectRunCountRef = useRef(0);
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
-  const swapSoundRef = useRef<HTMLAudioElement | null>(null);
+  const lastWinPhaseSoundRef = useRef<WinPhase>("idle");
 
   const activeConfig =
     difficulty === "custom"
@@ -154,10 +154,6 @@ export default function Home() {
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
-
-  useEffect(() => {
-  swapSoundRef.current = new Audio("./sfx/swap1.mp3");
-}, []);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") {
@@ -376,6 +372,7 @@ export default function Home() {
 
   const resetWinSequence = useCallback(() => {
     clearWinSequenceTimeouts();
+    lastWinPhaseSoundRef.current = "idle";
     setWinPhase("idle");
     setPersonalBestStatus(EMPTY_PERSONAL_BEST_STATUS);
   }, [clearWinSequenceTimeouts]);
@@ -412,7 +409,7 @@ export default function Home() {
     }
 
     pendingSwapAnimationRef.current = null;
-swapSoundRef.current?.play().catch(() => {});
+    swapSound.play();
     previousPositions.forEach((previousRect, tileId) => {
       const element = tileElementsRef.current[tileId];
       if (!element) {
@@ -563,6 +560,7 @@ swapSoundRef.current?.play().catch(() => {});
       );
       setWinState(true);
       setWinPhase("boardWave");
+      completeSound.play();
       clearDragSession();
 
       setBestStats((current) => {
@@ -598,6 +596,11 @@ swapSoundRef.current?.play().catch(() => {});
     const { boardWaveDurationMs, modalDelayMs } = getWinSequenceDurations(board.length);
 
     if (winPhase === "boardWave") {
+      if (lastWinPhaseSoundRef.current !== "boardWave") {
+        boardCompleteSound.play();
+        lastWinPhaseSoundRef.current = "boardWave";
+      }
+
       winSequenceTimeoutsRef.current.push(
         window.setTimeout(() => {
           setWinPhase("confetti");
@@ -691,6 +694,7 @@ swapSoundRef.current?.play().catch(() => {});
           setCompletion(finalCompletion);
           resetWinSequenceRef.current();
           setLoseState(true);
+          timeUpSound.play();
           clearDragSessionRef.current();
           return 0;
         }

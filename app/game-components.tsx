@@ -12,6 +12,7 @@ import { getConfettiViewportSize } from "./confetti-logic";
 import type { PersonalBestStatus } from "./personal-best";
 import type { ThemeMode } from "./settings-options";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
+import { buttonClickSound } from "./lib/sounds";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
@@ -846,7 +847,16 @@ function BookIcon() {
 
 function SunIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-6 w-6 pointer-events-none" // 👈 add this
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
     </svg>
@@ -855,7 +865,16 @@ function SunIcon() {
 
 function MoonIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-6 w-6 pointer-events-none" // 👈 add this
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
     </svg>
   );
@@ -871,7 +890,11 @@ export function ThemeToggle({
   return (
     <button
       type="button"
-      onClick={() => onThemeModeChange(themeMode === "light" ? "dark" : "light")}
+      onClick={() => {
+  // buttonClickSound.stop();
+  // buttonClickSound.play();
+  onThemeModeChange(themeMode === "light" ? "dark" : "light");
+}}
       aria-label={`Switch to ${themeMode === "light" ? "dark" : "light"} theme`}
       className="theme-header-surface flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-14 sm:w-14"
     >

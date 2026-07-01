@@ -116,14 +116,12 @@ html[data-theme="dark"] {
 }
 
 body {
-  min-height: 100vh;
+  height: 100vh;        /* force full screen */
+  overflow: hidden;     /* 🚨 removes scrolling */
   margin: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
   background-color: var(--app-bg);
   color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
-  transition: background-color 280ms cubic-bezier(0.22, 1, 0.36, 1), color 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .font-fredoka-display {
