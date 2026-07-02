@@ -27,7 +27,7 @@ import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-ty
 import { getWinSequenceDurations } from "./win-sequence";
 import type { WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
-import { boardCompleteSound, completeSound, swapSound, timeUpSound } from "./lib/sounds";
+import { boardCompleteSound, swapSound, timeUpSound } from "./lib/sounds";
 
 
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
@@ -560,7 +560,6 @@ export default function Home() {
       );
       setWinState(true);
       setWinPhase("boardWave");
-      completeSound.play();
       clearDragSession();
 
       setBestStats((current) => {
