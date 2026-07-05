@@ -1043,7 +1043,7 @@ export default function Home() {
           </div>
         </header>
 
-        <section ref={contentRef} className="flex flex-1 min-h-0 flex-col items-center justify-start gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)] mt-[10vh]">
+        <section ref={contentRef} className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
           <div
             ref={hudRef}
             className="w-full max-w-full"
@@ -1104,7 +1104,7 @@ export default function Home() {
               type="button"
               onClick={() => startGame(activeConfig)}
               aria-label="Restart game"
-              className="theme-button-primary restart-button font-fredoka-strong flex min-h-[clamp(2.5rem,4.5vw,3.2rem)] items-center justify-center gap-2 rounded-full px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.45rem,0.85vw,0.65rem)] text-[clamp(0.92rem,1.45vw,1.05rem)] shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              className="theme-button-primary restart-button font-fredoka-strong flex h-14 w-full max-w-[20rem] items-center justify-center gap-2 rounded-full px-7 py-3 text-base shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
             >
               <span aria-hidden="true" className="text-[clamp(0.95rem,1.5vw,1.1rem)] leading-none">
                 {"\u21BB"}

@@ -85,16 +85,16 @@ function createSoundEffect(steps: SoundStep[]): SoundEffect {
 }
 
 export const hoverSound = createSoundEffect([
-  { delay: 0, duration: 0.09, frequency: 520, gain: 0.015, type: "sine" },
+  { delay: 0, duration: 0.05, frequency: 500, gain: 0.015, type: "sine" },
 ]);
 
 export const buttonClickSound = createSoundEffect([
-  { delay: 0, duration: 0.06, frequency: 360, gain: 0.04, type: "sine" } // A soft, quick E4 tap
+  { delay: 0, duration: 0.1, frequency: 360, gain: 0.04, type: "sine" } // A soft, quick E4 tap
 ]);
 
 export const swapSound = createSoundEffect([
-  { delay: 0, duration: 0.09, frequency: 360, gain: 0.035, type: "sine" },
-  { delay: 0.07, duration: 0.12, frequency: 500, gain: 0.025, type: "sine" },
+  { delay: 0, duration: 0.05, frequency: 320, gain: 0.035, type: "sine" },
+  { delay: 0.07, duration: 0.1, frequency: 420, gain: 0.025, type: "sine" },
 ]);
 
 export const timeUpSound = createSoundEffect([
@@ -103,8 +103,8 @@ export const timeUpSound = createSoundEffect([
 ]);
 
 export const boardCompleteSound = createSoundEffect([
-  { delay: 0, duration: 0.2, frequency: 523, gain: 0.03, type: "triangle" },  // C5
-  { delay: 0.1, duration: 0.2, frequency: 659, gain: 0.03, type: "triangle" },  // E5
-  { delay: 0.2, duration: 0.2, frequency: 784, gain: 0.03, type: "triangle" },  // G5
+  { delay: 0, duration: 0.5, frequency: 523, gain: 0.03, type: "triangle" },  // C5
+  { delay: 0.1, duration: 0.5, frequency: 659, gain: 0.03, type: "triangle" },  // E5
+  { delay: 0.2, duration: 0.5, frequency: 784, gain: 0.03, type: "triangle" },  // G5
   { delay: 0.35, duration: 0.5, frequency: 1047, gain: 0.04, type: "triangle" }, // C6 (High finish!)
 ]);

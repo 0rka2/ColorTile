@@ -301,6 +301,20 @@ html[data-theme="dark"] .restart-button:hover {
   background-color: #f8fafc;
 }
 
+.restart-button {
+  height: 4.2rem !important; /* increased by ~10% from 3.5rem to ~62px */
+  width: max-content !important;
+  min-width: auto !important;
+  padding-left: 2.5rem !important; /* increased by ~10% */
+  padding-right: 2.5rem !important; /* increased by ~10% */
+  font-size: 1.1rem !important; /* increased by ~10% from 0.875rem to ~15px */
+}
+
+.restart-button span {
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
 .theme-button-accent {
   background-color: var(--button-accent-bg);
   color: var(--button-accent-text);
@@ -355,7 +369,7 @@ html[data-theme="dark"] .restart-button:hover {
   --board-padding: clamp(0.16rem, 0.38vw, 0.32rem);
 }
 
-@media (max-width: 1366px), (max-height: 768px) {
+@media (max-width: 250px), (max-height: 650px){
   .game-hud-compact {
     display: block;
   }
