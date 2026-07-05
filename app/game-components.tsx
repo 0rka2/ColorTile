@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import Confetti from "react-confetti";
 import { FiHeart } from "react-icons/fi";
+import { hoverSound } from "./lib/sounds";
 
 import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
@@ -11,6 +12,7 @@ import { getConfettiViewportSize } from "./confetti-logic";
 import type { PersonalBestStatus } from "./personal-best";
 import type { ThemeMode } from "./settings-options";
 import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
+import { buttonClickSound } from "./lib/sounds";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
@@ -236,65 +238,70 @@ export function GameHud({
         </div>
       </div>
 
-      <div className="game-hud-full flex flex-col gap-[clamp(0.25rem,0.55vw,0.55rem)]">
-        <div className="grid grid-cols-2 gap-[clamp(0.25rem,0.6vw,0.55rem)]">
-          <div className="theme-card rounded-[clamp(0.75rem,1.2vw,0.9rem)] border px-[clamp(0.55rem,0.9vw,0.8rem)] py-[clamp(0.3rem,0.6vw,0.55rem)] text-center backdrop-blur">
-            <p className="theme-text-muted font-fredoka-strong text-[clamp(0.52rem,0.85vw,0.72rem)] uppercase leading-none tracking-[0.14em]">
-              Time Record
-            </p>
-            <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(0.85rem,1.8vw,1.2rem)] leading-none tracking-tight">
-              {bestTimeDisplay}
-            </p>
-          </div>
-          <div className="theme-card rounded-[clamp(0.75rem,1.2vw,0.9rem)] border px-[clamp(0.55rem,0.9vw,0.8rem)] py-[clamp(0.3rem,0.6vw,0.55rem)] text-center backdrop-blur">
-            <p className="theme-text-muted font-fredoka-strong text-[clamp(0.52rem,0.85vw,0.72rem)] uppercase leading-none tracking-[0.14em]">
-              Move Record
-            </p>
-            <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(0.85rem,1.8vw,1.2rem)] leading-none tracking-tight">
-              {bestMoves ?? "-"}
-            </p>
-          </div>
-        </div>
+      <div className="game-hud-full flex flex-col gap-2">
+  <div className="grid grid-cols-2 gap-2">
+    <div className="theme-card rounded-xl border px-3 py-2 text-center backdrop-blur">
+      <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+        Time Record
+      </p>
+      <p className="theme-text-primary mt-0.5 font-fredoka-display text-xl leading-none tracking-tight">
+        {bestTimeDisplay}
+      </p>
+    </div>
 
-        <div className="theme-panel relative overflow-hidden rounded-[clamp(0.9rem,1.7vw,1.25rem)] border px-[clamp(0.55rem,1vw,0.85rem)] py-[clamp(0.35rem,0.75vw,0.6rem)] backdrop-blur">
-          <div className="grid min-w-0 grid-cols-3 gap-[clamp(0.25rem,0.6vw,0.55rem)]">
-            <div className="min-w-0 text-left">
-              <p className="theme-text-muted font-fredoka-strong text-[clamp(0.5rem,0.8vw,0.68rem)] uppercase leading-none tracking-[0.14em]">
-                Time
-              </p>
-              <p className={`mt-0.5 font-fredoka-display text-[clamp(1.15rem,2.8vw,2rem)] leading-none tracking-tight ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
-                {timeDisplay}
-              </p>
-            </div>
+    <div className="theme-card rounded-xl border px-3 py-2 text-center backdrop-blur">
+      <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+        Move Record
+      </p>
+      <p className="theme-text-primary mt-0.5 font-fredoka-display text-xl leading-none tracking-tight">
+        {bestMoves ?? "-"}
+      </p>
+    </div>
+  </div>
 
-            <div className="min-w-0 text-center">
-              <p className="theme-text-muted font-fredoka-strong text-[clamp(0.5rem,0.8vw,0.68rem)] uppercase leading-none tracking-[0.14em]">
-                Moves
-              </p>
-              <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(1.15rem,2.8vw,1.95rem)] leading-none tracking-tight">
-                {moves}
-              </p>
-            </div>
-
-            <div className="min-w-0 text-right">
-              <p className="theme-text-muted font-fredoka-strong text-[clamp(0.5rem,0.8vw,0.68rem)] uppercase leading-none tracking-[0.14em]">
-                Progress
-              </p>
-              <p className="theme-text-primary mt-0.5 font-fredoka-display text-[clamp(1.1rem,2.65vw,1.9rem)] leading-none tracking-[-0.05em]">
-                {animatedQuality}%
-              </p>
-            </div>
-          </div>
-
-          <div className="theme-progress-track relative z-10 mt-[clamp(0.3rem,0.65vw,0.6rem)] h-[clamp(0.28rem,0.55vw,0.52rem)] overflow-hidden rounded-full">
-            <motion.div
-              className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
-              animate={{ width: `${qualityFill}%` }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            />
-          </div>
-        </div>
+  <div className="theme-panel relative overflow-hidden rounded-2xl border px-3 py-2 backdrop-blur">
+    <div className="grid min-w-0 grid-cols-3 gap-2">
+      <div className="min-w-0 text-left">
+        <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+          Time
+        </p>
+        <p
+          className={`mt-0.5 font-fredoka-display text-[32px] leading-none tracking-tight ${
+            timeWarning ? "theme-text-danger" : "theme-text-primary"
+          }`}
+        >
+          {timeDisplay}
+        </p>
       </div>
+
+      <div className="min-w-0 text-center">
+        <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+          Moves
+        </p>
+        <p className="theme-text-primary mt-0.5 font-fredoka-display text-[32px] leading-none tracking-tight">
+          {moves}
+        </p>
+      </div>
+
+      <div className="min-w-0 text-right">
+        <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+          Progress
+        </p>
+        <p className="theme-text-primary mt-0.5 font-fredoka-display text-[30px] leading-none tracking-[-0.05em]">
+          {animatedQuality}%
+        </p>
+      </div>
+    </div>
+
+    <div className="theme-progress-track relative z-10 mt-2 h-2 overflow-hidden rounded-full">
+      <motion.div
+        className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
+        animate={{ width: `${qualityFill}%` }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      />
+    </div>
+  </div>
+</div>
     </section>
   );
 }
@@ -380,8 +387,8 @@ const TileButton = memo(function TileButton({
     const bounds = event.currentTarget.getBoundingClientRect();
     const relativeX = (event.clientX - bounds.left) / bounds.width;
     const relativeY = (event.clientY - bounds.top) / bounds.height;
-    const rotateY = (relativeX - 0.5) * TILE_TILT_MAX_DEGREES * 2;
-    const rotateX = (0.5 - relativeY) * TILE_TILT_MAX_DEGREES * 2;
+    const rotateY = (relativeX - 0.5) * TILE_TILT_MAX_DEGREES * 1.2;
+    const rotateX = (0.5 - relativeY) * TILE_TILT_MAX_DEGREES * 1.2;
 
     setIsHovering(true);
     setTilt({ rotateX, rotateY });
@@ -392,6 +399,13 @@ const TileButton = memo(function TileButton({
       initial={false}
       ref={tileRef}
       type="button"
+
+      onPointerEnter={() => {
+  if (!isDragging && canHover) {
+    hoverSound.play();
+  }
+}}
+
       data-tile-index={index}
       onPointerDown={(event) => onPointerDown(event, index)}
       disabled={winState || loseState}
@@ -838,7 +852,16 @@ function BookIcon() {
 
 function SunIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-6 w-6 pointer-events-none" // 👈 add this
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
     </svg>
@@ -847,7 +870,16 @@ function SunIcon() {
 
 function MoonIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-6 w-6 pointer-events-none" // 👈 add this
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
     </svg>
   );
@@ -863,7 +895,11 @@ export function ThemeToggle({
   return (
     <button
       type="button"
-      onClick={() => onThemeModeChange(themeMode === "light" ? "dark" : "light")}
+      onClick={() => {
+  // buttonClickSound.stop();
+  // buttonClickSound.play();
+  onThemeModeChange(themeMode === "light" ? "dark" : "light");
+}}
       aria-label={`Switch to ${themeMode === "light" ? "dark" : "light"} theme`}
       className="theme-header-surface flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-14 sm:w-14"
     >

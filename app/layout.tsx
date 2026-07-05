@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { GlobalButtonSounds } from "./global-button-sounds";
 import "./globals.css";
 
 const fredoka = localFont({
@@ -22,7 +23,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={fredoka.variable}>{children}</body>
+      <body className={fredoka.variable}>
+        <GlobalButtonSounds />
+        {children}
+      </body>
     </html>
   );
 }

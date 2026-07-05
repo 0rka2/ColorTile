@@ -27,6 +27,8 @@ import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-ty
 import { getWinSequenceDurations } from "./win-sequence";
 import type { WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
+import { boardCompleteSound, swapSound, timeUpSound } from "./lib/sounds";
+
 
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
 const TILE_SWAP_ANIMATION_DURATION_MS = 220;
@@ -139,6 +141,7 @@ export default function Home() {
   const timerEffectRunCountRef = useRef(0);
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
+  const lastWinPhaseSoundRef = useRef<WinPhase>("idle");
 
   const activeConfig =
     difficulty === "custom"
@@ -369,6 +372,7 @@ export default function Home() {
 
   const resetWinSequence = useCallback(() => {
     clearWinSequenceTimeouts();
+    lastWinPhaseSoundRef.current = "idle";
     setWinPhase("idle");
     setPersonalBestStatus(EMPTY_PERSONAL_BEST_STATUS);
   }, [clearWinSequenceTimeouts]);
@@ -405,7 +409,7 @@ export default function Home() {
     }
 
     pendingSwapAnimationRef.current = null;
-
+    swapSound.play();
     previousPositions.forEach((previousRect, tileId) => {
       const element = tileElementsRef.current[tileId];
       if (!element) {
@@ -591,6 +595,11 @@ export default function Home() {
     const { boardWaveDurationMs, modalDelayMs } = getWinSequenceDurations(board.length);
 
     if (winPhase === "boardWave") {
+      if (lastWinPhaseSoundRef.current !== "boardWave") {
+        boardCompleteSound.play();
+        lastWinPhaseSoundRef.current = "boardWave";
+      }
+
       winSequenceTimeoutsRef.current.push(
         window.setTimeout(() => {
           setWinPhase("confetti");
@@ -684,6 +693,7 @@ export default function Home() {
           setCompletion(finalCompletion);
           resetWinSequenceRef.current();
           setLoseState(true);
+          timeUpSound.play();
           clearDragSessionRef.current();
           return 0;
         }
@@ -1033,7 +1043,7 @@ export default function Home() {
           </div>
         </header>
 
-        <section ref={contentRef} className="flex flex-1 min-h-0 flex-col items-center justify-start gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)] mt-[10vh]">
+        <section ref={contentRef} className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
           <div
             ref={hudRef}
             className="w-full max-w-full"
@@ -1094,7 +1104,7 @@ export default function Home() {
               type="button"
               onClick={() => startGame(activeConfig)}
               aria-label="Restart game"
-              className="theme-button-primary restart-button font-fredoka-strong flex min-h-[clamp(2.5rem,4.5vw,3.2rem)] items-center justify-center gap-2 rounded-full px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.45rem,0.85vw,0.65rem)] text-[clamp(0.92rem,1.45vw,1.05rem)] shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              className="theme-button-primary restart-button font-fredoka-strong flex h-14 w-full max-w-[20rem] items-center justify-center gap-2 rounded-full px-7 py-3 text-base shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
             >
               <span aria-hidden="true" className="text-[clamp(0.95rem,1.5vw,1.1rem)] leading-none">
                 {"\u21BB"}
