@@ -11,12 +11,12 @@
     "types": ["node"]
   },
   "include": [
-    "../app/game-logic.ts",
-    "../app/game-types.ts",
-    "../app/confetti-logic.ts",
-    "../app/gradient-quality.ts",
-    "../app/personal-best.ts",
-    "../app/win-sequence.ts",
+    "../app/game/game-logic.ts",
+    "../app/game/game-types.ts",
+    "../app/game/confetti-logic.ts",
+    "../app/game/gradient-quality.ts",
+    "../app/game/personal-best.ts",
+    "../app/game/win-sequence.ts",
     "./**/*.ts"
   ],
   "exclude": [

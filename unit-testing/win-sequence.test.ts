@@ -8,7 +8,7 @@ import {
   WIN_MODAL_TOTAL_DELAY_MS,
   WIN_TILE_POP_DURATION_MS,
   WIN_TILE_WAVE_STAGGER_MS,
-} from "../app/win-sequence";
+} from "../app/game/win-sequence";
 
 test("getWinWaveDuration returns zero when there are no tiles", () => {
   assert.equal(getWinWaveDuration(0), 0);

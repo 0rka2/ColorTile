@@ -3,12 +3,12 @@
 import { forwardRef, useEffect, useLayoutEffect, useState } from "react";
 import { HiOutlineSpeakerWave, HiOutlineSpeakerXMark } from "react-icons/hi2";
 
-import type { AppView } from "./app-view";
-import { GradientText } from "../components/ui/gradient-text";
+import type { AppView } from "../../views/app-view";
+import { GradientText } from "../../../components/ui/gradient-text";
 import { GameDrawer, ThemeToggle } from "./game-components";
-import { getSoundEnabled, setSoundEnabled } from "./lib/sounds";
-import { resolveThemeMode, THEME_MODE_STORAGE_KEY } from "./settings-options";
-import type { ThemeMode } from "./settings-options";
+import { getSoundEnabled, setSoundEnabled } from "../../lib/sounds";
+import { resolveThemeMode, THEME_MODE_STORAGE_KEY } from "../settings-options";
+import type { ThemeMode } from "../settings-options";
 
 type HeaderProps = {
   onLogoClick: () => void;
@@ -45,24 +45,24 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
 
   return (
     <header ref={ref} className="flex items-start justify-between gap-[clamp(0.605rem,1.32vw,0.99rem)]">
-      <div className="flex flex-wrap items-center gap-[0.55rem] sm:gap-[0.6875rem]">
-        <div className="relative">
-          <div className="theme-header-surface flex items-center gap-[0.55rem] rounded-[clamp(0.935rem,1.65vw,1.43rem)] border px-[clamp(0.715rem,1.54vw,1.045rem)] py-[clamp(0.495rem,1.1vw,0.825rem)] backdrop-blur sm:gap-[0.6875rem]">
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open navigation menu"
-              aria-expanded={drawerOpen}
-              className="theme-text-primary text-[clamp(1.21rem,1.98vw,1.595rem)] leading-none"
-            >
-              {"\u2630"}
-            </button>
+      <div className="flex flex-nowrap items-center gap-[clamp(1rem,2.6vw,2rem)]">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open navigation menu"
+          aria-expanded={drawerOpen}
+          className="theme-text-primary shrink-0 text-[clamp(1.5rem,1.98vw,1.595rem)] leading-none"
+        >
+          {"\u2630"}
+        </button>
 
+        <div className="relative">
+          <div className="theme-header-surface flex items-center rounded-[clamp(0.935rem,1.65vw,1.43rem)] border px-[clamp(0.715rem,1.54vw,1.045rem)] py-[clamp(0.495rem,1.1vw,0.825rem)] backdrop-blur">
             <button
               type="button"
               onClick={onLogoClick}
               aria-label="Go to ColorTile home"
-              className="font-fredoka-display theme-text-primary text-[clamp(1.485rem,2.64vw,2.31rem)] font-black leading-none tracking-[-0.05em]"
+              className="font-fredoka-display theme-text-primary shrink-0 text-[clamp(2rem,2.5vw,2.5rem)] font-black leading-none tracking-[-0.05em]"
             >
               <GradientText className="px-1">ColorTile</GradientText>
             </button>

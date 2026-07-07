@@ -1,48 +1,54 @@
 "use client";
 
-import { PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useAnimationControls } from "motion/react";
+import { FaShoppingCart } from "react-icons/fa";
+import { IoMdTrophy } from "react-icons/io";
+import { VscStarFull } from "react-icons/vsc";
 
-import { AboutView } from "./about-view";
-import type { AppView } from "./app-view";
+import {
+  EndlessStartModal,
+  GameBoard,
+  GameControls,
+  GameHud,
+  GameModal,
+  GameModeModal,
+  LeaderboardModal,
+  ShopComingSoonModal,
+  WinConfetti,
+} from "./game/components/game-components";
+import { Header } from "./game/components/header";
+import { useBoardDrag } from "./game/hooks/use-board-drag";
+import { useBoardSize } from "./game/hooks/use-board-size";
+import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
+import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
+import { useWinSequence } from "./game/hooks/use-win-sequence";
 import {
   checkCompletion,
-  clamp,
   DIFFICULTY_LABELS,
   formatTime,
   generateCornerColors,
   generateSolvedBoard,
   getBoardDensityClass,
+  getEndlessConfig,
+  getEndlessSwapBudget,
+  getEndlessThreeStarMoveLimit,
   getTileRadiusClass,
   isTileCorrect,
   isTileLocked,
   PRESET_DIFFICULTIES,
   scrambleBoard,
-  swapTiles,
-} from "./game-logic";
-import { CustomGameModal, GameBoard, GameControls, GameHud, GameModal, GameModeModal, WinConfetti } from "./game-components";
-import { getGradientQuality } from "./gradient-quality";
-import { Header } from "./header";
-import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./personal-best";
-import { PrivacyView } from "./privacy-view";
-import type { PersonalBestStatus } from "./personal-best";
-import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game-types";
-import { getWinSequenceDurations } from "./win-sequence";
-import type { WinPhase } from "./win-sequence";
+} from "./game/game-logic";
+import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game/game-types";
+import { getGradientQuality } from "./game/gradient-quality";
+import { timeUpSound } from "./lib/sounds";
+import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./game/personal-best";
+import type { PersonalBestStatus } from "./game/personal-best";
 import TutorialGuide from "./tutorial/tutorial-guide";
-import { boardCompleteSound, swapSound, timeUpSound } from "./lib/sounds";
-import { VscStarFull } from "react-icons/vsc";
-import { FaShoppingCart } from "react-icons/fa";
-import { IoMdTrophy } from "react-icons/io";
+import type { AppView } from "./views/app-view";
+import { AboutView } from "./views/about-view";
+import { PrivacyView } from "./views/privacy-view";
 
-
-const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
-const TILE_SWAP_ANIMATION_DURATION_MS = 220;
-const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
-const DRAG_ROTATION_MAX_DEGREES = 3;
-const DRAG_START_DISTANCE_PX = 6;
-const TILE_DRAG_SCALE = 1.065;
-const GAME_AREA_MAX_WIDTH_PX = 600;
 const HUD_FEEDBACK_EASE = [0.22, 1, 0.36, 1] as const;
 const HUD_FEEDBACK_ANIMATION = {
   opacity: [0.2, 1],
@@ -52,28 +58,6 @@ const HUD_FEEDBACK_ANIMATION = {
     ease: HUD_FEEDBACK_EASE,
   },
 };
-const DROP_TARGET_RING_CLASSES = [
-  "ring-2",
-  "ring-slate-300/70",
-  "ring-offset-2",
-  "ring-offset-white/80",
-];
-
-function getResponsiveCustomSizeMax(viewportWidth: number) {
-  if (viewportWidth < 480) {
-    return 8;
-  }
-
-  if (viewportWidth < 768) {
-    return 10;
-  }
-
-  if (viewportWidth < 1024) {
-    return 12;
-  }
-
-  return 14;
-}
 
 function getAccuracyScore(size: number, moves: number) {
   const targetMoves = Math.max(1, Math.round(size * size * 0.58));
@@ -94,280 +78,107 @@ function getBestSolveTime(record: BestStats[DifficultyKey], totalTime: number) {
   return undefined;
 }
 
-type DragSession = {
-  color: string;
-  grabX: number;
-  height: number;
-  index: number;
-  isCorrect: boolean;
-  pointerX: number;
-  pointerY: number;
-  pointerId: number;
-  offsetX: number;
-  offsetY: number;
-  tileId: string;
-  width: number;
-};
-
-type BoardStateUpdater = Tile[] | ((currentBoard: Tile[]) => Tile[]);
-
 export default function Home() {
-  const pageShellRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const hudRef = useRef<HTMLDivElement | null>(null);
-  const controlsRef = useRef<HTMLDivElement | null>(null);
-  const restartRef = useRef<HTMLDivElement | null>(null);
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
-  const [customSizeMax, setCustomSizeMax] = useState(14);
-  const [customSize, setCustomSize] = useState(8);
-  const [customTime, setCustomTime] = useState(60);
-  const [customDraftSize, setCustomDraftSize] = useState(8);
-  const [customDraftTime, setCustomDraftTime] = useState(35);
   const [board, setBoard] = useState<Tile[]>([]);
-  const [dragSession, setDragSession] = useState<DragSession | null>(null);
-  const [pressedTileIndex, setPressedTileIndex] = useState<number | null>(null);
   const [moves, setMoves] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(PRESET_DIFFICULTIES.normal.time);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
-  const [winPhase, setWinPhase] = useState<WinPhase>("idle");
   const [loseState, setLoseState] = useState(false);
-  const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [endlessModalOpen, setEndlessModalOpen] = useState(false);
+  const [endlessPuzzleNumber, setEndlessPuzzleNumber] = useState(1);
+  const [endlessStreak, setEndlessStreak] = useState(0);
+  const [endlessLastClear, setEndlessLastClear] = useState<{
+    isThreeStar: boolean;
+    puzzleNumber: number;
+    swapBudget: number;
+    threeStarMoveLimit: number;
+  } | null>(null);
   const [modeModalOpen, setModeModalOpen] = useState(false);
+  const [shopModalOpen, setShopModalOpen] = useState(false);
+  const [leaderboardModalOpen, setLeaderboardModalOpen] = useState(false);
   const [timerStarted, setTimerStarted] = useState(true);
-  const [bestStats, setBestStats] = useState<BestStats>({});
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
   const [boardResetKey, setBoardResetKey] = useState(0);
-  const [boardSize, setBoardSize] = useState(0);
   const [activeView, setActiveView] = useState<AppView>("game");
   const [hudFeedbackKey, setHudFeedbackKey] = useState(0);
   const hudFeedbackControls = useAnimationControls();
-  const tileElementsRef = useRef<Record<string, HTMLButtonElement | null>>({});
-  const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
-  const dragPointerPositionRef = useRef<{ x: number; y: number } | null>(null);
-  const dragPointerTargetRef = useRef<HTMLButtonElement | null>(null);
-  const pendingDragStartRef = useRef<DragSession | null>(null);
-  const dragOverlayElementRef = useRef<HTMLDivElement | null>(null);
-  const dragAnimationFrameRef = useRef<number | null>(null);
-  const hoveredTargetIndexRef = useRef<number | null>(null);
-  const latestBoardRef = useRef<Tile[]>([]);
-  const winSequenceTimeoutsRef = useRef<number[]>([]);
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
-  const lastWinPhaseSoundRef = useRef<WinPhase>("idle");
+
+  const { bestStats, setBestStats } = usePersistentBestStats();
+  const { endlessStats, setEndlessStats } = usePersistentEndlessStats();
 
   const activeConfig =
-    difficulty === "custom"
-      ? {
-          label: DIFFICULTY_LABELS.custom,
-          size: clamp(customSize, 4, customSizeMax),
-          time: clamp(customTime, 10, 480),
-        }
+    difficulty === "endless"
+      ? getEndlessConfig(endlessPuzzleNumber)
       : PRESET_DIFFICULTIES[difficulty];
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
-
-  useLayoutEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const measureBoardSize = () => {
-      const shellElement = pageShellRef.current;
-      const contentElement = contentRef.current;
-      const headerElement = headerRef.current;
-      const hudElement = hudRef.current;
-      const controlsElement = controlsRef.current;
-      const restartElement = restartRef.current;
-
-      if (!shellElement || !contentElement || !headerElement || !hudElement || !controlsElement || !restartElement) {
-        return;
-      }
-
-      const shellGap = Number.parseFloat(window.getComputedStyle(shellElement).rowGap || "0");
-      const contentGap = Number.parseFloat(window.getComputedStyle(contentElement).rowGap || "0");
-      const paddingLeft = Number.parseFloat(window.getComputedStyle(shellElement).paddingLeft || "0");
-      const paddingRight = Number.parseFloat(window.getComputedStyle(shellElement).paddingRight || "0");
-      const paddingTop = Number.parseFloat(window.getComputedStyle(shellElement).paddingTop || "0");
-      const paddingBottom = Number.parseFloat(window.getComputedStyle(shellElement).paddingBottom || "0");
-      const contentPaddingBottom = Number.parseFloat(window.getComputedStyle(contentElement).paddingBottom || "0");
-
-      const availableWidth = window.innerWidth - paddingLeft - paddingRight;
-      const reservedHeight =
-        headerElement.getBoundingClientRect().height +
-        hudElement.getBoundingClientRect().height +
-        controlsElement.getBoundingClientRect().height +
-        restartElement.getBoundingClientRect().height +
-        shellGap +
-        contentGap * 3 +
-        paddingTop +
-        paddingBottom +
-        contentPaddingBottom;
-      const availableHeight = window.innerHeight - reservedHeight;
-
-      const measuredBoardSize = Math.max(0, Math.floor(Math.min(availableWidth, availableHeight)));
-      const minimumBoardSize = window.innerWidth < 360 ? 240 : 280;
-      const nextBoardSize = Math.min(availableWidth, GAME_AREA_MAX_WIDTH_PX, Math.max(minimumBoardSize, measuredBoardSize));
-      setBoardSize((currentBoardSize) => Math.max(currentBoardSize, nextBoardSize));
-    };
-
-    measureBoardSize();
-
-    const resizeObserver = new ResizeObserver(measureBoardSize);
-    [pageShellRef.current, headerRef.current, contentRef.current, hudRef.current, controlsRef.current, restartRef.current].forEach((element) => {
-      if (element) {
-        resizeObserver.observe(element);
-      }
-    });
-
-    window.addEventListener("resize", measureBoardSize);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", measureBoardSize);
-    };
-  }, [activeConfig.time, activeConfig.size, activeView, board.length, boardResetKey, completion, difficulty, loseState, moves, timeLeft, winState]);
   const currentBest = bestStats[difficulty];
+  const isEndlessMode = difficulty === "endless";
+  const endlessSwapBudget = getEndlessSwapBudget(activeConfig.size, endlessStreak);
+  const endlessThreeStarMoveLimit = getEndlessThreeStarMoveLimit(endlessSwapBudget);
   const bestSolveTime = getBestSolveTime(currentBest, activeConfig.time);
   const bestTimeDisplay = bestSolveTime === undefined ? "-" : formatTime(bestSolveTime);
-  const solveTime = Math.max(0, activeConfig.time - timeLeft);
-  const draggedIndex = dragSession?.index ?? null;
+  const solveTime = timeLeft;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
   const gradientQuality = getGradientQuality(completion);
-  const winWaveActive = winPhase === "boardWave";
-  const confettiActive = winPhase === "confetti" || winPhase === "modal";
-  const winModalVisible = winPhase === "modal";
   const allowHoverWhenLocked = false;
 
-  const getTileRef = useCallback(
-    (tileId: string) => (element: HTMLButtonElement | null) => {
-      tileElementsRef.current[tileId] = element;
-    },
-    [],
-  );
+  const {
+    clearWinSequenceTimeouts,
+    confettiActive,
+    resetWinSequence,
+    setWinPhase,
+    winModalVisible,
+    winWaveActive,
+  } = useWinSequence({
+    boardLength: board.length,
+    setPersonalBestStatus,
+  });
 
-  const setDragOverlayRef = useCallback((element: HTMLDivElement | null) => {
-    dragOverlayElementRef.current = element;
-  }, []);
+  const {
+    clearDragSession,
+    clearPendingSwapAnimation,
+    dragSession,
+    draggedIndex,
+    getTileRef,
+    handlePointerDown,
+    pressedTileIndex,
+    setDragOverlayRef,
+    updateBoard,
+  } = useBoardDrag({
+    board,
+    loseState,
+    setBoard,
+    setMoves,
+    winState,
+  });
 
-  const updateBoard = useCallback((nextBoardOrUpdater: BoardStateUpdater) => {
-    setBoard((currentBoard) => {
-      const nextBoard =
-        typeof nextBoardOrUpdater === "function"
-          ? nextBoardOrUpdater(currentBoard)
-          : nextBoardOrUpdater;
-
-      latestBoardRef.current = nextBoard;
-      return nextBoard;
-    });
-  }, []);
-
-  const cancelDragAnimationFrame = useCallback(() => {
-    if (dragAnimationFrameRef.current !== null && typeof window !== "undefined") {
-      window.cancelAnimationFrame(dragAnimationFrameRef.current);
-      dragAnimationFrameRef.current = null;
-    }
-  }, []);
-
-  const clearWinSequenceTimeouts = useCallback(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    winSequenceTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    winSequenceTimeoutsRef.current = [];
-  }, []);
-
-  const updateDragOverlayPosition = useCallback(() => {
-    dragAnimationFrameRef.current = null;
-
-    const overlayElement = dragOverlayElementRef.current;
-    const pointerPosition = dragPointerPositionRef.current;
-    const currentDragSession = dragSession;
-
-    if (!overlayElement || !pointerPosition || !currentDragSession) {
-      return;
-    }
-
-    const nextX = pointerPosition.x - currentDragSession.offsetX;
-    const nextY = pointerPosition.y - currentDragSession.offsetY;
-    const rotate = clamp((pointerPosition.x - currentDragSession.grabX) / 14, -DRAG_ROTATION_MAX_DEGREES, DRAG_ROTATION_MAX_DEGREES);
-    overlayElement.style.transform = `translate3d(${nextX}px, ${nextY}px, 0) scale(${TILE_DRAG_SCALE}) rotate(${rotate}deg)`;
-  }, [dragSession]);
-
-  const scheduleDragOverlayPositionUpdate = useCallback(() => {
-    if (dragAnimationFrameRef.current !== null || typeof window === "undefined") {
-      return;
-    }
-
-    dragAnimationFrameRef.current = window.requestAnimationFrame(updateDragOverlayPosition);
-  }, [updateDragOverlayPosition]);
-
-  const setDropTargetHighlight = useCallback((index: number | null, active: boolean) => {
-    if (index === null) {
-      return;
-    }
-
-    const tile = latestBoardRef.current[index];
-    if (!tile) {
-      return;
-    }
-
-    const element = tileElementsRef.current[tile.id];
-    if (!element) {
-      return;
-    }
-
-    if (active) {
-      element.classList.add(...DROP_TARGET_RING_CLASSES);
-      return;
-    }
-
-    element.classList.remove(...DROP_TARGET_RING_CLASSES);
-  }, []);
-
-  const updateHoveredDropTarget = useCallback((nextIndex: number | null) => {
-    const previousIndex = hoveredTargetIndexRef.current;
-    if (previousIndex === nextIndex) {
-      return;
-    }
-
-    setDropTargetHighlight(previousIndex, false);
-    hoveredTargetIndexRef.current = nextIndex;
-    setDropTargetHighlight(nextIndex, true);
-  }, [setDropTargetHighlight]);
-
-  const clearDragSession = useCallback(() => {
-    cancelDragAnimationFrame();
-
-    const currentPointerTarget = dragPointerTargetRef.current;
-    const activePointerId = dragSession?.pointerId ?? pendingDragStartRef.current?.pointerId;
-    if (currentPointerTarget && activePointerId !== undefined) {
-      try {
-        if (currentPointerTarget.hasPointerCapture(activePointerId)) {
-          currentPointerTarget.releasePointerCapture(activePointerId);
-        }
-      } catch {
-        // Ignore stale capture cleanup errors.
-      }
-    }
-
-    dragPointerTargetRef.current = null;
-    dragPointerPositionRef.current = null;
-    pendingDragStartRef.current = null;
-    setPressedTileIndex(null);
-    updateHoveredDropTarget(null);
-    setDragSession(null);
-  }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
-
-  const resetWinSequence = useCallback(() => {
-    clearWinSequenceTimeouts();
-    lastWinPhaseSoundRef.current = "idle";
-    setWinPhase("idle");
-    setPersonalBestStatus(EMPTY_PERSONAL_BEST_STATUS);
-  }, [clearWinSequenceTimeouts]);
+  const {
+    boardAreaWidth,
+    contentRef,
+    controlsRef,
+    headerRef,
+    hudRef,
+    pageShellRef,
+    restartRef,
+  } = useBoardSize({
+    activeConfigSize: activeConfig.size,
+    activeConfigTime: activeConfig.time,
+    activeView,
+    boardLength: board.length,
+    boardResetKey,
+    completion,
+    difficulty,
+    loseState,
+    moves,
+    timeLeft,
+    winState,
+  });
 
   useEffect(() => {
     clearDragSessionRef.current = clearDragSession;
@@ -382,117 +193,7 @@ export default function Home() {
     void hudFeedbackControls.start(HUD_FEEDBACK_ANIMATION);
   }, [activeView, hudFeedbackControls, hudFeedbackKey]);
 
-  const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
-    if (typeof document === "undefined") {
-      return null;
-    }
-
-    const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
-    const target = element?.closest<HTMLElement>("[data-tile-index]");
-    if (!target) {
-      return null;
-    }
-
-    const rawIndex = target.dataset.tileIndex;
-    if (!rawIndex) {
-      return null;
-    }
-
-    const nextIndex = Number.parseInt(rawIndex, 10);
-    return Number.isNaN(nextIndex) ? null : nextIndex;
-  }, []);
-
-  useLayoutEffect(() => {
-    const previousPositions = pendingSwapAnimationRef.current;
-    if (!previousPositions) {
-      return;
-    }
-
-    pendingSwapAnimationRef.current = null;
-    swapSound.play();
-    previousPositions.forEach((previousRect, tileId) => {
-      const element = tileElementsRef.current[tileId];
-      if (!element) {
-        return;
-      }
-
-      const nextRect = element.getBoundingClientRect();
-      const deltaX = previousRect.left - nextRect.left;
-      const deltaY = previousRect.top - nextRect.top;
-
-      if (deltaX === 0 && deltaY === 0) {
-        return;
-      }
-
-      element.style.zIndex = "20";
-
-      const animation = element.animate(
-        [
-          { transform: `translate3d(${deltaX}px, ${deltaY}px, 0)` },
-          { transform: "translate3d(0, 0, 0)" },
-        ],
-        {
-          duration: TILE_SWAP_ANIMATION_DURATION_MS,
-          easing: TILE_SWAP_ANIMATION_EASING,
-        },
-      );
-
-      const resetStacking = () => {
-        element.style.zIndex = "";
-      };
-
-      animation.addEventListener("finish", resetStacking, { once: true });
-      animation.addEventListener("cancel", resetStacking, { once: true });
-    });
-  }, [board]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    try {
-      const stored = window.localStorage.getItem(BEST_STATS_STORAGE_KEY);
-      if (!stored) {
-        return;
-      }
-
-      const parsed = JSON.parse(stored) as BestStats;
-      setBestStats(parsed);
-    } catch {
-      // Ignore malformed local storage and start fresh.
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
-  }, [bestStats]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const updateCustomSizeMax = () => {
-      const nextMax = getResponsiveCustomSizeMax(window.innerWidth);
-      setCustomSizeMax(nextMax);
-      setCustomSize((currentSize) => clamp(currentSize, 4, nextMax));
-      setCustomDraftSize((currentSize) => clamp(currentSize, 4, nextMax));
-    };
-
-    updateCustomSizeMax();
-    window.addEventListener("resize", updateCustomSizeMax);
-
-    return () => {
-      window.removeEventListener("resize", updateCustomSizeMax);
-    };
-  }, []);
-
-  const startGame = (config: DifficultyConfig) => {
+  const startGame = useCallback((config: DifficultyConfig) => {
     const corners = generateCornerColors(config.size);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
     const nextBoard = scrambleBoard(nextSolvedBoard);
@@ -500,23 +201,24 @@ export default function Home() {
     clearDragSession();
     resetWinSequence();
     setBoardResetKey((currentKey) => currentKey + 1);
-    pendingSwapAnimationRef.current = null;
+    clearPendingSwapAnimation();
     updateBoard(nextBoard);
     setMoves(0);
-    setTimeLeft(config.time);
+    setTimeLeft(0);
     setCompletion(checkCompletion(nextBoard));
     setWinState(false);
     setLoseState(false);
+    setEndlessLastClear(null);
     setTimerStarted(true);
-  };
+  }, [clearDragSession, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
 
   useEffect(() => {
-    if (difficulty === "custom") {
+    if (difficulty === "endless") {
       return;
     }
 
     startGame(activeConfig);
-  }, [difficulty]);
+  }, [difficulty, startGame]);
 
   useEffect(() => {
     if (!board.length || winState || loseState) {
@@ -527,7 +229,33 @@ export default function Home() {
     setCompletion(nextCompletion);
 
     if (nextCompletion === 100) {
-      const solveTime = activeConfig.time - timeLeft;
+      const finalSolveTime = timeLeft;
+
+      if (isEndlessMode) {
+        const completedPuzzleNumber = endlessPuzzleNumber;
+        const completedSwapBudget = endlessSwapBudget;
+        const completedThreeStarMoveLimit = endlessThreeStarMoveLimit;
+        const isThreeStar = moves <= completedThreeStarMoveLimit;
+        const nextStreak = endlessStreak + 1;
+
+        setEndlessLastClear({
+          isThreeStar,
+          puzzleNumber: completedPuzzleNumber,
+          swapBudget: completedSwapBudget,
+          threeStarMoveLimit: completedThreeStarMoveLimit,
+        });
+        setEndlessStreak(nextStreak);
+        setEndlessStats((currentStats) => ({
+          clears: currentStats.clears + 1,
+          threeStarClears: currentStats.threeStarClears + (isThreeStar ? 1 : 0),
+          bestStreak: Math.max(currentStats.bestStreak, nextStreak),
+        }));
+        setWinState(true);
+        setWinPhase("boardWave");
+        clearDragSession();
+        return;
+      }
+
       const currentBestWithSolveTime = {
         ...currentBest,
         bestSolveTime: getBestSolveTime(currentBest, activeConfig.time),
@@ -536,7 +264,7 @@ export default function Home() {
       setPersonalBestStatus(
         getPersonalBestStatus(currentBestWithSolveTime, {
           moves,
-          solveTime,
+          solveTime: finalSolveTime,
         }),
       );
       setWinState(true);
@@ -550,8 +278,8 @@ export default function Home() {
           bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
           bestSolveTime:
             currentBestSolveTime === undefined
-              ? solveTime
-              : Math.min(currentBestSolveTime, solveTime),
+              ? finalSolveTime
+              : Math.min(currentBestSolveTime, finalSolveTime),
           fewestMoves:
             currentRecord.fewestMoves === undefined
               ? moves
@@ -564,81 +292,37 @@ export default function Home() {
         };
       });
     }
-  }, [activeConfig.time, board, clearDragSession, currentBest, difficulty, moves, timeLeft, winState]);
+  }, [activeConfig.time, board, clearDragSession, currentBest, difficulty, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, isEndlessMode, loseState, moves, setBestStats, setEndlessStats, setWinPhase, timeLeft, winState]);
 
   useEffect(() => {
-    if (winPhase !== "boardWave" && winPhase !== "confetti") {
+    if (!isEndlessMode || !board.length || winState || loseState || moves <= endlessSwapBudget || checkCompletion(board) === 100) {
       return;
     }
 
-    clearWinSequenceTimeouts();
-
-    const { boardWaveDurationMs, modalDelayMs } = getWinSequenceDurations(board.length);
-
-    if (winPhase === "boardWave") {
-      if (lastWinPhaseSoundRef.current !== "boardWave") {
-        boardCompleteSound.play();
-        lastWinPhaseSoundRef.current = "boardWave";
-      }
-
-      winSequenceTimeoutsRef.current.push(
-        window.setTimeout(() => {
-          setWinPhase("confetti");
-        }, boardWaveDurationMs),
-      );
-      return;
-    }
-
-    winSequenceTimeoutsRef.current.push(
-      window.setTimeout(() => {
-        setWinPhase("modal");
-      }, modalDelayMs - boardWaveDurationMs),
-    );
-
-    return () => {
-      clearWinSequenceTimeouts();
-    };
-  }, [board.length, clearWinSequenceTimeouts, winPhase]);
+    setEndlessPuzzleNumber(1);
+    setEndlessStreak(0);
+    resetWinSequenceRef.current();
+    setLoseState(false);
+    timeUpSound.play();
+    clearDragSessionRef.current();
+    startGame(getEndlessConfig(1));
+  }, [board, endlessSwapBudget, isEndlessMode, loseState, moves, startGame, winState]);
 
   useEffect(() => {
-    if (activeView !== "game" || !board.length || winState || loseState || customModalOpen || !timerStarted) {
+    if (activeView !== "game" || !board.length || winState || loseState || endlessModalOpen || !timerStarted) {
       return;
     }
 
     const interval = window.setInterval(() => {
       setTimeLeft((current) => {
-        if (current <= 1) {
-          window.clearInterval(interval);
-          const finalBoard = latestBoardRef.current;
-          const finalCompletion = finalBoard.length ? checkCompletion(finalBoard) : 0;
-
-          setBestStats((currentStats) => {
-            const currentRecord = currentStats[difficulty] ?? {};
-
-            return {
-              ...currentStats,
-              [difficulty]: {
-                ...currentRecord,
-                bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, finalCompletion),
-              },
-            };
-          });
-          setCompletion(finalCompletion);
-          resetWinSequenceRef.current();
-          setLoseState(true);
-          timeUpSound.play();
-          clearDragSessionRef.current();
-          return 0;
-        }
-
-        return current - 1;
+        return Math.round((current + 0.1) * 10) / 10;
       });
-    }, 1000);
+    }, 100);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeView, board.length, difficulty, winState, loseState, customModalOpen, timerStarted]);
+  }, [activeView, board.length, endlessModalOpen, loseState, timerStarted, winState]);
 
   useEffect(() => {
     if (!modeModalOpen) {
@@ -656,251 +340,76 @@ export default function Home() {
   }, [modeModalOpen]);
 
   useEffect(() => {
-    if (!dragSession) {
-      return;
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (event.pointerId !== dragSession.pointerId) {
-        return;
-      }
-
-      dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
-      scheduleDragOverlayPositionUpdate();
-
-      const rawTargetIndex = resolveDropTargetIndex(event.clientX, event.clientY);
-      const targetTile = rawTargetIndex === null ? null : latestBoardRef.current[rawTargetIndex];
-      const nextHoveredTargetIndex =
-        rawTargetIndex === null ||
-        rawTargetIndex === dragSession.index ||
-        !targetTile ||
-        isTileLocked(targetTile, rawTargetIndex)
-          ? null
-          : rawTargetIndex;
-
-      updateHoveredDropTarget(nextHoveredTargetIndex);
-    };
-
-    const handlePointerEnd = (event: PointerEvent) => {
-      if (event.pointerId !== dragSession.pointerId) {
-        return;
-      }
-
-      const sourceIndex = dragSession.index;
-      const targetIndex = resolveDropTargetIndex(event.clientX, event.clientY);
-      const draggedTile = board[sourceIndex];
-      const targetTile = targetIndex === null ? null : board[targetIndex];
-
-      if (
-        targetIndex !== null &&
-        targetIndex !== sourceIndex &&
-        draggedTile &&
-        targetTile &&
-        !winState &&
-        !loseState &&
-        !isTileLocked(draggedTile, sourceIndex) &&
-        !isTileLocked(targetTile, targetIndex)
-      ) {
-        const draggedTileElement = tileElementsRef.current[draggedTile.id];
-        const targetTileElement = tileElementsRef.current[targetTile.id];
-
-        if (draggedTileElement && targetTileElement) {
-          pendingSwapAnimationRef.current = new Map([
-            [draggedTile.id, draggedTileElement.getBoundingClientRect()],
-            [targetTile.id, targetTileElement.getBoundingClientRect()],
-          ]);
-        } else {
-          pendingSwapAnimationRef.current = null;
-        }
-
-        updateBoard((currentBoard) => swapTiles(currentBoard, sourceIndex, targetIndex));
-        setMoves((currentMoves) => currentMoves + 1);
-      } else {
-        pendingSwapAnimationRef.current = null;
-      }
-
-      clearDragSession();
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerEnd);
-    window.addEventListener("pointercancel", handlePointerEnd);
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerEnd);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-    };
-  }, [board, clearDragSession, dragSession, loseState, resolveDropTargetIndex, scheduleDragOverlayPositionUpdate, updateBoard, winState]);
-
-  useEffect(() => {
-    if (!dragSession) {
-      cancelDragAnimationFrame();
-      return;
-    }
-
-    scheduleDragOverlayPositionUpdate();
-
-    return () => {
-      cancelDragAnimationFrame();
-    };
-  }, [cancelDragAnimationFrame, dragSession, scheduleDragOverlayPositionUpdate]);
-
-  useEffect(() => {
-    if (dragSession || pressedTileIndex === null) {
-      return;
-    }
-
-    const handlePointerMove = (event: PointerEvent) => {
-      const pendingDragStart = pendingDragStartRef.current;
-      if (!pendingDragStart || event.pointerId !== pendingDragStart.pointerId) {
-        return;
-      }
-
-      dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
-
-      const distance = Math.hypot(
-        event.clientX - pendingDragStart.pointerX,
-        event.clientY - pendingDragStart.pointerY,
-      );
-
-      if (distance < DRAG_START_DISTANCE_PX) {
-        return;
-      }
-
-      pendingDragStartRef.current = null;
-      setPressedTileIndex(null);
-      setDragSession({
-        ...pendingDragStart,
-        pointerX: event.clientX,
-        pointerY: event.clientY,
-      });
-    };
-
-    const handlePointerEnd = (event: PointerEvent) => {
-      const pendingDragStart = pendingDragStartRef.current;
-      if (!pendingDragStart || event.pointerId !== pendingDragStart.pointerId) {
-        return;
-      }
-
-      clearDragSession();
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerEnd);
-    window.addEventListener("pointercancel", handlePointerEnd);
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerEnd);
-      window.removeEventListener("pointercancel", handlePointerEnd);
-    };
-  }, [clearDragSession, dragSession, pressedTileIndex]);
-
-  useEffect(() => {
-    return () => {
-      cancelDragAnimationFrame();
-    };
-  }, [cancelDragAnimationFrame]);
-
-  useEffect(() => {
     return () => {
       clearWinSequenceTimeouts();
     };
   }, [clearWinSequenceTimeouts]);
 
-  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, index: number) => {
-    if (winState || loseState) {
-      return;
-    }
-
-    const tile = board[index];
-    if (!tile || isTileLocked(tile, index)) {
-      return;
-    }
-
-    const tileElement = tileElementsRef.current[tile.id];
-    if (!tileElement) {
-      return;
-    }
-
-    const tileRect = tileElement.getBoundingClientRect();
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragPointerTargetRef.current = event.currentTarget;
-    dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
-
-    pendingDragStartRef.current = {
-      color: tile.color,
-      grabX: event.clientX,
-      height: tileRect.height,
-      index,
-      isCorrect: isTileCorrect(tile, index),
-      offsetX: event.clientX - tileRect.left,
-      offsetY: event.clientY - tileRect.top,
-      pointerX: event.clientX,
-      pointerY: event.clientY,
-      pointerId: event.pointerId,
-      tileId: tile.id,
-      width: tileRect.width,
-    };
-    setPressedTileIndex(index);
-  }, [board, loseState, winState]);
-
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
-    if (nextDifficulty === "custom") {
+    if (nextDifficulty === "endless") {
       clearDragSession();
       resetWinSequence();
-      setCustomDraftSize(customSize);
-      setCustomDraftTime(customTime);
-      setCustomModalOpen(true);
+      setEndlessModalOpen(true);
       setTimerStarted(false);
       return;
     }
 
-    setCustomModalOpen(false);
+    setEndlessModalOpen(false);
     clearDragSession();
     resetWinSequence();
     setDifficulty(nextDifficulty);
   };
 
-  const handleCustomStart = () => {
-    const nextConfig = {
-      label: DIFFICULTY_LABELS.custom,
-      size: clamp(customDraftSize, 4, customSizeMax),
-      time: clamp(customDraftTime, 10, 480),
-    };
-
-    setCustomSize(nextConfig.size);
-    setCustomTime(nextConfig.time);
-    setDifficulty("custom");
-    setCustomModalOpen(false);
-    startGame(nextConfig);
+  const handleEndlessStart = () => {
+    setDifficulty("endless");
+    setEndlessPuzzleNumber(1);
+    setEndlessStreak(0);
+    setEndlessModalOpen(false);
+    startGame(getEndlessConfig(1));
   };
 
-  const handleCustomClose = () => {
-    setCustomModalOpen(false);
+  const handleEndlessClose = () => {
+    setEndlessModalOpen(false);
     setTimerStarted(true);
     clearDragSession();
     resetWinSequence();
   };
 
+  const handleEndlessReplay = () => {
+    startGame(activeConfig);
+  };
+
+  const handleEndlessNextPuzzle = () => {
+    const nextPuzzleNumber = endlessPuzzleNumber + 1;
+
+    setEndlessPuzzleNumber(nextPuzzleNumber);
+    startGame(getEndlessConfig(nextPuzzleNumber));
+  };
+
+  const handleEndlessBack = () => {
+    resetWinSequence();
+    setEndlessModalOpen(true);
+    setTimerStarted(false);
+  };
+
   const handleAutoSolve = useCallback(() => {
     clearDragSession();
     resetWinSequence();
-    pendingSwapAnimationRef.current = null;
+    clearPendingSwapAnimation();
     updateBoard((currentBoard) =>
       [...currentBoard]
         .sort((firstTile, secondTile) => firstTile.correctIndex - secondTile.correctIndex)
         .map((tile, index) => ({ ...tile, currentIndex: index })),
     );
-  }, [clearDragSession, resetWinSequence, updateBoard]);
+  }, [clearDragSession, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
 
   const handleNavigateView = useCallback((nextView: AppView) => {
     if (nextView !== "game") {
       clearDragSession();
-      setCustomModalOpen(false);
+      setEndlessModalOpen(false);
       setModeModalOpen(false);
+      setShopModalOpen(false);
+      setLeaderboardModalOpen(false);
       setTimerStarted(true);
     }
 
@@ -916,7 +425,6 @@ export default function Home() {
     animate: hudFeedbackControls,
     initial: false,
   };
-  const boardAreaWidth = boardSize > 0 ? `${boardSize}px` : `${GAME_AREA_MAX_WIDTH_PX}px`;
 
   return (
     <main className={`theme-page-bg min-h-dvh overflow-x-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
@@ -931,23 +439,25 @@ export default function Home() {
                 type="button"
                 onClick={() => setModeModalOpen(true)}
                 aria-label="Open modes"
-                className="theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
               >
                 <VscStarFull className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
               </button>
 
               <button
                 type="button"
+                onClick={() => setShopModalOpen(true)}
                 aria-label="Open shop"
-                className="theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
               >
                 <FaShoppingCart className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
               </button>
 
               <button
                 type="button"
+                onClick={() => setLeaderboardModalOpen(true)}
                 aria-label="Open leaderboard"
-                className="theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
               >
                 <IoMdTrophy className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
               </button>
@@ -963,10 +473,14 @@ export default function Home() {
             <GameHud
               bestMoves={currentBest?.fewestMoves ?? null}
               bestTimeDisplay={bestTimeDisplay}
+              endlessInfo={isEndlessMode ? {
+                puzzleNumber: endlessPuzzleNumber,
+                swapBudget: endlessSwapBudget,
+              } : undefined}
               gradientQuality={gradientQuality}
               moves={moves}
               timeDisplay={formatTime(timeLeft)}
-              timeWarning={timeLeft <= 5 && !winState && !loseState}
+              timeWarning={false}
             />
           </motion.div>
 
@@ -1042,6 +556,16 @@ export default function Home() {
             activeConfig={activeConfig}
             accuracy={accuracy}
             completion={completion}
+            endlessResult={
+              isEndlessMode && endlessLastClear
+                ? {
+                    ...endlessLastClear,
+                    onBack: handleEndlessBack,
+                    onNextPuzzle: handleEndlessNextPuzzle,
+                    onReplay: handleEndlessReplay,
+                  }
+                : undefined
+            }
             loseState={loseState}
             moves={moves}
             onRestart={() => startGame(activeConfig)}
@@ -1056,15 +580,20 @@ export default function Home() {
             onClose={() => setModeModalOpen(false)}
             onDifficultyChange={handleDifficultyChange}
           />
-          <CustomGameModal
-            draftSize={customDraftSize}
-            draftTime={customDraftTime}
-            isOpen={customModalOpen}
-            maxSize={customSizeMax}
-            onClose={handleCustomClose}
-            onSizeChange={(value) => setCustomDraftSize(clamp(value, 4, customSizeMax))}
-            onStart={handleCustomStart}
-            onTimeChange={(value) => setCustomDraftTime(clamp(value, 10, 480))}
+          <EndlessStartModal
+            currentStreak={endlessStreak}
+            endlessStats={endlessStats}
+            isOpen={endlessModalOpen}
+            onClose={handleEndlessClose}
+            onStart={handleEndlessStart}
+          />
+          <ShopComingSoonModal
+            isOpen={shopModalOpen}
+            onClose={() => setShopModalOpen(false)}
+          />
+          <LeaderboardModal
+            isOpen={leaderboardModalOpen}
+            onClose={() => setLeaderboardModalOpen(false)}
           />
         </>
       )}

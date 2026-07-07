@@ -2,12 +2,12 @@
 
 import { useEffect } from "react";
 
-import { buttonClickSound } from "./lib/sounds";
+import { buttonClickSound } from "../../lib/sounds";
 
 export function GlobalButtonSounds() {
   useEffect(() => {
     const playForActionElement = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) {
+      if (!(target instanceof Element)) {
         return;
       }
 

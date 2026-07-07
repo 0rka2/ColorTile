@@ -3,16 +3,16 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import Confetti from "react-confetti";
 import { FiHeart } from "react-icons/fi";
-import { hoverSound } from "./lib/sounds";
+import { hoverSound } from "../../lib/sounds";
 
-import type { AppView } from "./app-view";
-import { getGradientQualityFill } from "./gradient-quality";
-import { DIFFICULTY_LABELS } from "./game-logic";
-import { getConfettiViewportSize } from "./confetti-logic";
-import type { PersonalBestStatus } from "./personal-best";
-import type { ThemeMode } from "./settings-options";
-import { DifficultyConfig, DifficultyKey, Tile } from "./game-types";
-import { buttonClickSound } from "./lib/sounds";
+import type { AppView } from "../../views/app-view";
+import { getGradientQualityFill } from "../gradient-quality";
+import { DIFFICULTY_LABELS } from "../game-logic";
+import { getConfettiViewportSize } from "../confetti-logic";
+import type { PersonalBestStatus } from "../personal-best";
+import type { ThemeMode } from "../settings-options";
+import { DifficultyConfig, DifficultyKey, EndlessStats, Tile } from "../game-types";
+import { buttonClickSound } from "../../lib/sounds";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
@@ -135,6 +135,10 @@ export function CheckMark() {
 type HudProps = {
   bestMoves: number | null;
   bestTimeDisplay: string;
+  endlessInfo?: {
+    puzzleNumber: number;
+    swapBudget: number;
+  };
   gradientQuality: number;
   moves: number;
   timeDisplay: string;
@@ -144,6 +148,7 @@ type HudProps = {
 export function GameHud({
   bestMoves,
   bestTimeDisplay,
+  endlessInfo,
   gradientQuality,
   moves,
   timeDisplay,
@@ -194,6 +199,9 @@ export function GameHud({
   }, [gradientQuality]);
 
   const qualityFill = getGradientQualityFill(animatedQuality);
+  const moveDisplay = endlessInfo ? `${moves}/${endlessInfo.swapBudget}` : moves;
+  const moveLabel = endlessInfo ? "Swaps" : "Moves";
+  const progressLabel = endlessInfo ? `Puzzle ${endlessInfo.puzzleNumber}` : "Progress";
 
   return (
     <section className="flex w-full max-w-none flex-col gap-[clamp(0.3rem,0.7vw,0.75rem)]">
@@ -211,16 +219,16 @@ export function GameHud({
           <div className="flex min-w-0 items-center gap-3">
             <div className="text-center">
               <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
-                Moves
+                {moveLabel}
               </p>
               <p className="theme-text-primary mt-1 font-fredoka-display text-[1.15rem] leading-none tracking-tight">
-                {moves}
+                {moveDisplay}
               </p>
             </div>
             <div className="h-9 w-px bg-[var(--border-soft)]" aria-hidden="true" />
             <div className="text-right">
               <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
-                Progress
+                {progressLabel}
               </p>
               <p className="theme-text-primary mt-1 font-fredoka-display text-[1.15rem] leading-none tracking-[-0.05em]">
                 {animatedQuality}%
@@ -239,6 +247,7 @@ export function GameHud({
       </div>
 
       <div className="game-hud-full flex flex-col gap-2">
+  {!endlessInfo && (
   <div className="grid grid-cols-2 gap-2">
     <div className="theme-card rounded-xl border px-3 py-2 text-center backdrop-blur">
       <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
@@ -258,6 +267,7 @@ export function GameHud({
       </p>
     </div>
   </div>
+  )}
 
   <div className="theme-panel relative overflow-hidden rounded-2xl border px-3 py-2 backdrop-blur">
     <div className="grid min-w-0 grid-cols-3 gap-2">
@@ -276,16 +286,16 @@ export function GameHud({
 
       <div className="min-w-0 text-center">
         <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
-          Moves
+          {moveLabel}
         </p>
         <p className="theme-text-primary mt-0.5 font-fredoka-display text-[32px] leading-none tracking-tight">
-          {moves}
+          {moveDisplay}
         </p>
       </div>
 
       <div className="min-w-0 text-right">
         <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
-          Progress
+          {progressLabel}
         </p>
         <p className="theme-text-primary mt-0.5 font-fredoka-display text-[30px] leading-none tracking-[-0.05em]">
           {animatedQuality}%
@@ -658,6 +668,15 @@ type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
   completion: number;
+  endlessResult?: {
+    isThreeStar: boolean;
+    onBack: () => void;
+    onNextPuzzle: () => void;
+    onReplay: () => void;
+    puzzleNumber: number;
+    swapBudget: number;
+    threeStarMoveLimit: number;
+  };
   loseState: boolean;
   moves: number;
   onRestart: () => void;
@@ -670,6 +689,7 @@ export function GameModal({
   activeConfig,
   accuracy,
   completion,
+  endlessResult,
   loseState,
   moves,
   onRestart,
@@ -699,6 +719,57 @@ export function GameModal({
       >
         <div className="relative z-10 flex flex-col">
           {winState ? (
+            endlessResult ? (
+              <div className="mx-auto max-w-lg">
+                <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Endless</p>
+                <h2 className="theme-text-primary font-fredoka-display mt-3 text-[2rem] leading-none sm:text-[2.4rem]">
+                  Cleared
+                </h2>
+                <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.18em] text-emerald-500 sm:mt-5 sm:text-lg">
+                  {renderStars(endlessResult.isThreeStar ? 3 : 1)}
+                </div>
+                <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.95rem] leading-6 sm:text-[1.05rem] sm:leading-7">
+                  Puzzle {endlessResult.puzzleNumber} cleared in {moves} swaps. Three-star clears need {endlessResult.threeStarMoveLimit} swaps or fewer.
+                </p>
+                <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
+                  <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{timeDisplay}</p>
+                  </div>
+                  <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Swaps</p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{moves}/{endlessResult.swapBudget}</p>
+                  </div>
+                  <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Progress</p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{completion}%</p>
+                  </div>
+                </div>
+                <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={endlessResult.onReplay}
+                    className="theme-button-secondary font-fredoka-strong rounded-full px-5 py-3 text-sm sm:text-base"
+                  >
+                    Replay
+                  </button>
+                  <button
+                    type="button"
+                    onClick={endlessResult.onBack}
+                    className="theme-button-secondary font-fredoka-strong rounded-full px-5 py-3 text-sm sm:text-base"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={endlessResult.onNextPuzzle}
+                    className="theme-button-primary font-fredoka-strong rounded-full px-5 py-3 text-sm shadow-[0_18px_34px_rgba(15,23,42,0.2)] sm:text-base"
+                  >
+                    Next Puzzle
+                  </button>
+                </div>
+              </div>
+            ) : (
             <>
               <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Perfect Gradient</p>
               <motion.h2
@@ -735,6 +806,7 @@ export function GameModal({
                 </div>
               </div>
             </>
+            )
           ) : (
             <div className="mx-auto mt-3 max-w-lg">
               <h2 className="theme-text-primary font-fredoka-display text-[2rem] leading-none tracking-[-0.05em] sm:text-[2.35rem]">
@@ -761,13 +833,15 @@ export function GameModal({
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={onRestart}
-            className="theme-button-primary font-fredoka-strong mt-8 rounded-full px-6 py-3 text-base shadow-[0_18px_34px_rgba(15,23,42,0.2)] sm:mt-10 sm:px-7 sm:py-3.5"
-          >
-            Play Again
-          </button>
+          {!endlessResult && (
+            <button
+              type="button"
+              onClick={onRestart}
+              className="theme-button-primary font-fredoka-strong mt-8 rounded-full px-6 py-3 text-base shadow-[0_18px_34px_rgba(15,23,42,0.2)] sm:mt-10 sm:px-7 sm:py-3.5"
+            >
+              Play Again
+            </button>
+          )}
         </div>
       </motion.div>
     </div>,
@@ -1087,7 +1161,7 @@ export function GameModeModal({
         <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-3.5">
           {(Object.keys(DIFFICULTY_LABELS) as DifficultyKey[]).map((key) => {
             const isActive = difficulty === key;
-            const isCustom = key === "custom";
+            const isEndless = key === "endless";
 
             return (
               <button
@@ -1098,7 +1172,7 @@ export function GameModeModal({
                   onClose();
                 }}
                 className={`font-fredoka-strong rounded-[1rem] px-4 py-3.5 text-base leading-tight transition sm:rounded-2xl sm:px-4 ${
-                  isCustom ? "col-span-2" : ""
+                  isEndless ? "col-span-2" : ""
                 } ${
                   isActive ? "theme-button-primary" : "theme-button-secondary"
                 }`}
@@ -1109,6 +1183,311 @@ export function GameModeModal({
           })}
         </div>
       </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
+
+type ShopComingSoonModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+export function ShopComingSoonModal({
+  isOpen,
+  onClose,
+}: Readonly<ShopComingSoonModalProps>) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <motion.div
+      className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Shop coming soon"
+        className="theme-modal relative w-full max-w-[24rem] rounded-[1.5rem] border p-7 text-center sm:rounded-[1.75rem] sm:p-8"
+        initial={{ opacity: 0, y: 18, scale: 0.94 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close shop window"
+          className="theme-close-button font-fredoka-strong absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full"
+        >
+          {"\u00D7"}
+        </button>
+        <h2 className="theme-text-primary font-fredoka-display mt-8 text-[2rem] leading-none sm:text-[2.35rem]">
+          Coming soon..
+        </h2>
+        <p className="theme-text-muted font-fredoka-regular mt-4 text-base leading-6">
+          The shop is not open yet.
+        </p>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
+
+type LeaderboardCategoryId = "fastest" | "wins" | "streaks" | "daily" | "moves";
+
+type LeaderboardCategory = {
+  id: LeaderboardCategoryId;
+  label: string;
+  title: string;
+  modes?: string[];
+};
+
+type LeaderboardRow = {
+  name: string;
+  rank: string;
+  value: string;
+  highlight?: boolean;
+};
+
+const LEADERBOARD_CATEGORIES: LeaderboardCategory[] = [
+  {
+    id: "fastest",
+    label: "Fastest solves",
+    title: "Fastest solves",
+    modes: ["Normal", "Hard", "Expert", "Extreme"],
+  },
+  {
+    id: "wins",
+    label: "Most wins",
+    title: "Most wins",
+  },
+  {
+    id: "streaks",
+    label: "Best streaks",
+    title: "Best streaks",
+    modes: ["Daily Puzzle", "Endless"],
+  },
+  {
+    id: "daily",
+    label: "Daily puzzle times",
+    title: "Daily puzzle times",
+  },
+  {
+    id: "moves",
+    label: "Fewest moves",
+    title: "Fewest moves",
+    modes: ["Normal", "Hard", "Expert", "Extreme"],
+  },
+];
+
+const LEADERBOARD_PLACEHOLDERS: Record<LeaderboardCategoryId, LeaderboardRow[]> = {
+  fastest: [
+    { rank: "1st", name: "EyeOfTheNinja", value: "0.7s" },
+    { rank: "2nd", name: "skskkdkd81", value: "1.1s" },
+    { rank: "3rd", name: "angiestealsyou", value: "1.1s" },
+    { rank: "4th", name: "duonghoanming", value: "1.7s" },
+    { rank: "5th", name: "bblum3_ryt", value: "2.3s" },
+    { rank: "6th", name: "YunoMyl3s", value: "2.7s" },
+  ],
+  wins: [
+    { rank: "1st", name: "ColorPilot", value: "128 wins" },
+    { rank: "2nd", name: "TileRunner", value: "116 wins" },
+    { rank: "3rd", name: "GradientAce", value: "104 wins" },
+    { rank: "4th", name: "SwapWizard", value: "92 wins" },
+    { rank: "5th", name: "HueHunter", value: "81 wins" },
+    { rank: "6th", name: "BoardBoss", value: "76 wins" },
+  ],
+  streaks: [
+    { rank: "1st", name: "Xiresh", value: "42 day streak" },
+    { rank: "2nd", name: "Emmy_chicken4", value: "39 day streak" },
+    { rank: "3rd", name: "Jnkubus", value: "39 day streak", highlight: true },
+    { rank: "4th", name: "Misery426dremon", value: "37 day streak" },
+    { rank: "5th", name: "xxxthaithai4635", value: "36 day streak" },
+    { rank: "6th", name: "malifim700", value: "34 day streak" },
+  ],
+  daily: [
+    { rank: "1st", name: "ShadowdragonR4", value: "13s" },
+    { rank: "2nd", name: "Farryn_Valgirelle", value: "15s" },
+    { rank: "3rd", name: "Emmy_chicken4", value: "16s" },
+    { rank: "4th", name: "Jnkubus", value: "17s", highlight: true },
+    { rank: "5th", name: "piranary2", value: "17s" },
+    { rank: "6th", name: "kc9zn", value: "18s" },
+  ],
+  moves: [
+    { rank: "1st", name: "helloiambored_27", value: "6 moves" },
+    { rank: "2nd", name: "BrendaYTamer", value: "6 moves" },
+    { rank: "3rd", name: "xcute_amarix", value: "6 moves" },
+    { rank: "4th", name: "rainbowmonkplayz38", value: "6 moves" },
+    { rank: "5th", name: "Ximena_214365", value: "6 moves" },
+    { rank: "6th", name: "Styles_Monster", value: "6 moves" },
+  ],
+};
+
+type LeaderboardModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+export function LeaderboardModal({
+  isOpen,
+  onClose,
+}: Readonly<LeaderboardModalProps>) {
+  const [activeCategoryId, setActiveCategoryId] = useState<LeaderboardCategoryId>("fastest");
+  const [selectedModes, setSelectedModes] = useState<Record<string, string>>({
+    fastest: "Normal",
+    streaks: "Daily Puzzle",
+    moves: "Normal",
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || typeof document === "undefined") {
+    return null;
+  }
+
+  const activeCategory =
+    LEADERBOARD_CATEGORIES.find((category) => category.id === activeCategoryId) ??
+    LEADERBOARD_CATEGORIES[0];
+  const activeRows = LEADERBOARD_PLACEHOLDERS[activeCategory.id];
+
+  return createPortal(
+    <motion.div
+      className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-3 backdrop-blur-sm sm:p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="relative z-10 flex w-full max-w-[48rem] flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <motion.nav
+          aria-label="Leaderboard categories"
+          className="theme-modal order-2 flex w-full gap-2 overflow-x-auto rounded-[1.35rem] border p-3 sm:order-1 sm:w-[11.5rem] sm:flex-col sm:overflow-visible"
+          initial={{ opacity: 0, x: -14, scale: 0.96 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {LEADERBOARD_CATEGORIES.map((category) => {
+            const isActive = category.id === activeCategory.id;
+
+            return (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => setActiveCategoryId(category.id)}
+                className={`font-fredoka-strong min-w-[9.5rem] rounded-[1rem] px-4 py-3 text-sm leading-tight sm:min-w-0 ${
+                  isActive ? "theme-button-primary" : "theme-button-secondary"
+                }`}
+              >
+                {category.label}
+              </button>
+            );
+          })}
+        </motion.nav>
+
+        <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Leaderboard"
+          className="theme-modal order-1 relative w-full rounded-[1.5rem] border p-5 sm:order-2 sm:p-7"
+          initial={{ opacity: 0, y: 18, scale: 0.94 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="theme-text-primary font-fredoka-display text-[1.65rem] leading-none sm:text-[2rem]">
+              {activeCategory.title}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close leaderboard window"
+              className="theme-close-button font-fredoka-strong flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+            >
+              {"\u00D7"}
+            </button>
+          </div>
+
+          {activeCategory.modes && (
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+              {activeCategory.modes.map((mode) => {
+                const isActive = selectedModes[activeCategory.id] === mode;
+
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() =>
+                      setSelectedModes((currentModes) => ({
+                        ...currentModes,
+                        [activeCategory.id]: mode,
+                      }))
+                    }
+                    className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
+                      isActive ? "theme-button-primary" : "theme-button-secondary"
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-5 flex max-h-[20rem] flex-col gap-2 overflow-hidden">
+            {activeRows.map((row) => (
+              <div
+                key={`${activeCategory.id}-${row.rank}-${row.name}`}
+                className={`flex min-h-12 items-center gap-3 rounded-[0.95rem] px-4 py-3 ${
+                  row.highlight ? "bg-rose-500/70 text-white" : "theme-panel-muted theme-text-primary"
+                }`}
+              >
+                <span className={`font-fredoka-strong w-10 shrink-0 text-sm ${row.highlight ? "text-white" : "text-teal-700"}`}>
+                  {row.rank}
+                </span>
+                <span className="font-fredoka-strong min-w-0 flex-1 truncate text-sm">
+                  {row.name}
+                </span>
+                <span className={`font-fredoka-regular shrink-0 text-xs sm:text-sm ${row.highlight ? "text-white" : "theme-text-muted"}`}>
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
     </motion.div>,
     document.body,
   );
@@ -1135,27 +1514,21 @@ export function GameControls({
   );
 }
 
-type CustomGameModalProps = {
-  draftSize: number;
-  draftTime: number;
+type EndlessStartModalProps = {
+  currentStreak: number;
+  endlessStats: EndlessStats;
   isOpen: boolean;
-  maxSize: number;
   onClose: () => void;
-  onSizeChange: (value: number) => void;
   onStart: () => void;
-  onTimeChange: (value: number) => void;
 };
 
-export function CustomGameModal({
-  draftSize,
-  draftTime,
+export function EndlessStartModal({
+  currentStreak,
+  endlessStats,
   isOpen,
-  maxSize,
   onClose,
-  onSizeChange,
   onStart,
-  onTimeChange,
-}: Readonly<CustomGameModalProps>) {
+}: Readonly<EndlessStartModalProps>) {
   if (!isOpen) {
     return null;
   }
@@ -1167,59 +1540,55 @@ export function CustomGameModal({
   return createPortal(
     <div className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="theme-modal w-full max-w-[40.5rem] rounded-[1.5rem] border p-7 sm:rounded-[1.75rem] sm:p-9">
-        <p className="theme-text-muted font-fredoka-strong text-[0.78rem] uppercase tracking-[0.2em] sm:text-sm sm:tracking-[0.28em]">Custom Game</p>
-        <h2 className="theme-text-primary font-fredoka-display mt-3 text-[1.95rem] leading-none sm:text-[2.4rem]">Build your board</h2>
-        <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.98rem] leading-6 sm:text-[1.05rem] sm:leading-7">
-          Choose your grid size and timer, then press Start when you are ready. The countdown waits for you.
-        </p>
-
-        <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
-          <label className="theme-panel-muted rounded-[1rem] p-4 text-base sm:rounded-2xl">
-            <span className="theme-text-muted font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] sm:text-[0.82rem] sm:tracking-[0.24em]">
-              Grid Size
-            </span>
-            <input
-              type="number"
-              min={4}
-              max={maxSize}
-              value={draftSize}
-              onChange={(event) => onSizeChange(Number(event.target.value) || 4)}
-              className="theme-input font-fredoka-regular w-full rounded-xl border px-4 py-3.5 text-base outline-none sm:text-[1.05rem]"
-            />
-            <span className="theme-text-muted font-fredoka-regular mt-2 block text-sm">
-              Max for this screen: {maxSize} x {maxSize}
-            </span>
-          </label>
-
-          <label className="theme-panel-muted rounded-[1rem] p-4 text-base sm:rounded-2xl">
-            <span className="theme-text-muted font-fredoka-strong mb-3 block text-[0.78rem] uppercase tracking-[0.2em] sm:text-[0.82rem] sm:tracking-[0.24em]">
-              Time Limit
-            </span>
-            <input
-              type="number"
-              min={10}
-              max={480}
-              value={draftTime}
-              onChange={(event) => onTimeChange(Number(event.target.value) || 10)}
-              className="theme-input font-fredoka-regular w-full rounded-xl border px-4 py-3.5 text-base outline-none sm:text-[1.05rem]"
-            />
-          </label>
-        </div>
-
-        <div className="mt-7 flex items-center justify-end gap-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="theme-text-primary font-fredoka-display text-[1.95rem] leading-none sm:text-[2.4rem]">Endless</h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="theme-button-secondary font-fredoka-regular rounded-full px-4 py-2.5 text-sm sm:px-5 sm:text-base"
+            aria-label="Close endless window"
+            className="theme-close-button font-fredoka-strong flex h-11 w-11 items-center justify-center rounded-full"
           >
-            Cancel
+            {"\u00D7"}
           </button>
+        </div>
+
+        <div className="theme-panel-muted mt-6 rounded-[1rem] p-4 sm:rounded-2xl">
+          <p className="theme-text-primary font-fredoka-strong text-base">Progress</p>
+          <p className="theme-text-primary font-fredoka-display mt-3 text-[1.25rem] leading-none">
+            {endlessStats.threeStarClears} three-star clears
+          </p>
+          <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="theme-text-primary font-fredoka-display text-xl leading-none">{endlessStats.clears}</p>
+              <p className="theme-text-muted font-fredoka-regular mt-1 text-xs">clears</p>
+            </div>
+            <div>
+              <p className="theme-text-primary font-fredoka-display text-xl leading-none">{currentStreak}</p>
+              <p className="theme-text-muted font-fredoka-regular mt-1 text-xs">current streak</p>
+            </div>
+            <div>
+              <p className="theme-text-primary font-fredoka-display text-xl leading-none">{endlessStats.bestStreak}</p>
+              <p className="theme-text-muted font-fredoka-regular mt-1 text-xs">best streak</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="theme-panel-muted mt-3 rounded-[1rem] p-4 sm:rounded-2xl">
+          <p className="theme-text-primary font-fredoka-strong text-base">Next puzzle</p>
+          <p className="theme-text-muted font-fredoka-regular mt-3 text-sm leading-5">
+            Solve before the swap limit. Three-star clears need efficient routes, and failed challenges reset the run to puzzle one.
+          </p>
+        </div>
+
+        <div className="mt-4">
           <button
             type="button"
             onClick={onStart}
-            className="theme-button-primary font-fredoka-strong rounded-full px-5 py-3 text-sm sm:px-6 sm:text-base"
+            className="theme-button-primary font-fredoka-strong w-full rounded-full px-5 py-3 text-sm sm:text-base"
           >
-            Start
+            Start Puzzle
           </button>
         </div>
       </div>

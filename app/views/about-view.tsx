@@ -13,7 +13,7 @@ const aboutItems = [
   },
   {
     title: "Difficulty",
-    copy: "Choose a preset challenge or create a custom board size and timer.",
+    copy: "Choose a preset challenge or build a streak in Endless mode.",
   },
   {
     title: "Skill",

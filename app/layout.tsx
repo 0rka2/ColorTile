@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { GlobalButtonSounds } from "./global-button-sounds";
+import { GlobalButtonSounds } from "./game/components/global-button-sounds";
 import "./globals.css";
 
 const fredoka = localFont({

@@ -2,7 +2,7 @@
 
 import { PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import { GameBoard, GameHud } from "../game-components";
+import { GameBoard, GameHud } from "../game/components/game-components";
 import {
   checkCompletion,
   getBoardDensityClass,
@@ -10,7 +10,7 @@ import {
   isTileCorrect,
   isTileLocked,
   swapTiles,
-} from "../game-logic";
+} from "../game/game-logic";
 
 const BOARD_SIZE = 4;
 const DRAG_ROTATION_MAX_DEGREES = 3;

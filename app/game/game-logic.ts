@@ -12,11 +12,45 @@ export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = {
   hard: PRESET_DIFFICULTIES.hard.label,
   expert: PRESET_DIFFICULTIES.expert.label,
   extreme: PRESET_DIFFICULTIES.extreme.label,
-  custom: "Custom",
+  endless: "Endless",
 };
 
 export const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+
+export function getEndlessPuzzleSize(puzzleNumber: number) {
+  if (puzzleNumber <= 5) {
+    return 4;
+  }
+
+  if (puzzleNumber <= 10) {
+    return 5;
+  }
+
+  if (puzzleNumber <= 15) {
+    return 6;
+  }
+
+  return 7;
+}
+
+export function getEndlessSwapBudget(size: number, streak: number) {
+  return Math.max(size + 4, size * size - 1 - Math.floor(streak / 3));
+}
+
+export function getEndlessThreeStarMoveLimit(swapBudget: number) {
+  return Math.ceil(swapBudget * 0.7);
+}
+
+export function getEndlessConfig(puzzleNumber: number): DifficultyConfig {
+  const size = getEndlessPuzzleSize(puzzleNumber);
+
+  return {
+    label: "Endless",
+    size,
+    time: 0,
+  };
+}
 
 function getGradientContrastBoost(size: number) {
   return clamp((size - 4) / 16, 0, 0.45);
@@ -241,10 +275,16 @@ export function isTileLocked(tile: Tile, index: number): boolean {
   return tile.isCorner || isTileCorrect(tile, index);
 }
 
-export function formatTime(seconds: number) {
+export function formatTime(seconds: number, options?: { roundUp?: boolean }) {
   const safeSeconds = Math.max(0, seconds);
-  const minutes = Math.floor(safeSeconds / 60);
-  const remainder = safeSeconds % 60;
+  const displaySeconds = options?.roundUp ? Math.ceil(safeSeconds) : Math.floor(safeSeconds);
+
+  if (safeSeconds < 60) {
+    return safeSeconds.toFixed(1);
+  }
+
+  const minutes = Math.floor(displaySeconds / 60);
+  const remainder = displaySeconds % 60;
   return `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }
 

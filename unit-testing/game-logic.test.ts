@@ -7,6 +7,9 @@ import {
   formatTime,
   generateSolvedBoard,
   getBoardDensityClass,
+  getEndlessPuzzleSize,
+  getEndlessSwapBudget,
+  getEndlessThreeStarMoveLimit,
   getTileRadiusClass,
   hexToRgb,
   hslToHex,
@@ -15,8 +18,8 @@ import {
   isTileLocked,
   scrambleBoard,
   swapTiles,
-} from "../app/game-logic";
-import type { Tile } from "../app/game-types";
+} from "../app/game/game-logic";
+import type { Tile } from "../app/game/game-types";
 
 function buildSolvedBoard(size = 4) {
   return generateSolvedBoard(size, ["#ff0000", "#00ff00", "#0000ff", "#ffffff"]);
@@ -133,10 +136,39 @@ test("isTileLocked only locks corners and correct tiles", () => {
   assert.equal(isTileLocked(swappedBoard[1], 1), false);
 });
 
-test("formatTime never returns negative time and keeps leading zeroes", () => {
-  assert.equal(formatTime(-4), "0:00");
-  assert.equal(formatTime(9), "0:09");
+test("formatTime uses compact stopwatch formatting", () => {
+  assert.equal(formatTime(-4), "0.0");
+  assert.equal(formatTime(0.9), "0.9");
+  assert.equal(formatTime(7.1), "7.1");
+  assert.equal(formatTime(9.9), "9.9");
+  assert.equal(formatTime(10), "10.0");
+  assert.equal(formatTime(59.9), "59.9");
+  assert.equal(formatTime(60), "1:00");
+  assert.equal(formatTime(119.9), "1:59");
+  assert.equal(formatTime(119.9, { roundUp: true }), "2:00");
   assert.equal(formatTime(125), "2:05");
+});
+
+test("endless puzzle sizes increase at the planned puzzle thresholds", () => {
+  assert.equal(getEndlessPuzzleSize(1), 4);
+  assert.equal(getEndlessPuzzleSize(5), 4);
+  assert.equal(getEndlessPuzzleSize(6), 5);
+  assert.equal(getEndlessPuzzleSize(10), 5);
+  assert.equal(getEndlessPuzzleSize(11), 6);
+  assert.equal(getEndlessPuzzleSize(15), 6);
+  assert.equal(getEndlessPuzzleSize(16), 7);
+});
+
+test("endless swap budget tightens with streak but keeps a minimum", () => {
+  assert.equal(getEndlessSwapBudget(4, 0), 15);
+  assert.equal(getEndlessSwapBudget(4, 3), 14);
+  assert.equal(getEndlessSwapBudget(4, 99), 8);
+  assert.equal(getEndlessSwapBudget(7, 0), 48);
+});
+
+test("endless three-star limit is seventy percent rounded up", () => {
+  assert.equal(getEndlessThreeStarMoveLimit(15), 11);
+  assert.equal(getEndlessThreeStarMoveLimit(14), 10);
 });
 
 test("tile radius and board density classes change at the expected thresholds", () => {

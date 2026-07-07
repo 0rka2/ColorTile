@@ -6,7 +6,7 @@ export type Tile = {
   isCorner: boolean;
 };
 
-export type DifficultyKey = "normal" | "hard" | "expert" | "extreme" | "custom";
+export type DifficultyKey = "normal" | "hard" | "expert" | "extreme" | "endless";
 
 export type DifficultyConfig = {
   label: string;
@@ -14,7 +14,7 @@ export type DifficultyConfig = {
   time: number;
 };
 
-export type PresetDifficultyKey = Exclude<DifficultyKey, "custom">;
+export type PresetDifficultyKey = Exclude<DifficultyKey, "endless">;
 
 export type BestRecord = {
   bestCompletion?: number;
@@ -24,3 +24,9 @@ export type BestRecord = {
 };
 
 export type BestStats = Partial<Record<DifficultyKey, BestRecord>>;
+
+export type EndlessStats = {
+  clears: number;
+  threeStarClears: number;
+  bestStreak: number;
+};

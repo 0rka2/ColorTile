@@ -221,6 +221,25 @@ select {
   box-shadow: var(--shadow-card);
 }
 
+.side-action-button {
+  transform-origin: center;
+  transition:
+    transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.side-action-button:hover,
+.side-action-button:focus-visible {
+  transform: scale(1.08) rotate(4deg);
+}
+
+.side-action-button:active {
+  transform: scale(1.02) rotate(2deg);
+}
+
 .theme-panel-muted {
   background-color: var(--surface-muted);
   border-color: var(--border-soft);
