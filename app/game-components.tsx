@@ -1,11 +1,11 @@
 import { memo, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { motion } from "motion/react";
 import Confetti from "react-confetti";
 import { FiHeart } from "react-icons/fi";
 import { hoverSound } from "./lib/sounds";
 
+import type { AppView } from "./app-view";
 import { getGradientQualityFill } from "./gradient-quality";
 import { DIFFICULTY_LABELS } from "./game-logic";
 import { getConfettiViewportSize } from "./confetti-logic";
@@ -918,19 +918,22 @@ export function ThemeToggle({
 type GameDrawerProps = {
   isOpen: boolean;
   onClose: () => void;
-  onOpenCustom: () => void;
-  onOpenModes: () => void;
+  onNavigateView: (view: AppView) => void;
 };
 
 export function GameDrawer({
   isOpen,
   onClose,
-  onOpenCustom,
-  onOpenModes,
+  onNavigateView,
 }: Readonly<GameDrawerProps>) {
   if (!isOpen || typeof document === "undefined") {
     return null;
   }
+
+  const handleNavigate = (view: AppView) => {
+    onNavigateView(view);
+    onClose();
+  };
 
   return (
     <>
@@ -972,41 +975,41 @@ export function GameDrawer({
 </a>
 
 
-            <Link
-              href="/about"
-              onClick={onClose}
+            <button
+              type="button"
+              onClick={() => handleNavigate("about")}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
               <span className="theme-text-secondary">
                 <InfoIcon />
               </span>
               <span className="font-fredoka-strong text-[1rem] leading-none">About</span>
-            </Link>
+            </button>
 
-            <Link
-              href="/privacy"
-              onClick={onClose}
+            <button
+              type="button"
+              onClick={() => handleNavigate("privacy")}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
               <span className="theme-text-secondary">
                 <PrivacyIcon />
               </span>
               <span className="font-fredoka-strong text-[1rem] leading-none">Privacy Policy</span>
-            </Link>
+            </button>
 
             
 
 
-            <Link
-              href="/tutorial"
-              onClick={onClose}
+            <button
+              type="button"
+              onClick={() => handleNavigate("tutorial")}
               className="theme-button-secondary flex items-center gap-3 rounded-[1rem] px-4 py-3 text-left"
             >
               <span className="theme-text-secondary">
                 <BookIcon />
               </span>
               <span className="font-fredoka-strong text-[1rem] leading-none">Tutorial</span>
-            </Link>
+            </button>
 
          <a
   href="https://ko-fi.com/orka67"

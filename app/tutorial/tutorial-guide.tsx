@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { GameBoard, GameHud } from "../game-components";
@@ -138,7 +137,11 @@ function getPracticeBoard() {
   return swapTiles(getSolvedTutorialBoard("practice"), 5, 6);
 }
 
-export default function TutorialGuide() {
+type TutorialGuideProps = {
+  onPlay: () => void;
+};
+
+export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) {
   const [stageIndex, setStageIndex] = useState(0);
   const [board, setBoard] = useState(() => getSolvedTutorialBoard("goal"));
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
@@ -566,7 +569,7 @@ export default function TutorialGuide() {
   };
 
   return (
-    <section className="relative flex min-h-dvh flex-col items-center justify-start gap-[clamp(0.6rem,1.5vw,1rem)] overflow-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-4 text-center">
+    <section className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-start gap-[clamp(0.6rem,1.5vw,1rem)] overflow-hidden text-center">
       <div className="theme-overlay pointer-events-none fixed inset-0 z-10" />
 
       <div
@@ -682,12 +685,13 @@ export default function TutorialGuide() {
             <p className="theme-text-secondary mx-auto mt-4 max-w-[19rem] text-sm leading-6">
               Keep matching the gradient and clear the board before time runs out.
             </p>
-            <Link
-              href="/"
+            <button
+              type="button"
+              onClick={onPlay}
               className="theme-button-primary mt-7 inline-flex w-full items-center justify-center rounded-full px-6 py-3 font-fredoka-strong text-base"
             >
               Play
-            </Link>
+            </button>
           </div>
         </div>
       )}
