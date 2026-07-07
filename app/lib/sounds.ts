@@ -31,6 +31,41 @@ type AudioWindow = Window &
   };
 
 let audioContext: AudioContext | null = null;
+let soundEnabled = true;
+
+const SOUND_ENABLED_STORAGE_KEY = "colortile-sound-enabled";
+
+export function getSoundEnabled() {
+  if (typeof window === "undefined") {
+    return soundEnabled;
+  }
+
+  let storedValue: string | null = null;
+
+  try {
+    storedValue = window.localStorage.getItem(SOUND_ENABLED_STORAGE_KEY);
+  } catch {
+    return soundEnabled;
+  }
+
+  if (storedValue !== null) {
+    soundEnabled = storedValue === "true";
+  }
+
+  return soundEnabled;
+}
+
+export function setSoundEnabled(nextSoundEnabled: boolean) {
+  soundEnabled = nextSoundEnabled;
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(SOUND_ENABLED_STORAGE_KEY, String(nextSoundEnabled));
+  } catch {}
+}
 
 function getAudioContext() {
   if (typeof window === "undefined") {
@@ -48,6 +83,10 @@ function getAudioContext() {
 }
 
 function playSteps(steps: SoundStep[]) {
+  if (!getSoundEnabled()) {
+    return;
+  }
+
   const context = getAudioContext();
   if (!context) {
     return;

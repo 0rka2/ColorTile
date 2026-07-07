@@ -855,7 +855,7 @@ function SunIcon() {
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="h-6 w-6 pointer-events-none" // 👈 add this
+      className="h-[1.65rem] w-[1.65rem] pointer-events-none" // 👈 add this
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -873,7 +873,7 @@ function MoonIcon() {
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="h-6 w-6 pointer-events-none" // 👈 add this
+      className="h-[1.65rem] w-[1.65rem] pointer-events-none" // 👈 add this
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -901,7 +901,7 @@ export function ThemeToggle({
   onThemeModeChange(themeMode === "light" ? "dark" : "light");
 }}
       aria-label={`Switch to ${themeMode === "light" ? "dark" : "light"} theme`}
-      className="theme-header-surface flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-14 sm:w-14"
+      className="theme-header-surface flex h-[3.3rem] w-[3.3rem] items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
     >
       <motion.span
         key={themeMode}

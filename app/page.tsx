@@ -210,7 +210,7 @@ export default function Home() {
       const measuredBoardSize = Math.max(0, Math.floor(Math.min(availableWidth, availableHeight)));
       const minimumBoardSize = window.innerWidth < 360 ? 240 : 280;
       const nextBoardSize = Math.min(availableWidth, GAME_AREA_MAX_WIDTH_PX, Math.max(minimumBoardSize, measuredBoardSize));
-      setBoardSize(nextBoardSize);
+      setBoardSize((currentBoardSize) => Math.max(currentBoardSize, nextBoardSize));
     };
 
     measureBoardSize();
@@ -916,6 +916,7 @@ export default function Home() {
     animate: hudFeedbackControls,
     initial: false,
   };
+  const boardAreaWidth = boardSize > 0 ? `${boardSize}px` : `${GAME_AREA_MAX_WIDTH_PX}px`;
 
   return (
     <main className={`theme-page-bg min-h-dvh overflow-x-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
@@ -957,7 +958,7 @@ export default function Home() {
             {...hudFeedbackMotion}
             ref={hudRef}
             className="w-full max-w-full"
-            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
+            style={{ width: boardAreaWidth }}
           >
             <GameHud
               bestMoves={currentBest?.fewestMoves ?? null}
@@ -972,7 +973,7 @@ export default function Home() {
           <motion.div
             {...hudFeedbackMotion}
             className="flex w-full max-w-full justify-center"
-            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
+            style={{ width: boardAreaWidth }}
           >
             <GameBoard
               key={boardResetKey}
@@ -999,7 +1000,7 @@ export default function Home() {
             {...hudFeedbackMotion}
             ref={controlsRef}
             className="w-full max-w-full"
-            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
+            style={{ width: boardAreaWidth }}
           >
             <GameControls
               showDevControls={process.env.NODE_ENV !== "production"}
@@ -1011,7 +1012,7 @@ export default function Home() {
             {...hudFeedbackMotion}
             ref={restartRef}
             className="relative z-10 flex w-full justify-center"
-            style={{ width: boardSize > 0 ? `min(100%, ${boardSize}px)` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)` }}
+            style={{ width: boardAreaWidth }}
           >
             <button
               type="button"
