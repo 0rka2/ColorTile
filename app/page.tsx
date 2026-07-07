@@ -28,6 +28,9 @@ import { getWinSequenceDurations } from "./win-sequence";
 import type { WinPhase } from "./win-sequence";
 import { GradientText } from "../components/ui/gradient-text";
 import { boardCompleteSound, swapSound, timeUpSound } from "./lib/sounds";
+import { VscStarFull } from "react-icons/vsc";
+import { FaShoppingCart } from "react-icons/fa";
+import { IoMdTrophy } from "react-icons/io";
 
 
 const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
@@ -1023,19 +1026,6 @@ export default function Home() {
                 onOpenModes={handleOpenModesFromDrawer}
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setModeModalOpen(true)}
-              aria-label="Open modes"
-              className="theme-header-surface flex min-h-[clamp(2.55rem,4.8vw,3.25rem)] items-center gap-2 rounded-full border px-[clamp(0.8rem,1.8vw,1.15rem)] py-[clamp(0.45rem,1vw,0.75rem)] shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
-            >
-              <span className="theme-text-primary font-fredoka-strong text-[clamp(0.9rem,1.45vw,1.08rem)] leading-none">
-                {activeConfig.label}
-              </span>
-              <span aria-hidden="true" className="theme-text-muted text-[clamp(0.75rem,1vw,0.9rem)] leading-none">
-                {"\u25BE"}
-              </span>
-            </button>
           </div>
 
           <div className="shrink-0">
@@ -1043,7 +1033,34 @@ export default function Home() {
           </div>
         </header>
 
-        <section ref={contentRef} className="flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
+        <section ref={contentRef} className="relative flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
+          <div className="fixed left-[clamp(0.75rem,3vw,2rem)] top-1/2 z-10 flex -translate-y-1/2 flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setModeModalOpen(true)}
+              aria-label="Open modes"
+              className="theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+            >
+              <VscStarFull className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Open shop"
+              className="theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+            >
+              <FaShoppingCart className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Open leaderboard"
+              className="theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+            >
+              <IoMdTrophy className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+            </button>
+          </div>
+
           <div
             ref={hudRef}
             className="w-full max-w-full"
