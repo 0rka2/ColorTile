@@ -456,6 +456,25 @@ html[data-theme="dark"] .restart-button:hover {
   --gradient-purple: #aa55ff;
 }
 
+.gradient-text--intro {
+  background: transparent;
+  width: fit-content;
+  min-width: max-content;
+  overflow: hidden;
+}
+
+.gradient-text--intro .gradient-text__content {
+  display: inline-block;
+  background: linear-gradient(90deg, #ff4040, #ffb23f, #ffe14a, #23d773, #2d87ff, #aa55ff, #ff4fb0, #ff4040);
+  background-size: 300% 100%;
+  background-clip: text;
+  color: transparent;
+  padding-right: 0.18em;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: intro-gradient-shift 6s linear infinite;
+}
+
 .gradient-text__content {
   position: relative;
   z-index: 0;
@@ -517,6 +536,11 @@ html[data-theme="dark"] .gradient-text__content {
   -webkit-text-fill-color: currentColor;
 }
 
+html[data-theme="dark"] .gradient-text--intro .gradient-text__content {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
 html[data-theme="dark"] .gradient-text__blend {
   mix-blend-mode: darken;
 }
@@ -548,6 +572,16 @@ html[data-theme="dark"] .gradient-text__blob {
 
   100% {
     transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes intro-gradient-shift {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 300% 50%;
   }
 }
 

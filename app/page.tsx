@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, useAnimationControls } from "motion/react";
+import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { FaShoppingCart } from "react-icons/fa";
 import { IoMdTrophy } from "react-icons/io";
 import { VscStarFull } from "react-icons/vsc";
 
+import { GradientText } from "../components/ui/gradient-text";
 import {
   EndlessStartModal,
   GameBoard,
@@ -59,22 +60,36 @@ const HUD_FEEDBACK_ANIMATION = {
   },
 };
 
+const INTRO_COMPLETED_STORAGE_KEY = "colortile-intro-completed";
 const LEADERBOARD_PLAYER_NAME_STORAGE_KEY = "colortile-leaderboard-player-name";
+const PLAYER_NAME_MAX_LENGTH = 24;
+const INTRO_WELCOME_DURATION_MS = 1400;
+
+type IntroStep = "welcome" | "name";
+
+function generateGuestPlayerName() {
+  return `guest${Math.floor(100 + Math.random() * 900)}`;
+}
+
+function sanitizePlayerName(value: string) {
+  return value.replace(/\s+/g, " ").trim().slice(0, PLAYER_NAME_MAX_LENGTH);
+}
 
 function getLeaderboardPlayerName() {
   if (typeof window === "undefined") {
-    return "Player";
+    return "guest000";
   }
 
   const storedName = window.localStorage.getItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY);
+  const sanitizedStoredName = storedName ? sanitizePlayerName(storedName) : "";
 
-  if (storedName) {
-    return storedName;
+  if (sanitizedStoredName) {
+    return sanitizedStoredName;
   }
 
-  const generatedName = `Player ${Math.floor(1000 + Math.random() * 9000)}`;
-  window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, generatedName);
-  return generatedName;
+  const fallbackName = generateGuestPlayerName();
+  window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, fallbackName);
+  return fallbackName;
 }
 
 async function submitLeaderboardScore(entry: {
@@ -130,6 +145,108 @@ function getBestSolveTime(record: BestStats[DifficultyKey], totalTime: number) {
   return undefined;
 }
 
+type IntroOnboardingProps = {
+  introStep: IntroStep;
+  nameError: string | null;
+  onNameChange: (value: string) => void;
+  onPlay: () => void;
+  playerNameInput: string;
+};
+
+function IntroOnboarding({
+  introStep,
+  nameError,
+  onNameChange,
+  onPlay,
+  playerNameInput,
+}: Readonly<IntroOnboardingProps>) {
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (introStep !== "name") {
+      return;
+    }
+
+    nameInputRef.current?.focus();
+    nameInputRef.current?.select();
+  }, [introStep]);
+
+  return (
+    <div className="theme-page-bg fixed inset-0 z-[80] flex items-center justify-center px-6 py-10">
+      <AnimatePresence mode="wait">
+        {introStep === "welcome" ? (
+          <motion.div
+            key="welcome"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -26 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-[calc(100vw-2rem)] text-center"
+          >
+            <GradientText
+              as="h1"
+              className="gradient-text--intro whitespace-nowrap py-2 font-fredoka-display text-[2.35rem] leading-none tracking-[-0.05em] sm:text-[3.25rem]"
+              showBlend={false}
+            >
+              welcome to ColorTile
+            </GradientText>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="name"
+            initial={{ opacity: 0, y: 22 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -22 }}
+            transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+            className="flex w-full max-w-[22rem] flex-col items-center text-center"
+          >
+            <GradientText
+              as="h2"
+              className="gradient-text--intro py-2 font-fredoka-display text-[4.2rem] leading-none tracking-[-0.05em] sm:text-[5.4rem]"
+              showBlend={false}
+            >
+              ColorTile
+            </GradientText>
+
+            <form
+              className="mt-8 flex w-full flex-col items-center"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onPlay();
+              }}
+            >
+              <label className="w-full" htmlFor="player-name">
+                <input
+                  id="player-name"
+                  ref={nameInputRef}
+                  type="text"
+                  value={playerNameInput}
+                  onChange={(event) => onNameChange(event.target.value)}
+                  maxLength={PLAYER_NAME_MAX_LENGTH}
+                  className="theme-input theme-text-primary h-14 w-full rounded-full border px-5 text-center font-fredoka-strong text-lg uppercase outline-none focus:border-slate-400"
+                  autoComplete="nickname"
+                  spellCheck={false}
+                />
+              </label>
+
+              <p className={`mt-3 min-h-5 text-sm leading-5 ${nameError ? "theme-text-danger" : "theme-text-muted"}`}>
+                {nameError ?? ""}
+              </p>
+
+              <button
+                type="submit"
+                className="theme-button-primary font-fredoka-strong mt-4 inline-flex h-12 min-w-[9rem] items-center justify-center rounded-full px-8 text-base shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              >
+                Play
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
   const [board, setBoard] = useState<Tile[]>([]);
@@ -155,6 +272,11 @@ export default function Home() {
   const [boardResetKey, setBoardResetKey] = useState(0);
   const [activeView, setActiveView] = useState<AppView>("game");
   const [hudFeedbackKey, setHudFeedbackKey] = useState(0);
+  const [introStep, setIntroStep] = useState<IntroStep>("welcome");
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+  const [isOnboardingReady, setIsOnboardingReady] = useState(false);
+  const [playerNameInput, setPlayerNameInput] = useState("");
+  const [playerNameError, setPlayerNameError] = useState<string | null>(null);
   const hudFeedbackControls = useAnimationControls();
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
@@ -236,6 +358,44 @@ export default function Home() {
     clearDragSessionRef.current = clearDragSession;
     resetWinSequenceRef.current = resetWinSequence;
   }, [clearDragSession, resetWinSequence]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storedIntroCompleted =
+      window.localStorage.getItem(INTRO_COMPLETED_STORAGE_KEY) === "true";
+    const storedPlayerName = window.localStorage.getItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY);
+    const nextPlayerName = sanitizePlayerName(storedPlayerName ?? "") || generateGuestPlayerName();
+
+    setPlayerNameInput(nextPlayerName);
+    setIsOnboardingComplete(storedIntroCompleted);
+    setIntroStep(storedIntroCompleted ? "name" : "welcome");
+    setIsOnboardingReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOnboardingReady || isOnboardingComplete) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setIntroStep("name");
+    }, INTRO_WELCOME_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isOnboardingComplete, isOnboardingReady]);
+
+  useEffect(() => {
+    if (!isOnboardingReady || isOnboardingComplete) {
+      return;
+    }
+
+    setTimerStarted(false);
+  }, [isOnboardingComplete, isOnboardingReady]);
 
   useEffect(() => {
     if (activeView !== "game" || hudFeedbackKey === 0) {
@@ -501,10 +661,32 @@ export default function Home() {
     handleNavigateView("game");
   }, [handleNavigateView]);
 
+  const handlePlayerNameChange = useCallback((nextValue: string) => {
+    setPlayerNameInput(nextValue.slice(0, PLAYER_NAME_MAX_LENGTH));
+    setPlayerNameError(null);
+  }, []);
+
+  const handleIntroPlay = useCallback(() => {
+    const sanitizedPlayerName = sanitizePlayerName(playerNameInput);
+
+    window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, sanitizedPlayerName);
+    window.localStorage.setItem(INTRO_COMPLETED_STORAGE_KEY, "true");
+    setPlayerNameInput(sanitizedPlayerName);
+    setPlayerNameError(null);
+    setIsOnboardingComplete(true);
+    setActiveView("game");
+    setTimerStarted(true);
+    startGame(activeConfig);
+  }, [activeConfig, playerNameInput, startGame]);
+
   const hudFeedbackMotion = {
     animate: hudFeedbackControls,
     initial: false,
   };
+
+  if (!isOnboardingReady) {
+    return <main className="theme-page-bg min-h-dvh" />;
+  }
 
   return (
     <main className={`theme-page-bg min-h-dvh overflow-x-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
@@ -676,6 +858,16 @@ export default function Home() {
             onClose={() => setLeaderboardModalOpen(false)}
           />
         </>
+      )}
+
+      {activeView === "game" && !isOnboardingComplete && (
+        <IntroOnboarding
+          introStep={introStep}
+          nameError={playerNameError}
+          onNameChange={handlePlayerNameChange}
+          onPlay={handleIntroPlay}
+          playerNameInput={playerNameInput}
+        />
       )}
     </main>
   );
