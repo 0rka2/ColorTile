@@ -59,6 +59,58 @@ const HUD_FEEDBACK_ANIMATION = {
   },
 };
 
+const LEADERBOARD_PLAYER_NAME_STORAGE_KEY = "colortile-leaderboard-player-name";
+
+function getLeaderboardPlayerName() {
+  if (typeof window === "undefined") {
+    return "Player";
+  }
+
+  const storedName = window.localStorage.getItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY);
+
+  if (storedName) {
+    return storedName;
+  }
+
+  const generatedName = `Player ${Math.floor(1000 + Math.random() * 9000)}`;
+  window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, generatedName);
+  return generatedName;
+}
+
+async function submitLeaderboardScore(entry: {
+  difficulty: "normal" | "hard" | "expert" | "extreme";
+  moves: number;
+  solveTime: number;
+}) {
+  await fetch("/api/leaderboard", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...entry,
+      playerName: getLeaderboardPlayerName(),
+    }),
+  });
+}
+
+async function submitEndlessStreak(entry: {
+  streakCount: number;
+}) {
+  await fetch("/api/leaderboard", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      category: "streaks",
+      difficulty: "endless",
+      playerName: getLeaderboardPlayerName(),
+      streakCount: entry.streakCount,
+    }),
+  });
+}
+
 function getAccuracyScore(size: number, moves: number) {
   const targetMoves = Math.max(1, Math.round(size * size * 0.58));
   const moveCount = Math.max(1, moves);
@@ -237,6 +289,7 @@ export default function Home() {
         const completedThreeStarMoveLimit = endlessThreeStarMoveLimit;
         const isThreeStar = moves <= completedThreeStarMoveLimit;
         const nextStreak = endlessStreak + 1;
+        const shouldSubmitEndlessStreak = nextStreak > endlessStats.bestStreak;
 
         setEndlessLastClear({
           isThreeStar,
@@ -253,6 +306,15 @@ export default function Home() {
         setWinState(true);
         setWinPhase("boardWave");
         clearDragSession();
+
+        if (shouldSubmitEndlessStreak) {
+          void submitEndlessStreak({
+            streakCount: nextStreak,
+          }).catch(() => {
+            // Ignore leaderboard submission failures so local progress still works.
+          });
+        }
+
         return;
       }
 
@@ -270,6 +332,24 @@ export default function Home() {
       setWinState(true);
       setWinPhase("boardWave");
       clearDragSession();
+
+      const previousBestSolveTime = currentBestWithSolveTime.bestSolveTime;
+      const previousFewestMoves = currentBest?.fewestMoves;
+      const shouldSubmitLeaderboardScore =
+        previousBestSolveTime === undefined ||
+        previousFewestMoves === undefined ||
+        finalSolveTime <= previousBestSolveTime ||
+        moves <= previousFewestMoves;
+
+      if (shouldSubmitLeaderboardScore) {
+        void submitLeaderboardScore({
+          difficulty,
+          moves,
+          solveTime: finalSolveTime,
+        }).catch(() => {
+          // Ignore leaderboard submission failures so local progress still works.
+        });
+      }
 
       setBestStats((current) => {
         const currentRecord = current[difficulty] ?? {};
@@ -292,7 +372,7 @@ export default function Home() {
         };
       });
     }
-  }, [activeConfig.time, board, clearDragSession, currentBest, difficulty, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, isEndlessMode, loseState, moves, setBestStats, setEndlessStats, setWinPhase, timeLeft, winState]);
+  }, [activeConfig.time, board, clearDragSession, currentBest, difficulty, endlessPuzzleNumber, endlessStats.bestStreak, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, isEndlessMode, loseState, moves, setBestStats, setEndlessStats, setWinPhase, timeLeft, winState]);
 
   useEffect(() => {
     if (!isEndlessMode || !board.length || winState || loseState || moves <= endlessSwapBudget || checkCompletion(board) === 100) {

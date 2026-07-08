@@ -7,12 +7,11 @@ import { hoverSound } from "../../lib/sounds";
 
 import type { AppView } from "../../views/app-view";
 import { getGradientQualityFill } from "../gradient-quality";
-import { DIFFICULTY_LABELS } from "../game-logic";
+import { DIFFICULTY_LABELS, formatTime } from "../game-logic";
 import { getConfettiViewportSize } from "../confetti-logic";
 import type { PersonalBestStatus } from "../personal-best";
 import type { ThemeMode } from "../settings-options";
 import { DifficultyConfig, DifficultyKey, EndlessStats, Tile } from "../game-types";
-import { buttonClickSound } from "../../lib/sounds";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
@@ -1253,20 +1252,24 @@ export function ShopComingSoonModal({
   );
 }
 
-type LeaderboardCategoryId = "fastest" | "wins" | "streaks" | "daily" | "moves";
+type LeaderboardCategoryId = "fastest" | "moves" | "streaks";
 
 type LeaderboardCategory = {
   id: LeaderboardCategoryId;
   label: string;
   title: string;
-  modes?: string[];
+  metricLabel: string;
+  modes: DifficultyKey[];
 };
 
-type LeaderboardRow = {
-  name: string;
-  rank: string;
-  value: string;
-  highlight?: boolean;
+type LeaderboardApiRow = {
+  created_at: string;
+  difficulty: DifficultyKey;
+  id: number;
+  moves: number;
+  player_name: string;
+  solve_time: number;
+  streak_count?: number;
 };
 
 const LEADERBOARD_CATEGORIES: LeaderboardCategory[] = [
@@ -1274,74 +1277,60 @@ const LEADERBOARD_CATEGORIES: LeaderboardCategory[] = [
     id: "fastest",
     label: "Fastest solves",
     title: "Fastest solves",
-    modes: ["Normal", "Hard", "Expert", "Extreme"],
-  },
-  {
-    id: "wins",
-    label: "Most wins",
-    title: "Most wins",
-  },
-  {
-    id: "streaks",
-    label: "Best streaks",
-    title: "Best streaks",
-    modes: ["Daily Puzzle", "Endless"],
-  },
-  {
-    id: "daily",
-    label: "Daily puzzle times",
-    title: "Daily puzzle times",
+    metricLabel: "Time",
+    modes: ["normal", "hard", "expert", "extreme"],
   },
   {
     id: "moves",
     label: "Fewest moves",
     title: "Fewest moves",
-    modes: ["Normal", "Hard", "Expert", "Extreme"],
+    metricLabel: "Moves",
+    modes: ["normal", "hard", "expert", "extreme"],
+  },
+  {
+    id: "streaks",
+    label: "Best streaks",
+    title: "Best streaks",
+    metricLabel: "Puzzles beaten",
+    modes: ["endless"],
   },
 ];
 
-const LEADERBOARD_PLACEHOLDERS: Record<LeaderboardCategoryId, LeaderboardRow[]> = {
-  fastest: [
-    { rank: "1st", name: "EyeOfTheNinja", value: "0.7s" },
-    { rank: "2nd", name: "skskkdkd81", value: "1.1s" },
-    { rank: "3rd", name: "angiestealsyou", value: "1.1s" },
-    { rank: "4th", name: "duonghoanming", value: "1.7s" },
-    { rank: "5th", name: "bblum3_ryt", value: "2.3s" },
-    { rank: "6th", name: "YunoMyl3s", value: "2.7s" },
-  ],
-  wins: [
-    { rank: "1st", name: "ColorPilot", value: "128 wins" },
-    { rank: "2nd", name: "TileRunner", value: "116 wins" },
-    { rank: "3rd", name: "GradientAce", value: "104 wins" },
-    { rank: "4th", name: "SwapWizard", value: "92 wins" },
-    { rank: "5th", name: "HueHunter", value: "81 wins" },
-    { rank: "6th", name: "BoardBoss", value: "76 wins" },
-  ],
-  streaks: [
-    { rank: "1st", name: "Xiresh", value: "42 day streak" },
-    { rank: "2nd", name: "Emmy_chicken4", value: "39 day streak" },
-    { rank: "3rd", name: "Jnkubus", value: "39 day streak", highlight: true },
-    { rank: "4th", name: "Misery426dremon", value: "37 day streak" },
-    { rank: "5th", name: "xxxthaithai4635", value: "36 day streak" },
-    { rank: "6th", name: "malifim700", value: "34 day streak" },
-  ],
-  daily: [
-    { rank: "1st", name: "ShadowdragonR4", value: "13s" },
-    { rank: "2nd", name: "Farryn_Valgirelle", value: "15s" },
-    { rank: "3rd", name: "Emmy_chicken4", value: "16s" },
-    { rank: "4th", name: "Jnkubus", value: "17s", highlight: true },
-    { rank: "5th", name: "piranary2", value: "17s" },
-    { rank: "6th", name: "kc9zn", value: "18s" },
-  ],
-  moves: [
-    { rank: "1st", name: "helloiambored_27", value: "6 moves" },
-    { rank: "2nd", name: "BrendaYTamer", value: "6 moves" },
-    { rank: "3rd", name: "xcute_amarix", value: "6 moves" },
-    { rank: "4th", name: "rainbowmonkplayz38", value: "6 moves" },
-    { rank: "5th", name: "Ximena_214365", value: "6 moves" },
-    { rank: "6th", name: "Styles_Monster", value: "6 moves" },
-  ],
-};
+function getLeaderboardRank(position: number) {
+  const value = position + 1;
+  const remainder = value % 10;
+  const teenValue = value % 100;
+
+  if (teenValue >= 11 && teenValue <= 13) {
+    return `${value}th`;
+  }
+
+  if (remainder === 1) {
+    return `${value}st`;
+  }
+
+  if (remainder === 2) {
+    return `${value}nd`;
+  }
+
+  if (remainder === 3) {
+    return `${value}rd`;
+  }
+
+  return `${value}th`;
+}
+
+function getLeaderboardValue(categoryId: LeaderboardCategoryId, row: LeaderboardApiRow) {
+  if (categoryId === "streaks") {
+    return `${row.streak_count ?? 0} puzzles`;
+  }
+
+  if (categoryId === "moves") {
+    return `${row.moves} moves`;
+  }
+
+  return `${formatTime(row.solve_time)}s`;
+}
 
 type LeaderboardModalProps = {
   isOpen: boolean;
@@ -1353,11 +1342,14 @@ export function LeaderboardModal({
   onClose,
 }: Readonly<LeaderboardModalProps>) {
   const [activeCategoryId, setActiveCategoryId] = useState<LeaderboardCategoryId>("fastest");
-  const [selectedModes, setSelectedModes] = useState<Record<string, string>>({
-    fastest: "Normal",
-    streaks: "Daily Puzzle",
-    moves: "Normal",
+  const [selectedModes, setSelectedModes] = useState<Record<LeaderboardCategoryId, DifficultyKey>>({
+    fastest: "normal",
+    moves: "normal",
+    streaks: "endless",
   });
+  const [rows, setRows] = useState<LeaderboardApiRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -1374,14 +1366,61 @@ export function LeaderboardModal({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
-  if (!isOpen || typeof document === "undefined") {
-    return null;
-  }
-
   const activeCategory =
     LEADERBOARD_CATEGORIES.find((category) => category.id === activeCategoryId) ??
     LEADERBOARD_CATEGORIES[0];
-  const activeRows = LEADERBOARD_PLACEHOLDERS[activeCategory.id];
+  const activeMode = selectedModes[activeCategory.id];
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function loadLeaderboard() {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const response = await fetch(
+          `/api/leaderboard?category=${activeCategory.id}&difficulty=${activeMode}`,
+          {
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load leaderboard.");
+        }
+
+        const nextRows = (await response.json()) as LeaderboardApiRow[];
+
+        if (!isCancelled) {
+          setRows(nextRows);
+        }
+      } catch {
+        if (!isCancelled) {
+          setRows([]);
+          setLoadError("Leaderboard is unavailable right now.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadLeaderboard();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeCategory.id, activeMode, isOpen]);
+
+  if (!isOpen || typeof document === "undefined") {
+    return null;
+  }
 
   return createPortal(
     <motion.div
@@ -1440,48 +1479,62 @@ export function LeaderboardModal({
             </button>
           </div>
 
-          {activeCategory.modes && (
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-              {activeCategory.modes.map((mode) => {
-                const isActive = selectedModes[activeCategory.id] === mode;
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+            {activeCategory.modes.map((mode) => {
+              const isActive = selectedModes[activeCategory.id] === mode;
 
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() =>
-                      setSelectedModes((currentModes) => ({
-                        ...currentModes,
-                        [activeCategory.id]: mode,
-                      }))
-                    }
-                    className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
-                      isActive ? "theme-button-primary" : "theme-button-secondary"
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() =>
+                    setSelectedModes((currentModes) => ({
+                      ...currentModes,
+                      [activeCategory.id]: mode,
+                    }))
+                  }
+                  className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
+                    isActive ? "theme-button-primary" : "theme-button-secondary"
+                  }`}
+                >
+                  {DIFFICULTY_LABELS[mode]}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="mt-5 flex max-h-[20rem] flex-col gap-2 overflow-hidden">
-            {activeRows.map((row) => (
+            {isLoading && (
+              <div className="theme-panel-muted theme-text-muted rounded-[0.95rem] px-4 py-5 text-sm">
+                Loading leaderboard...
+              </div>
+            )}
+
+            {!isLoading && loadError && (
+              <div className="theme-panel-muted theme-text-muted rounded-[0.95rem] px-4 py-5 text-sm">
+                {loadError}
+              </div>
+            )}
+
+            {!isLoading && !loadError && rows.length === 0 && (
+              <div className="theme-panel-muted theme-text-muted rounded-[0.95rem] px-4 py-5 text-sm leading-6">
+                No scores have been recorded for this mode yet. Finish a run to create the first entry.
+              </div>
+            )}
+
+            {!isLoading && !loadError && rows.map((row, index) => (
               <div
-                key={`${activeCategory.id}-${row.rank}-${row.name}`}
-                className={`flex min-h-12 items-center gap-3 rounded-[0.95rem] px-4 py-3 ${
-                  row.highlight ? "bg-rose-500/70 text-white" : "theme-panel-muted theme-text-primary"
-                }`}
+                key={`${activeCategory.id}-${row.id}`}
+                className="theme-panel-muted theme-text-primary flex min-h-12 items-center gap-3 rounded-[0.95rem] px-4 py-3"
               >
-                <span className={`font-fredoka-strong w-10 shrink-0 text-sm ${row.highlight ? "text-white" : "text-teal-700"}`}>
-                  {row.rank}
+                <span className="font-fredoka-strong w-10 shrink-0 text-sm text-teal-700">
+                  {getLeaderboardRank(index)}
                 </span>
                 <span className="font-fredoka-strong min-w-0 flex-1 truncate text-sm">
-                  {row.name}
+                  {row.player_name}
                 </span>
-                <span className={`font-fredoka-regular shrink-0 text-xs sm:text-sm ${row.highlight ? "text-white" : "theme-text-muted"}`}>
-                  {row.value}
+                <span className="font-fredoka-regular shrink-0 text-xs sm:text-sm theme-text-muted">
+                  {getLeaderboardValue(activeCategory.id, row)}
                 </span>
               </div>
             ))}
