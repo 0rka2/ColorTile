@@ -1,14 +1,17 @@
 "use client";
 
-import { PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from "react";
+import { PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 
 import { GameBoard, GameHud } from "../game/components/game-components";
 import {
   checkCompletion,
   getBoardDensityClass,
   getTileRadiusClass,
+  formatTime,
   isTileCorrect,
   isTileLocked,
+  PRESET_DIFFICULTIES,
   swapTiles,
 } from "../game/game-logic";
 
@@ -18,6 +21,13 @@ const DRAG_START_DISTANCE_PX = 6;
 const TILE_DRAG_SCALE = 1.065;
 const TILE_SWAP_ANIMATION_DURATION_MS = 220;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const STEP_COMPLETION_DELAY_MS = 600;
+const SPOTLIGHT_PADDING_PX = 14;
+const MODAL_GAP_PX = 18;
+const MODAL_WIDTH_PX = 480;
+const MODAL_ESTIMATED_HEIGHT_PX = 216;
+const VIEWPORT_MARGIN_PX = 16;
+const TUTORIAL_TIME_SECONDS = PRESET_DIFFICULTIES.normal.time;
 const DROP_TARGET_RING_CLASSES = [
   "ring-2",
   "ring-slate-300/70",
@@ -40,12 +50,12 @@ const stageCopy = [
   },
   {
     eyebrow: "Try it",
-    title: "Swap the two out-of-place tiles.",
+    title: "Swap the two out of place tiles.",
     highlight: "board",
   },
   {
     eyebrow: "Timer",
-    title: "Finish before time runs out. Fewer moves improves your score.",
+    title: "Finish as fast as you can. Use fewer moves to improve your score.",
     highlight: "hud",
   },
   {
@@ -67,6 +77,23 @@ type DragSession = {
   pointerY: number;
   pointerId: number;
   tileId: string;
+  width: number;
+};
+
+type SpotlightRect = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
+type ModalPosition = {
+  left: number;
+  top: number;
+};
+
+type ModalSize = {
+  height: number;
   width: number;
 };
 
@@ -137,6 +164,44 @@ function getPracticeBoard() {
   return swapTiles(getSolvedTutorialBoard("practice"), 5, 6);
 }
 
+function getPaddedSpotlightRect(element: HTMLElement): SpotlightRect {
+  const rect = element.getBoundingClientRect();
+  const left = Math.max(VIEWPORT_MARGIN_PX, rect.left - SPOTLIGHT_PADDING_PX);
+  const top = Math.max(VIEWPORT_MARGIN_PX, rect.top - SPOTLIGHT_PADDING_PX);
+  const right = Math.min(window.innerWidth - VIEWPORT_MARGIN_PX, rect.right + SPOTLIGHT_PADDING_PX);
+  const bottom = Math.min(window.innerHeight - VIEWPORT_MARGIN_PX, rect.bottom + SPOTLIGHT_PADDING_PX);
+
+  return {
+    height: bottom - top,
+    left,
+    top,
+    width: right - left,
+  };
+}
+
+function getClampedModalLeft(centeredLeft: number, modalWidth: number) {
+  return Math.max(
+    VIEWPORT_MARGIN_PX,
+    Math.min(centeredLeft, window.innerWidth - modalWidth - VIEWPORT_MARGIN_PX),
+  );
+}
+
+function getTutorialModalPosition(spotlightRect: SpotlightRect, modalSize: ModalSize): ModalPosition {
+  const modalWidth = Math.min(modalSize.width, window.innerWidth - VIEWPORT_MARGIN_PX * 2);
+  const modalHeight = modalSize.height;
+  const centeredLeft = spotlightRect.left + spotlightRect.width / 2 - modalWidth / 2;
+  const belowTop = spotlightRect.top + spotlightRect.height + MODAL_GAP_PX;
+  const aboveTop = spotlightRect.top - modalHeight - MODAL_GAP_PX;
+  const maxTop = window.innerHeight - modalHeight - VIEWPORT_MARGIN_PX;
+  const hasRoomBelow = belowTop + modalHeight <= window.innerHeight - VIEWPORT_MARGIN_PX;
+  const hasRoomAbove = aboveTop >= VIEWPORT_MARGIN_PX;
+
+  return {
+    left: getClampedModalLeft(centeredLeft, modalWidth),
+    top: Math.max(VIEWPORT_MARGIN_PX, Math.min(hasRoomBelow || !hasRoomAbove ? belowTop : aboveTop, maxTop)),
+  };
+}
+
 type TutorialGuideProps = {
   onPlay: () => void;
 };
@@ -146,8 +211,17 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   const [board, setBoard] = useState(() => getSolvedTutorialBoard("goal"));
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
   const [pressedTileIndex, setPressedTileIndex] = useState<number | null>(null);
+  const [stepCompletionPending, setStepCompletionPending] = useState(false);
   const [readyModalOpen, setReadyModalOpen] = useState(false);
+  const [modalPosition, setModalPosition] = useState<ModalPosition | null>(null);
+  const [modalSize, setModalSize] = useState<ModalSize>({
+    height: MODAL_ESTIMATED_HEIGHT_PX,
+    width: MODAL_WIDTH_PX,
+  });
 
+  const hudSpotlightRef = useRef<HTMLDivElement | null>(null);
+  const boardSpotlightRef = useRef<HTMLDivElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
   const tileElementsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   const dragOverlayElementRef = useRef<HTMLDivElement | null>(null);
   const dragPointerTargetRef = useRef<HTMLButtonElement | null>(null);
@@ -156,14 +230,37 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
+  const stepCompletionTimeoutRef = useRef<number | null>(null);
 
   const stage = stageCopy[stageIndex];
-  const canInteractWithBoard = stageIndex === 1 && !readyModalOpen;
+  const canInteractWithBoard = stageIndex === 1 && !readyModalOpen && !stepCompletionPending;
   const completion = stageIndex === 1 ? checkCompletion(board) : 100;
   const hudProgress = stageIndex === 1 && completion < 100 ? 90 : completion;
+  const tutorialMoves = stageIndex >= 2 || stepCompletionPending ? 1 : 0;
+  const tutorialTimeDisplay = stageIndex >= 2 || stepCompletionPending
+    ? formatTime(TUTORIAL_TIME_SECONDS - 3)
+    : formatTime(TUTORIAL_TIME_SECONDS);
   const draggedIndex = dragSession?.index ?? null;
   const tileRadiusClass = getTileRadiusClass(BOARD_SIZE);
   const boardDensityClass = getBoardDensityClass(BOARD_SIZE);
+  const activeSpotlightClass =
+    "relative z-40 drop-shadow-[0_22px_42px_rgba(255,255,255,0.28)]";
+  const inactiveSpotlightClass = "relative z-20 opacity-45";
+
+  const updateSpotlight = useCallback(() => {
+    if (readyModalOpen) {
+      setModalPosition(null);
+      return;
+    }
+
+    const targetElement = stage.highlight === "hud" ? hudSpotlightRef.current : boardSpotlightRef.current;
+    if (!targetElement) {
+      return;
+    }
+
+    const nextSpotlightRect = getPaddedSpotlightRect(targetElement);
+    setModalPosition(getTutorialModalPosition(nextSpotlightRect, modalSize));
+  }, [modalSize, readyModalOpen, stage.highlight]);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -176,13 +273,24 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     dragOverlayElementRef.current = element;
   }, []);
 
+  const clearStepCompletionTimeout = useCallback(() => {
+    if (stepCompletionTimeoutRef.current === null || typeof window === "undefined") {
+      return;
+    }
+
+    window.clearTimeout(stepCompletionTimeoutRef.current);
+    stepCompletionTimeoutRef.current = null;
+  }, []);
+
   const resetTileRefs = () => {
     tileElementsRef.current = {};
     pendingSwapAnimationRef.current = null;
   };
 
   const goToStage = (nextStageIndex: number) => {
+    clearStepCompletionTimeout();
     resetTileRefs();
+    setStepCompletionPending(false);
     setStageIndex(nextStageIndex);
     setReadyModalOpen(nextStageIndex === 3);
 
@@ -193,6 +301,81 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
 
     setBoard(getSolvedTutorialBoard(`stage-${nextStageIndex}`));
   };
+
+  useLayoutEffect(() => {
+    updateSpotlight();
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateOnNextFrame = () => {
+      window.requestAnimationFrame(updateSpotlight);
+    };
+
+    window.addEventListener("resize", updateOnNextFrame);
+    window.addEventListener("scroll", updateOnNextFrame, true);
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateOnNextFrame);
+    const hudElement = hudSpotlightRef.current;
+    const boardElement = boardSpotlightRef.current;
+    const modalElement = modalRef.current;
+
+    if (resizeObserver) {
+      if (hudElement) {
+        resizeObserver.observe(hudElement);
+      }
+
+      if (boardElement) {
+        resizeObserver.observe(boardElement);
+      }
+
+      if (modalElement) {
+        resizeObserver.observe(modalElement);
+      }
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateOnNextFrame);
+      window.removeEventListener("scroll", updateOnNextFrame, true);
+      resizeObserver?.disconnect();
+    };
+  }, [board.length, readyModalOpen, stageIndex, updateSpotlight]);
+
+  useLayoutEffect(() => {
+    const modalElement = modalRef.current;
+    if (!modalElement || readyModalOpen) {
+      return;
+    }
+
+    const updateModalSize = () => {
+      const rect = modalElement.getBoundingClientRect();
+      setModalSize({
+        height: rect.height || MODAL_ESTIMATED_HEIGHT_PX,
+        width: rect.width || MODAL_WIDTH_PX,
+      });
+    };
+
+    updateModalSize();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(updateModalSize);
+    resizeObserver.observe(modalElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [readyModalOpen, stageIndex]);
+
+  useEffect(() => {
+    return () => {
+      clearStepCompletionTimeout();
+    };
+  }, [clearStepCompletionTimeout]);
 
   const cancelDragAnimationFrame = useCallback(() => {
     if (dragAnimationFrameRef.current !== null && typeof window !== "undefined") {
@@ -306,13 +489,23 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   }, [updateDragOverlayPosition]);
 
   useEffect(() => {
-    if (stageIndex !== 1 || checkCompletion(board) !== 100) {
+    if (stageIndex !== 1 || stepCompletionPending || checkCompletion(board) !== 100) {
       return;
     }
 
     clearDragSession();
-    goToStage(2);
-  }, [board, clearDragSession, stageIndex]);
+    setStepCompletionPending(true);
+
+    if (typeof window === "undefined") {
+      goToStage(2);
+      return;
+    }
+
+    stepCompletionTimeoutRef.current = window.setTimeout(() => {
+      stepCompletionTimeoutRef.current = null;
+      goToStage(2);
+    }, STEP_COMPLETION_DELAY_MS);
+  }, [board, clearDragSession, stageIndex, stepCompletionPending]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -569,27 +762,36 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   };
 
   return (
-    <section className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-start gap-[clamp(0.6rem,1.5vw,1rem)] overflow-hidden text-center">
-      <div className="theme-overlay pointer-events-none fixed inset-0 z-10" />
+    <section className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-start gap-[clamp(0.6rem,1.5vw,1rem)] overflow-visible text-center">
+      {!readyModalOpen && (
+        <motion.div
+          className="pointer-events-none fixed inset-0 z-10 bg-slate-950/60"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+        />
+      )}
 
       <div
-        className={`w-full max-w-[min(100%,34rem)] transition-all ${
-          stage.highlight === "hud" ? "relative z-20 scale-[1.02]" : "relative z-0 opacity-60"
+        ref={hudSpotlightRef}
+        className={`w-full max-w-[min(100%,34rem)] transition-all [&_.backdrop-blur]:backdrop-blur-none ${
+          stage.highlight === "hud" && !readyModalOpen ? activeSpotlightClass : inactiveSpotlightClass
         }`}
       >
         <GameHud
           bestMoves={19}
-          bestTimeDisplay="0:55"
+          bestTimeDisplay={formatTime(TUTORIAL_TIME_SECONDS - 5)}
           gradientQuality={hudProgress}
-          moves={stageIndex >= 2 ? 1 : 0}
-          timeDisplay="0:57"
+          moves={tutorialMoves}
+          timeDisplay={tutorialTimeDisplay}
           timeWarning={false}
         />
       </div>
 
       <div
-        className={`w-full max-w-[min(92vw,34rem)] transition-all ${
-          stage.highlight === "board" ? "relative z-20 scale-[1.01]" : "relative z-0 opacity-60"
+        ref={boardSpotlightRef}
+        className={`w-full max-w-[min(92vw,34rem)] transition-all [&_.theme-board-shell]:backdrop-blur-none ${
+          stage.highlight === "board" && !readyModalOpen ? activeSpotlightClass : inactiveSpotlightClass
         }`}
       >
         <GameBoard
@@ -609,11 +811,11 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           setDragOverlayRef={setDragOverlayRef}
           tileRadiusClass={tileRadiusClass}
           winState={!canInteractWithBoard}
-          winWaveActive={false}
+          winWaveActive={stepCompletionPending}
         />
       </div>
 
-      <div className="relative z-0 flex w-full max-w-[min(92vw,34rem)] justify-center opacity-60">
+      <div className={`${inactiveSpotlightClass} flex w-full max-w-[min(92vw,34rem)] justify-center`}>
         <button
           type="button"
           disabled
@@ -623,31 +825,50 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
         </button>
       </div>
 
-      {!readyModalOpen && (
-        <div className={`theme-modal fixed z-30 w-[min(92vw,24rem)] rounded-[1.25rem] border p-4 text-left ${
-          stage.highlight === "hud"
-            ? "left-1/2 top-[clamp(5.5rem,16vh,8rem)] -translate-x-1/2"
-            : "bottom-[clamp(1rem,5vh,3rem)] left-1/2 -translate-x-1/2"
-        }`}>
-          <div className="flex items-center gap-3">
-            <span className="theme-chip rounded-full px-4 py-1.5 font-fredoka-strong text-xs text-emerald-700">
+      {!readyModalOpen && modalPosition && (
+        <motion.div
+          ref={modalRef}
+          className="theme-modal fixed z-50 w-[min(92vw,30rem)] rounded-[1.5rem] border p-6 text-left"
+          initial={{ opacity: 0, scale: 0.94, y: 10 }}
+          style={{
+            left: modalPosition.left,
+            pointerEvents: "auto",
+            top: modalPosition.top,
+          }}
+          animate={{
+            opacity: 1,
+            scale: 1,
+            y: 0,
+          }}
+          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="flex items-center gap-4">
+            <span className="theme-chip rounded-full px-5 py-2 font-fredoka-strong text-base text-emerald-700">
               {stageIndex + 1} / 4
             </span>
-            <span className="theme-text-muted font-fredoka-regular text-xs">
+            <span className="theme-text-muted font-fredoka-regular text-base">
               {stage.eyebrow}
             </span>
           </div>
 
-          <p className="theme-text-primary font-fredoka-strong mt-3 text-base leading-6">
+          <p className="theme-text-primary font-fredoka-strong mt-5 text-2xl leading-9">
             {stage.title}
           </p>
 
-          <div className="mt-4 flex items-center justify-end gap-2">
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onPlay}
+              className="theme-button-secondary rounded-full px-5 py-3 font-fredoka-strong text-lg"
+            >
+              Skip
+            </button>
+
             <button
               type="button"
               onClick={handleBack}
               disabled={stageIndex === 0}
-              className="theme-button-secondary rounded-full px-4 py-2.5 font-fredoka-strong text-sm disabled:cursor-not-allowed disabled:opacity-45"
+              className="theme-button-secondary rounded-full px-5 py-3 font-fredoka-strong text-lg disabled:cursor-not-allowed disabled:opacity-45"
             >
               Back
             </button>
@@ -656,7 +877,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 disabled
-                className="theme-button-secondary rounded-full px-4 py-2.5 font-fredoka-strong text-sm opacity-70"
+                className="theme-button-secondary rounded-full px-5 py-3 font-fredoka-strong text-lg opacity-70"
               >
                 Swap first
               </button>
@@ -664,35 +885,40 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 onClick={handleNext}
-                className="theme-button-primary rounded-full px-5 py-2.5 font-fredoka-strong text-sm"
+                className="theme-button-primary rounded-full px-6 py-3 font-fredoka-strong text-lg"
               >
                 Next
               </button>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {readyModalOpen && (
-        <div className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="theme-modal w-full max-w-[26rem] rounded-[1.5rem] border p-7 text-center">
-            <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.24em]">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/60 p-4">
+          <motion.div
+            className="theme-modal w-full max-w-[32rem] rounded-[1.75rem] border p-9 text-center"
+            initial={{ opacity: 0, y: 18, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <p className="theme-text-muted font-fredoka-strong text-sm uppercase tracking-[0.24em]">
               Tutorial complete
             </p>
-            <h2 className="theme-text-primary font-fredoka-display mt-3 text-[2.35rem] leading-none">
+            <h2 className="theme-text-primary font-fredoka-display mt-4 text-[3rem] leading-none">
               You&apos;re ready
             </h2>
-            <p className="theme-text-secondary mx-auto mt-4 max-w-[19rem] text-sm leading-6">
-              Keep matching the gradient and clear the board before time runs out.
+            <p className="theme-text-secondary mx-auto mt-5 max-w-[24rem] text-lg leading-8">
+              Blend it, solve it, clear it!
             </p>
             <button
               type="button"
               onClick={onPlay}
-              className="theme-button-primary mt-7 inline-flex w-full items-center justify-center rounded-full px-6 py-3 font-fredoka-strong text-base"
+              className="theme-button-primary mt-8 inline-flex w-full items-center justify-center rounded-full px-7 py-4 font-fredoka-strong text-lg"
             >
               Play
             </button>
-          </div>
+          </motion.div>
         </div>
       )}
     </section>

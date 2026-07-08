@@ -6,6 +6,12 @@ import { HiOutlineSpeakerWave, HiOutlineSpeakerXMark } from "react-icons/hi2";
 import type { AppView } from "../../views/app-view";
 import { GradientText } from "../../../components/ui/gradient-text";
 import { GameDrawer, ThemeToggle } from "./game-components";
+import {
+  getCookie,
+  getCookieConsent,
+  setCookie,
+  THEME_MODE_COOKIE_NAME,
+} from "../../lib/cookies";
 import { getSoundEnabled, setSoundEnabled } from "../../lib/sounds";
 import { resolveThemeMode, THEME_MODE_STORAGE_KEY } from "../settings-options";
 import type { ThemeMode } from "../settings-options";
@@ -25,7 +31,10 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
 
   useLayoutEffect(() => {
     try {
-      setThemeMode(resolveThemeMode(window.localStorage.getItem(THEME_MODE_STORAGE_KEY)));
+      const storedThemeMode =
+        getCookie(THEME_MODE_COOKIE_NAME) ?? window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+
+      setThemeMode(resolveThemeMode(storedThemeMode));
       setSoundIsEnabled(getSoundEnabled());
     } catch {
       setThemeMode("light");
@@ -36,10 +45,8 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
 
-    try {
-      window.localStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode);
-    } catch {
-      // Keep the selected theme in memory if storage is unavailable.
+    if (getCookieConsent() === "accepted") {
+      setCookie(THEME_MODE_COOKIE_NAME, themeMode);
     }
   }, [themeMode]);
 

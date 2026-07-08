@@ -674,10 +674,9 @@ export default function Home() {
     setPlayerNameInput(sanitizedPlayerName);
     setPlayerNameError(null);
     setIsOnboardingComplete(true);
-    setActiveView("game");
+    setActiveView("tutorial");
     setTimerStarted(true);
-    startGame(activeConfig);
-  }, [activeConfig, playerNameInput, startGame]);
+  }, [playerNameInput]);
 
   const hudFeedbackMotion = {
     animate: hudFeedbackControls,

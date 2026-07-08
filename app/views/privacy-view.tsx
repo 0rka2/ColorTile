@@ -5,9 +5,19 @@ const privacyItems = [
       "ColorTile does not require an account and does not ask for your name, email address, payment information, or other personal details inside the game.",
   },
   {
+    title: "Necessary Cookie",
+    copy:
+      "ColorTile uses one necessary cookie to remember whether you accepted or declined optional cookies.",
+  },
+  {
+    title: "Preference Cookie",
+    copy:
+      "If you accept cookies, ColorTile may use a small preference cookie to remember your selected theme.",
+  },
+  {
     title: "Local Records",
     copy:
-      "The game stores your theme preference and gameplay records, such as best times and fewest moves, in your browser's local storage.",
+      "The game stores gameplay records, such as best times, fewest moves, and endless stats, in your browser's local storage.",
   },
   {
     title: "Your Device",
