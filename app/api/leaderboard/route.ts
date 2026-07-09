@@ -1,18 +1,10 @@
 import { getSql } from "@/app/lib/db";
-
-const LEADERBOARD_CATEGORIES = ["fastest", "moves", "streaks"] as const;
-const LEADERBOARD_DIFFICULTIES = ["normal", "hard", "expert", "extreme", "endless"] as const;
-
-type LeaderboardCategory = (typeof LEADERBOARD_CATEGORIES)[number];
-type LeaderboardDifficulty = (typeof LEADERBOARD_DIFFICULTIES)[number];
-
-function isLeaderboardCategory(value: string | null): value is LeaderboardCategory {
-  return value !== null && LEADERBOARD_CATEGORIES.includes(value as LeaderboardCategory);
-}
-
-function isLeaderboardDifficulty(value: string | null): value is LeaderboardDifficulty {
-  return value !== null && LEADERBOARD_DIFFICULTIES.includes(value as LeaderboardDifficulty);
-}
+import {
+  canUseLeaderboardCategory,
+  isLeaderboardCategory,
+  isLeaderboardDifficulty,
+  type LeaderboardDifficulty,
+} from "@/app/game/leaderboard";
 
 async function ensureLeaderboardTable() {
   const sql = getSql();
@@ -51,16 +43,9 @@ export async function GET(request: Request) {
     );
   }
 
-  if (categoryParam === "streaks" && difficultyParam !== "endless") {
+  if (!canUseLeaderboardCategory(categoryParam, difficultyParam)) {
     return Response.json(
-      { error: "Best streaks is only available for endless mode." },
-      { status: 400 },
-    );
-  }
-
-  if (categoryParam !== "streaks" && difficultyParam === "endless") {
-    return Response.json(
-      { error: "This leaderboard category is not available for endless mode." },
+      { error: "This leaderboard query is not available for that mode." },
       { status: 400 },
     );
   }
@@ -114,6 +99,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid difficulty." }, { status: 400 });
   }
 
+  const difficulty = body.difficulty as LeaderboardDifficulty;
+
   const playerName = body.playerName?.trim();
   const moves = body.moves;
   const solveTime = body.solveTime;
@@ -125,7 +112,7 @@ export async function POST(request: Request) {
   if (body.category === "streaks") {
     const streakCount = body.streakCount;
 
-    if (body.difficulty !== "endless") {
+    if (!canUseLeaderboardCategory("streaks", difficulty)) {
       return Response.json({ error: "Best streaks must use endless difficulty." }, { status: 400 });
     }
 
@@ -137,7 +124,7 @@ export async function POST(request: Request) {
     const sql = getSql();
     await sql`
       insert into endless_streak_leaderboard (player_name, difficulty, streak_count)
-      values (${playerName}, ${body.difficulty}, ${streakCount})
+      values (${playerName}, ${difficulty}, ${streakCount})
     `;
 
     return Response.json({ ok: true }, { status: 201 });
@@ -151,11 +138,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "Solve time must be a positive number." }, { status: 400 });
   }
 
+  if (!canUseLeaderboardCategory("fastest", difficulty)) {
+    return Response.json({ error: "This difficulty cannot submit solve scores." }, { status: 400 });
+  }
+
   await ensureLeaderboardTable();
   const sql = getSql();
   await sql`
     insert into leaderboard (player_name, difficulty, moves, solve_time)
-    values (${playerName}, ${body.difficulty}, ${moves}, ${solveTime})
+    values (${playerName}, ${difficulty}, ${moves}, ${solveTime})
   `;
 
   return Response.json({ ok: true }, { status: 201 });

@@ -7,26 +7,23 @@ import { IoMdTrophy } from "react-icons/io";
 import { VscStarFull } from "react-icons/vsc";
 
 import { GradientText } from "../components/ui/gradient-text";
-import {
-  EndlessStartModal,
-  GameBoard,
-  GameControls,
-  GameHud,
-  GameModal,
-  GameModeModal,
-  LeaderboardModal,
-  ShopComingSoonModal,
-  WinConfetti,
-} from "./game/components/game-components";
+import { GameBoard } from "./game/components/game-board";
+import { GameControls } from "./game/components/game-controls";
+import { GameHud } from "./game/components/game-hud";
+import { GameModal } from "./game/components/modals/game-modal";
+import { GameModeModal } from "./game/components/modals/game-mode-modal";
+import { LeaderboardModal } from "./game/components/modals/leaderboard-modal";
+import { ShopComingSoonModal } from "./game/components/modals/shop-coming-soon-modal";
+import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
 import { useBoardSize } from "./game/hooks/use-board-size";
 import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
 import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
 import { useWinSequence } from "./game/hooks/use-win-sequence";
+import type { LeaderboardDifficulty } from "./game/leaderboard";
 import {
   checkCompletion,
-  DIFFICULTY_LABELS,
   formatTime,
   generateCornerColors,
   generateSolvedBoard,
@@ -34,15 +31,16 @@ import {
   getEndlessConfig,
   getEndlessSwapBudget,
   getEndlessThreeStarMoveLimit,
+  getGameModeConfig,
   getTileRadiusClass,
+  isBlackAndWhiteMode,
   isTileCorrect,
   isTileLocked,
-  PRESET_DIFFICULTIES,
   scrambleBoard,
 } from "./game/game-logic";
 import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game/game-types";
 import { getGradientQuality } from "./game/gradient-quality";
-import { timeUpSound } from "./lib/sounds";
+import { countdownSound, timeUpSound } from "./lib/sounds";
 import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./game/personal-best";
 import type { PersonalBestStatus } from "./game/personal-best";
 import TutorialGuide from "./tutorial/tutorial-guide";
@@ -64,6 +62,7 @@ const INTRO_COMPLETED_STORAGE_KEY = "colortile-intro-completed";
 const LEADERBOARD_PLAYER_NAME_STORAGE_KEY = "colortile-leaderboard-player-name";
 const PLAYER_NAME_MAX_LENGTH = 24;
 const INTRO_WELCOME_DURATION_MS = 1400;
+const BLACK_AND_WHITE_PREVIEW_DURATION_MS = 3000;
 
 type IntroStep = "welcome" | "name";
 
@@ -93,7 +92,7 @@ function getLeaderboardPlayerName() {
 }
 
 async function submitLeaderboardScore(entry: {
-  difficulty: "normal" | "hard" | "expert" | "extreme";
+  difficulty: LeaderboardDifficulty;
   moves: number;
   solveTime: number;
 }) {
@@ -250,12 +249,14 @@ function IntroOnboarding({
 export default function Home() {
   const [difficulty, setDifficulty] = useState<DifficultyKey>("normal");
   const [board, setBoard] = useState<Tile[]>([]);
+  const [boardVisualMode, setBoardVisualMode] = useState<"color" | "grayscale">("color");
+  const [previewActive, setPreviewActive] = useState(false);
+  const [previewCountdown, setPreviewCountdown] = useState<number | null>(null);
   const [moves, setMoves] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
-  const [endlessModalOpen, setEndlessModalOpen] = useState(false);
   const [endlessPuzzleNumber, setEndlessPuzzleNumber] = useState(1);
   const [endlessStreak, setEndlessStreak] = useState(0);
   const [endlessLastClear, setEndlessLastClear] = useState<{
@@ -280,6 +281,8 @@ export default function Home() {
   const hudFeedbackControls = useAnimationControls();
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
+  const blackAndWhitePreviewTimeoutRef = useRef<number | null>(null);
+  const blackAndWhitePreviewIntervalRef = useRef<number | null>(null);
 
   const { bestStats, setBestStats } = usePersistentBestStats();
   const { endlessStats, setEndlessStats } = usePersistentEndlessStats();
@@ -287,12 +290,13 @@ export default function Home() {
   const activeConfig =
     difficulty === "endless"
       ? getEndlessConfig(endlessPuzzleNumber)
-      : PRESET_DIFFICULTIES[difficulty];
+      : getGameModeConfig(difficulty);
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
   const currentBest = bestStats[difficulty];
   const isEndlessMode = difficulty === "endless";
+  const isBlackAndWhiteRun = isBlackAndWhiteMode(difficulty);
   const endlessSwapBudget = getEndlessSwapBudget(activeConfig.size, endlessStreak);
   const endlessThreeStarMoveLimit = getEndlessThreeStarMoveLimit(endlessSwapBudget);
   const bestSolveTime = getBestSolveTime(currentBest, activeConfig.time);
@@ -405,11 +409,34 @@ export default function Home() {
     void hudFeedbackControls.start(HUD_FEEDBACK_ANIMATION);
   }, [activeView, hudFeedbackControls, hudFeedbackKey]);
 
+  useEffect(() => {
+    if (previewCountdown === null) {
+      return;
+    }
+
+    countdownSound.play();
+  }, [previewCountdown]);
+
+  const clearBlackAndWhitePreview = useCallback(() => {
+    if (blackAndWhitePreviewTimeoutRef.current !== null) {
+      window.clearTimeout(blackAndWhitePreviewTimeoutRef.current);
+      blackAndWhitePreviewTimeoutRef.current = null;
+    }
+
+    if (blackAndWhitePreviewIntervalRef.current !== null) {
+      window.clearInterval(blackAndWhitePreviewIntervalRef.current);
+      blackAndWhitePreviewIntervalRef.current = null;
+    }
+
+    setPreviewCountdown(null);
+  }, []);
+
   const startGame = useCallback((config: DifficultyConfig) => {
     const corners = generateCornerColors(config.size);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
     const nextBoard = scrambleBoard(nextSolvedBoard);
 
+    clearBlackAndWhitePreview();
     clearDragSession();
     resetWinSequence();
     setBoardResetKey((currentKey) => currentKey + 1);
@@ -421,8 +448,35 @@ export default function Home() {
     setWinState(false);
     setLoseState(false);
     setEndlessLastClear(null);
+    setBoardVisualMode("color");
+
+    if (isBlackAndWhiteMode(difficulty)) {
+      setPreviewActive(true);
+      setPreviewCountdown(3);
+      setTimerStarted(false);
+      blackAndWhitePreviewIntervalRef.current = window.setInterval(() => {
+        setPreviewCountdown((currentCountdown) =>
+          currentCountdown === null ? null : Math.max(1, currentCountdown - 1),
+        );
+      }, 1000);
+      blackAndWhitePreviewTimeoutRef.current = window.setTimeout(() => {
+        if (blackAndWhitePreviewIntervalRef.current !== null) {
+          window.clearInterval(blackAndWhitePreviewIntervalRef.current);
+          blackAndWhitePreviewIntervalRef.current = null;
+        }
+
+        setBoardVisualMode("grayscale");
+        setPreviewActive(false);
+        setPreviewCountdown(null);
+        setTimerStarted(true);
+        blackAndWhitePreviewTimeoutRef.current = null;
+      }, BLACK_AND_WHITE_PREVIEW_DURATION_MS);
+      return;
+    }
+
+    setPreviewActive(false);
     setTimerStarted(true);
-  }, [clearDragSession, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
+  }, [clearBlackAndWhitePreview, clearDragSession, clearPendingSwapAnimation, difficulty, resetWinSequence, updateBoard]);
 
   useEffect(() => {
     if (difficulty === "endless") {
@@ -493,23 +547,13 @@ export default function Home() {
       setWinPhase("boardWave");
       clearDragSession();
 
-      const previousBestSolveTime = currentBestWithSolveTime.bestSolveTime;
-      const previousFewestMoves = currentBest?.fewestMoves;
-      const shouldSubmitLeaderboardScore =
-        previousBestSolveTime === undefined ||
-        previousFewestMoves === undefined ||
-        finalSolveTime <= previousBestSolveTime ||
-        moves <= previousFewestMoves;
-
-      if (shouldSubmitLeaderboardScore) {
-        void submitLeaderboardScore({
-          difficulty,
-          moves,
-          solveTime: finalSolveTime,
-        }).catch(() => {
-          // Ignore leaderboard submission failures so local progress still works.
-        });
-      }
+      void submitLeaderboardScore({
+        difficulty,
+        moves,
+        solveTime: finalSolveTime,
+      }).catch(() => {
+        // Ignore leaderboard submission failures so local progress still works.
+      });
 
       setBestStats((current) => {
         const currentRecord = current[difficulty] ?? {};
@@ -549,7 +593,7 @@ export default function Home() {
   }, [board, endlessSwapBudget, isEndlessMode, loseState, moves, startGame, winState]);
 
   useEffect(() => {
-    if (activeView !== "game" || !board.length || winState || loseState || endlessModalOpen || !timerStarted) {
+    if (activeView !== "game" || !board.length || winState || loseState || !timerStarted) {
       return;
     }
 
@@ -562,7 +606,7 @@ export default function Home() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeView, board.length, endlessModalOpen, loseState, timerStarted, winState]);
+  }, [activeView, board.length, loseState, timerStarted, winState]);
 
   useEffect(() => {
     if (!modeModalOpen) {
@@ -581,38 +625,39 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
+      clearBlackAndWhitePreview();
       clearWinSequenceTimeouts();
     };
-  }, [clearWinSequenceTimeouts]);
+  }, [clearBlackAndWhitePreview, clearWinSequenceTimeouts]);
 
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
+    clearBlackAndWhitePreview();
+    setPreviewActive(false);
+    setBoardVisualMode(isBlackAndWhiteMode(nextDifficulty) ? "grayscale" : "color");
+
     if (nextDifficulty === "endless") {
-      clearDragSession();
-      resetWinSequence();
-      setEndlessModalOpen(true);
-      setTimerStarted(false);
       return;
     }
 
-    setEndlessModalOpen(false);
     clearDragSession();
     resetWinSequence();
+
+    if (nextDifficulty === difficulty) {
+      startGame(getGameModeConfig(nextDifficulty));
+      return;
+    }
+
     setDifficulty(nextDifficulty);
   };
 
   const handleEndlessStart = () => {
+    clearBlackAndWhitePreview();
+    setPreviewActive(false);
+    setBoardVisualMode("color");
     setDifficulty("endless");
     setEndlessPuzzleNumber(1);
     setEndlessStreak(0);
-    setEndlessModalOpen(false);
     startGame(getEndlessConfig(1));
-  };
-
-  const handleEndlessClose = () => {
-    setEndlessModalOpen(false);
-    setTimerStarted(true);
-    clearDragSession();
-    resetWinSequence();
   };
 
   const handleEndlessReplay = () => {
@@ -628,7 +673,7 @@ export default function Home() {
 
   const handleEndlessBack = () => {
     resetWinSequence();
-    setEndlessModalOpen(true);
+    setModeModalOpen(true);
     setTimerStarted(false);
   };
 
@@ -645,8 +690,9 @@ export default function Home() {
 
   const handleNavigateView = useCallback((nextView: AppView) => {
     if (nextView !== "game") {
+      clearBlackAndWhitePreview();
+      setPreviewActive(false);
       clearDragSession();
-      setEndlessModalOpen(false);
       setModeModalOpen(false);
       setShopModalOpen(false);
       setLeaderboardModalOpen(false);
@@ -654,7 +700,7 @@ export default function Home() {
     }
 
     setActiveView(nextView);
-  }, [clearDragSession]);
+  }, [clearBlackAndWhitePreview, clearDragSession, previewActive]);
 
   const handleLogoClick = useCallback(() => {
     setHudFeedbackKey((currentKey) => currentKey + 1);
@@ -758,8 +804,11 @@ export default function Home() {
               dragSession={dragSession}
               draggedIndex={draggedIndex}
               getTileRef={getTileRef}
+              interactionDisabled={previewActive}
+              previewCountdown={previewActive ? previewCountdown : null}
               setDragOverlayRef={setDragOverlayRef}
               tileRadiusClass={tileRadiusClass}
+              visualMode={isBlackAndWhiteRun && !previewActive ? "grayscale" : boardVisualMode}
               confettiActive={confettiActive}
               winWaveActive={winWaveActive}
               winState={winState}
@@ -836,17 +885,13 @@ export default function Home() {
           />
           <WinConfetti active={confettiActive} />
           <GameModeModal
+            currentStreak={endlessStreak}
             difficulty={difficulty}
+            endlessStats={endlessStats}
             isOpen={modeModalOpen}
             onClose={() => setModeModalOpen(false)}
             onDifficultyChange={handleDifficultyChange}
-          />
-          <EndlessStartModal
-            currentStreak={endlessStreak}
-            endlessStats={endlessStats}
-            isOpen={endlessModalOpen}
-            onClose={handleEndlessClose}
-            onStart={handleEndlessStart}
+            onEndlessStart={handleEndlessStart}
           />
           <ShopComingSoonModal
             isOpen={shopModalOpen}

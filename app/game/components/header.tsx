@@ -5,7 +5,7 @@ import { HiOutlineSpeakerWave, HiOutlineSpeakerXMark } from "react-icons/hi2";
 
 import type { AppView } from "../../views/app-view";
 import { GradientText } from "../../../components/ui/gradient-text";
-import { GameDrawer, ThemeToggle } from "./game-components";
+import { GameDrawer, ThemeToggle } from "./game-drawer";
 import {
   getCookie,
   getCookieConsent,

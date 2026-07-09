@@ -1,19 +1,133 @@
-import { DifficultyConfig, DifficultyKey, PresetDifficultyKey, Tile } from "./game-types";
+import {
+  BlackAndWhiteModeKey,
+  DifficultyConfig,
+  DifficultyKey,
+  ModeStyle,
+  PresetDifficultyKey,
+  PresetModeKey,
+  Tile,
+} from "./game-types";
 
 export const PRESET_DIFFICULTIES: Record<PresetDifficultyKey, DifficultyConfig> = {
-  normal: { label: "Normal", size: 4, time:  120},
-  hard: { label: "Hard", size: 5, time: 240},
+  normal: { label: "Normal", size: 4, time: 120 },
+  hard: { label: "Hard", size: 5, time: 240 },
   expert: { label: "Expert", size: 6, time: 360 },
   extreme: { label: "Extreme", size: 7, time: 420 },
 };
 
-export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = {
-  normal: PRESET_DIFFICULTIES.normal.label,
-  hard: PRESET_DIFFICULTIES.hard.label,
-  expert: PRESET_DIFFICULTIES.expert.label,
-  extreme: PRESET_DIFFICULTIES.extreme.label,
-  endless: "Endless",
+export const PRESET_MODE_DIFFICULTIES: PresetDifficultyKey[] = [
+  "normal",
+  "hard",
+  "expert",
+  "extreme",
+];
+
+export const COLOR_PRESET_MODE_KEYS: PresetDifficultyKey[] = [...PRESET_MODE_DIFFICULTIES];
+
+export const BLACK_AND_WHITE_PRESET_MODE_KEYS: BlackAndWhiteModeKey[] = [
+  "black-and-white-normal",
+  "black-and-white-hard",
+  "black-and-white-expert",
+  "black-and-white-extreme",
+];
+
+export const PRESET_MODE_KEYS: PresetModeKey[] = [
+  ...COLOR_PRESET_MODE_KEYS,
+  ...BLACK_AND_WHITE_PRESET_MODE_KEYS,
+];
+
+export type GameModeDefinition = DifficultyConfig & {
+  baseDifficulty: PresetDifficultyKey | null;
+  isEndless: boolean;
+  key: DifficultyKey;
+  leaderboardDifficulty: DifficultyKey;
+  style: ModeStyle | "endless";
 };
+
+export const GAME_MODE_DEFINITIONS: Record<DifficultyKey, GameModeDefinition> = {
+  normal: {
+    ...PRESET_DIFFICULTIES.normal,
+    baseDifficulty: "normal",
+    isEndless: false,
+    key: "normal",
+    leaderboardDifficulty: "normal",
+    style: "color",
+  },
+  hard: {
+    ...PRESET_DIFFICULTIES.hard,
+    baseDifficulty: "hard",
+    isEndless: false,
+    key: "hard",
+    leaderboardDifficulty: "hard",
+    style: "color",
+  },
+  expert: {
+    ...PRESET_DIFFICULTIES.expert,
+    baseDifficulty: "expert",
+    isEndless: false,
+    key: "expert",
+    leaderboardDifficulty: "expert",
+    style: "color",
+  },
+  extreme: {
+    ...PRESET_DIFFICULTIES.extreme,
+    baseDifficulty: "extreme",
+    isEndless: false,
+    key: "extreme",
+    leaderboardDifficulty: "extreme",
+    style: "color",
+  },
+  "black-and-white-normal": {
+    ...PRESET_DIFFICULTIES.normal,
+    baseDifficulty: "normal",
+    isEndless: false,
+    key: "black-and-white-normal",
+    label: "B&W Normal",
+    leaderboardDifficulty: "black-and-white-normal",
+    style: "black-and-white",
+  },
+  "black-and-white-hard": {
+    ...PRESET_DIFFICULTIES.hard,
+    baseDifficulty: "hard",
+    isEndless: false,
+    key: "black-and-white-hard",
+    label: "B&W Hard",
+    leaderboardDifficulty: "black-and-white-hard",
+    style: "black-and-white",
+  },
+  "black-and-white-expert": {
+    ...PRESET_DIFFICULTIES.expert,
+    baseDifficulty: "expert",
+    isEndless: false,
+    key: "black-and-white-expert",
+    label: "B&W Expert",
+    leaderboardDifficulty: "black-and-white-expert",
+    style: "black-and-white",
+  },
+  "black-and-white-extreme": {
+    ...PRESET_DIFFICULTIES.extreme,
+    baseDifficulty: "extreme",
+    isEndless: false,
+    key: "black-and-white-extreme",
+    label: "B&W Extreme",
+    leaderboardDifficulty: "black-and-white-extreme",
+    style: "black-and-white",
+  },
+  endless: {
+    baseDifficulty: null,
+    isEndless: true,
+    key: "endless",
+    label: "Endless",
+    leaderboardDifficulty: "endless",
+    size: 0,
+    style: "endless",
+    time: 0,
+  },
+};
+
+export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = Object.fromEntries(
+  Object.entries(GAME_MODE_DEFINITIONS).map(([key, mode]) => [key, mode.label]),
+) as Record<DifficultyKey, string>;
 
 export const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -49,6 +163,47 @@ export function getEndlessConfig(puzzleNumber: number): DifficultyConfig {
     label: "Endless",
     size,
     time: 0,
+  };
+}
+
+export function getModeStyle(modeKey: DifficultyKey): ModeStyle {
+  return GAME_MODE_DEFINITIONS[modeKey].style === "black-and-white"
+    ? "black-and-white"
+    : "color";
+}
+
+export function isBlackAndWhiteMode(modeKey: DifficultyKey) {
+  return GAME_MODE_DEFINITIONS[modeKey].style === "black-and-white";
+}
+
+export function isPresetMode(modeKey: DifficultyKey): modeKey is PresetModeKey {
+  return modeKey !== "endless";
+}
+
+export function getPresetModeKey(
+  style: ModeStyle,
+  difficulty: PresetDifficultyKey,
+): PresetModeKey {
+  if (style === "color") {
+    return difficulty;
+  }
+
+  return `black-and-white-${difficulty}` as BlackAndWhiteModeKey;
+}
+
+export function getGameModeConfig(
+  modeKey: DifficultyKey,
+  options?: { endlessPuzzleNumber?: number },
+): DifficultyConfig {
+  if (modeKey === "endless") {
+    return getEndlessConfig(options?.endlessPuzzleNumber ?? 1);
+  }
+
+  const mode = GAME_MODE_DEFINITIONS[modeKey];
+  return {
+    label: mode.label,
+    size: mode.size,
+    time: mode.time,
   };
 }
 

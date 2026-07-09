@@ -3,7 +3,8 @@
 import { PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
-import { GameBoard, GameHud } from "../game/components/game-components";
+import { GameBoard } from "../game/components/game-board";
+import { GameHud } from "../game/components/game-hud";
 import {
   checkCompletion,
   getBoardDensityClass,
@@ -803,6 +804,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           dragSession={dragSession}
           draggedIndex={draggedIndex}
           getTileRef={getTileRef}
+          interactionDisabled={!canInteractWithBoard}
           isTileCorrect={isTileCorrect}
           isTileLocked={isTileLocked}
           loseState={false}
@@ -810,6 +812,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           pressedTileIndex={pressedTileIndex}
           setDragOverlayRef={setDragOverlayRef}
           tileRadiusClass={tileRadiusClass}
+          visualMode="color"
           winState={!canInteractWithBoard}
           winWaveActive={stepCompletionPending}
         />

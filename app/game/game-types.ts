@@ -6,15 +6,25 @@ export type Tile = {
   isCorner: boolean;
 };
 
-export type DifficultyKey = "normal" | "hard" | "expert" | "extreme" | "endless";
+export type PresetDifficultyKey = "normal" | "hard" | "expert" | "extreme";
+
+export type ModeStyle = "color" | "black-and-white";
+
+export type BlackAndWhiteModeKey =
+  | "black-and-white-normal"
+  | "black-and-white-hard"
+  | "black-and-white-expert"
+  | "black-and-white-extreme";
+
+export type PresetModeKey = PresetDifficultyKey | BlackAndWhiteModeKey;
+
+export type DifficultyKey = PresetModeKey | "endless";
 
 export type DifficultyConfig = {
   label: string;
   size: number;
   time: number;
 };
-
-export type PresetDifficultyKey = Exclude<DifficultyKey, "endless">;
 
 export type BestRecord = {
   bestCompletion?: number;

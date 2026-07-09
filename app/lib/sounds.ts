@@ -141,6 +141,11 @@ export const timeUpSound = createSoundEffect([
   { delay: 0.18, duration: 0.26, frequency: 174, gain: 0.065, type: "sine" },
 ]);
 
+export const countdownSound = createSoundEffect([
+  { delay: 0, duration: 0.12, frequency: 150, gain: 0.05, type: "sine" },
+  { delay: 0.02, duration: 0.15, frequency: 50, gain: 0.03, type: "sine" },
+]);
+
 export const boardCompleteSound = createSoundEffect([
   { delay: 0, duration: 0.5, frequency: 523, gain: 0.045, type: "triangle" },  // C5
   { delay: 0.1, duration: 0.5, frequency: 659, gain: 0.045, type: "triangle" },  // E5

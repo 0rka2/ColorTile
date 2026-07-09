@@ -2,18 +2,27 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  BLACK_AND_WHITE_PRESET_MODE_KEYS,
+  COLOR_PRESET_MODE_KEYS,
+  DIFFICULTY_LABELS,
+  GAME_MODE_DEFINITIONS,
+  PRESET_DIFFICULTIES,
   checkCompletion,
   clamp,
   formatTime,
   generateSolvedBoard,
+  getGameModeConfig,
   getBoardDensityClass,
   getEndlessPuzzleSize,
   getEndlessSwapBudget,
+  getModeStyle,
+  getPresetModeKey,
   getEndlessThreeStarMoveLimit,
   getTileRadiusClass,
   hexToRgb,
   hslToHex,
   interpolateHue,
+  isBlackAndWhiteMode,
   isSolved,
   isTileLocked,
   scrambleBoard,
@@ -180,4 +189,36 @@ test("tile radius and board density classes change at the expected thresholds", 
   assert.equal(getBoardDensityClass(4), "board-grid--default");
   assert.equal(getBoardDensityClass(10), "board-grid--compact");
   assert.equal(getBoardDensityClass(18), "board-grid--dense");
+});
+
+test("black and white modes mirror preset board sizes and times", () => {
+  assert.deepEqual(COLOR_PRESET_MODE_KEYS, ["normal", "hard", "expert", "extreme"]);
+  assert.deepEqual(BLACK_AND_WHITE_PRESET_MODE_KEYS, [
+    "black-and-white-normal",
+    "black-and-white-hard",
+    "black-and-white-expert",
+    "black-and-white-extreme",
+  ]);
+
+  assert.deepEqual(getGameModeConfig("black-and-white-normal"), {
+    label: "B&W Normal",
+    size: PRESET_DIFFICULTIES.normal.size,
+    time: PRESET_DIFFICULTIES.normal.time,
+  });
+  assert.deepEqual(getGameModeConfig("black-and-white-extreme"), {
+    label: "B&W Extreme",
+    size: PRESET_DIFFICULTIES.extreme.size,
+    time: PRESET_DIFFICULTIES.extreme.time,
+  });
+});
+
+test("mode helpers resolve style and keys for black and white runs", () => {
+  assert.equal(getPresetModeKey("color", "hard"), "hard");
+  assert.equal(getPresetModeKey("black-and-white", "hard"), "black-and-white-hard");
+  assert.equal(getModeStyle("expert"), "color");
+  assert.equal(getModeStyle("black-and-white-expert"), "black-and-white");
+  assert.equal(isBlackAndWhiteMode("black-and-white-normal"), true);
+  assert.equal(isBlackAndWhiteMode("normal"), false);
+  assert.equal(DIFFICULTY_LABELS["black-and-white-hard"], "B&W Hard");
+  assert.equal(GAME_MODE_DEFINITIONS.endless.isEndless, true);
 });
