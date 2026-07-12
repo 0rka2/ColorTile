@@ -3,7 +3,12 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 
 import { hoverSound } from "../../lib/sounds";
-import type { Tile } from "../game-types";
+import {
+  getBlackAndWhiteRevealStainEdges,
+  hexToRgb,
+  isBlackAndWhiteTileInRevealSplash,
+} from "../game-logic";
+import type { RevealStainEdge, Tile } from "../game-types";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
@@ -19,6 +24,18 @@ const TILE_INTERACTION_SPRING = {
   stiffness: 560,
   damping: 30,
   mass: 0.58,
+};
+const STAIN_CLASS_NAMES: Record<RevealStainEdge, string> = {
+  top: "inset-x-0 top-0 h-[68%]",
+  right: "inset-y-0 right-0 w-[68%]",
+  bottom: "inset-x-0 bottom-0 h-[68%]",
+  left: "inset-y-0 left-0 w-[68%]",
+};
+const STAIN_GRADIENT_SHAPES: Record<RevealStainEdge, string> = {
+  top: "ellipse 92% 112% at top",
+  right: "ellipse 112% 92% at right",
+  bottom: "ellipse 92% 112% at bottom",
+  left: "ellipse 112% 92% at left",
 };
 
 function CheckMark() {
@@ -39,7 +56,27 @@ function CheckMark() {
 }
 
 function withVisualModeFilter(baseFilter: string, visualMode: "color" | "grayscale") {
-  return visualMode === "grayscale" ? `${baseFilter} grayscale(1)` : baseFilter;
+  return baseFilter;
+}
+
+function getVisualModeBackgroundColor(color: string, visualMode: "color" | "grayscale") {
+  if (visualMode === "color") {
+    return color;
+  }
+
+  const { r, g, b } = hexToRgb(color);
+  const luminance = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+  const gentleGray = Math.round(luminance * 0.72 + 255 * 0.28);
+  return `rgb(${gentleGray}, ${gentleGray}, ${gentleGray})`;
+}
+
+function getRgbText(color: string) {
+  const { r, g, b } = hexToRgb(color);
+  return `${r}, ${g}, ${b}`;
+}
+
+function getStainBackground(edge: RevealStainEdge, rgbText: string) {
+  return `radial-gradient(${STAIN_GRADIENT_SHAPES[edge]}, rgba(${rgbText}, 0.88) 0%, rgba(${rgbText}, 0.5) 46%, rgba(${rgbText}, 0.18) 72%, transparent 96%)`;
 }
 
 type BoardProps = {
@@ -87,6 +124,7 @@ type TileButtonProps = {
   isPressed: boolean;
   tile: Tile;
   tileRadiusClass: string;
+  stainEdges: RevealStainEdge[];
   visualMode: BoardProps["visualMode"];
   winWaveActive: boolean;
   winWaveDelay: number;
@@ -106,6 +144,7 @@ const TileButton = memo(function TileButton({
   isPressed,
   tile,
   tileRadiusClass,
+  stainEdges,
   visualMode,
   winWaveActive,
   winWaveDelay,
@@ -136,6 +175,8 @@ const TileButton = memo(function TileButton({
     setIsHovering(true);
     setTilt({ rotateX, rotateY });
   };
+
+  const tileRgbText = getRgbText(tile.color);
 
   return (
     <motion.button
@@ -201,9 +242,25 @@ const TileButton = memo(function TileButton({
       className={`tile-surface relative aspect-square border border-white/75 ${tileRadiusClass} ${
         isDragging ? "pointer-events-none" : ""
       } ${canDrag && !interactionDisabled ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
-      style={{ backgroundColor: tile.color, touchAction: "none" }}
+      style={{
+        backgroundColor: getVisualModeBackgroundColor(tile.color, visualMode),
+        touchAction: "none",
+      }}
       aria-label={`Tile ${index + 1}${tile.isCorner ? ", fixed corner tile" : ""}${isCorrect ? ", correct position" : ""}${!canDrag && !tile.isCorner ? ", locked" : ""}`}
     >
+      {stainEdges.length > 0 && (
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+          {stainEdges.map((edge) => (
+            <span
+              key={edge}
+              className={`absolute ${STAIN_CLASS_NAMES[edge]}`}
+              style={{
+                background: getStainBackground(edge, tileRgbText),
+              }}
+            />
+          ))}
+        </span>
+      )}
       <span aria-hidden="true" className="tile-glass-sheen" />
       {isCorrect && (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -222,6 +279,7 @@ const TileButton = memo(function TileButton({
     previousProps.isCorrect === nextProps.isCorrect &&
     previousProps.isDragging === nextProps.isDragging &&
     previousProps.isPressed === nextProps.isPressed &&
+    previousProps.stainEdges.join(",") === nextProps.stainEdges.join(",") &&
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
     previousProps.visualMode === nextProps.visualMode &&
@@ -256,6 +314,14 @@ export const GameBoard = memo(function GameBoard({
   const size = Math.sqrt(board.length);
   const initialOverlayX = dragSession ? dragSession.pointerX - dragSession.offsetX : 0;
   const initialOverlayY = dragSession ? dragSession.pointerY - dragSession.offsetY : 0;
+  const dragTile = dragSession ? board[dragSession.index] : undefined;
+  const dragOverlayVisualMode =
+    visualMode === "grayscale" &&
+    dragSession &&
+    dragTile &&
+    isTileCorrect(dragTile, dragSession.index)
+      ? "color"
+      : visualMode;
   const dragOverlay =
     dragSession && typeof document !== "undefined"
       ? createPortal(
@@ -272,7 +338,7 @@ export const GameBoard = memo(function GameBoard({
               top: 0,
               transform: `translate3d(${initialOverlayX}px, ${initialOverlayY}px, 0) scale(${TILE_DRAG_SCALE}) rotate(0deg)`,
               transition: "transform 110ms cubic-bezier(0.22, 1, 0.36, 1), filter 240ms ease",
-              filter: visualMode === "grayscale" ? "grayscale(1)" : "none",
+              filter: dragOverlayVisualMode === "grayscale" ? "grayscale(1)" : "none",
               width: `${dragSession.width}px`,
               zIndex: 50,
             }}
@@ -339,6 +405,16 @@ export const GameBoard = memo(function GameBoard({
                 !interactionDisabled &&
                 (allowHoverWhenLocked || (!winState && !loseState && (canDrag || isCorrect)));
               const columnIndex = index % size;
+              const hasRevealSplash =
+                visualMode === "grayscale" && isBlackAndWhiteTileInRevealSplash(board, index, size);
+              const stainEdges =
+                visualMode === "grayscale"
+                  ? getBlackAndWhiteRevealStainEdges(board, index, size)
+                  : [];
+              const tileVisualMode =
+                hasRevealSplash && isCorrect
+                  ? "color"
+                  : visualMode;
 
               return (
                 <TileButton
@@ -352,7 +428,8 @@ export const GameBoard = memo(function GameBoard({
                   isPressed={pressedTileIndex === index}
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
-                  visualMode={visualMode}
+                  stainEdges={stainEdges}
+                  visualMode={tileVisualMode}
                   winWaveActive={winWaveActive}
                   winWaveDelay={columnIndex * 0.045}
                   winState={winState}

@@ -11,6 +11,7 @@ import {
   clamp,
   formatTime,
   generateSolvedBoard,
+  getBlackAndWhiteRevealStainEdges,
   getGameModeConfig,
   getBoardDensityClass,
   getEndlessPuzzleSize,
@@ -22,6 +23,7 @@ import {
   hexToRgb,
   hslToHex,
   interpolateHue,
+  isBlackAndWhiteTileInRevealSplash,
   isBlackAndWhiteMode,
   isSolved,
   isTileLocked,
@@ -32,6 +34,16 @@ import type { Tile } from "../app/game/game-types";
 
 function buildSolvedBoard(size = 4) {
   return generateSolvedBoard(size, ["#ff0000", "#00ff00", "#0000ff", "#ffffff"]);
+}
+
+function buildBoardWithCorrectIndexes(size: number, correctIndexes: number[]): Tile[] {
+  return Array.from({ length: size * size }, (_, index) => ({
+    id: `tile-${index}`,
+    color: "#000000",
+    correctIndex: correctIndexes.includes(index) ? index : -1,
+    currentIndex: index,
+    isCorner: false,
+  }));
 }
 
 function withMockedRandom(values: number[], callback: () => void) {
@@ -143,6 +155,61 @@ test("isTileLocked only locks corners and correct tiles", () => {
   assert.equal(isTileLocked(solvedBoard[0], 0), true);
   assert.equal(isTileLocked(movableTile, 1), true);
   assert.equal(isTileLocked(swappedBoard[1], 1), false);
+});
+
+test("black and white reveal splash includes a correct center tile and its side neighbors", () => {
+  const board = buildBoardWithCorrectIndexes(4, [5]);
+
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 5, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 1, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 4, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 6, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 9, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 0, 4), false);
+});
+
+test("black and white reveal splash includes only valid side neighbors for a correct corner tile", () => {
+  const board = buildBoardWithCorrectIndexes(4, [0]);
+
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 0, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 1, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 4, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 3, 4), false);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 5, 4), false);
+});
+
+test("black and white reveal splash does not wrap across row edges", () => {
+  const board = buildBoardWithCorrectIndexes(4, [3]);
+
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 3, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 2, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 7, 4), true);
+  assert.equal(isBlackAndWhiteTileInRevealSplash(board, 4, 4), false);
+});
+
+test("black and white reveal stains point toward correct neighbor tiles", () => {
+  const board = buildBoardWithCorrectIndexes(4, [1, 4, 6, 9]);
+
+  assert.deepEqual(getBlackAndWhiteRevealStainEdges(board, 5, 4), [
+    "top",
+    "bottom",
+    "left",
+    "right",
+  ]);
+});
+
+test("black and white reveal stains do not appear on correct tiles", () => {
+  const board = buildBoardWithCorrectIndexes(4, [5]);
+
+  assert.deepEqual(getBlackAndWhiteRevealStainEdges(board, 5, 4), []);
+});
+
+test("black and white reveal splash reaches every position on a solved board", () => {
+  const board = buildSolvedBoard(4);
+
+  board.forEach((_, index) => {
+    assert.equal(isBlackAndWhiteTileInRevealSplash(board, index, 4), true);
+  });
 });
 
 test("formatTime uses compact stopwatch formatting", () => {
