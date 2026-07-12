@@ -5,7 +5,6 @@ import {
   ModeStyle,
   PresetDifficultyKey,
   PresetModeKey,
-  RevealStainEdge,
   Tile,
 } from "./game-types";
 
@@ -155,6 +154,14 @@ export function getEndlessSwapBudget(size: number, streak: number) {
 
 export function getEndlessThreeStarMoveLimit(swapBudget: number) {
   return Math.ceil(swapBudget * 0.7);
+}
+
+export function getEndlessPuzzleStyle(size: number, randomValue = Math.random()): ModeStyle {
+  if (size !== PRESET_DIFFICULTIES.hard.size) {
+    return "color";
+  }
+
+  return randomValue < 0.3 ? "black-and-white" : "color";
 }
 
 export function getEndlessConfig(puzzleNumber: number): DifficultyConfig {
@@ -425,36 +432,6 @@ export function isSolved(board: Tile[]): boolean {
 
 export function isTileCorrect(tile: Tile, index: number): boolean {
   return tile.correctIndex === index;
-}
-
-export function getBlackAndWhiteRevealStainEdges(board: Tile[], index: number, size: number): RevealStainEdge[] {
-  const tile = board[index];
-  if (!tile || isTileCorrect(tile, index)) {
-    return [];
-  }
-
-  const stainSources: Array<{ edge: RevealStainEdge; index: number }> = [
-    { edge: "top", index: index - size },
-    { edge: "bottom", index: index + size },
-    { edge: "left", index: index % size === 0 ? -1 : index - 1 },
-    { edge: "right", index: index % size === size - 1 ? -1 : index + 1 },
-  ];
-
-  return stainSources
-    .filter(({ index: sourceIndex }) => {
-      const sourceTile = board[sourceIndex];
-      return sourceTile !== undefined && isTileCorrect(sourceTile, sourceIndex);
-    })
-    .map(({ edge }) => edge);
-}
-
-export function isBlackAndWhiteTileInRevealSplash(board: Tile[], index: number, size: number): boolean {
-  const tile = board[index];
-  if (!tile) {
-    return false;
-  }
-
-  return isTileCorrect(tile, index) || getBlackAndWhiteRevealStainEdges(board, index, size).length > 0;
 }
 
 export function isTileLocked(tile: Tile, index: number): boolean {

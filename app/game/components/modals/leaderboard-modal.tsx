@@ -3,19 +3,23 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 
 import {
-  LEADERBOARD_DIFFICULTIES,
+  getLeaderboardDifficultyForFamily,
+  LEADERBOARD_MODE_FAMILIES,
+  LEADERBOARD_PRESET_DIFFICULTIES,
   type LeaderboardDifficulty,
+  type LeaderboardModeFamily,
 } from "../../leaderboard";
 import { DIFFICULTY_LABELS, formatTime } from "../../game-logic";
+import type { PresetDifficultyKey } from "../../game-types";
 
 type LeaderboardCategoryId = "fastest" | "moves" | "streaks";
+type SolveLeaderboardCategoryId = Exclude<LeaderboardCategoryId, "streaks">;
 
 type LeaderboardCategory = {
   id: LeaderboardCategoryId;
   label: string;
   title: string;
   metricLabel: string;
-  modes: LeaderboardDifficulty[];
 };
 
 type LeaderboardApiRow = {
@@ -34,23 +38,31 @@ const LEADERBOARD_CATEGORIES: LeaderboardCategory[] = [
     label: "Fastest solves",
     title: "Fastest solves",
     metricLabel: "Time",
-    modes: LEADERBOARD_DIFFICULTIES.filter((difficulty) => difficulty !== "endless"),
   },
   {
     id: "moves",
     label: "Fewest moves",
     title: "Fewest moves",
     metricLabel: "Moves",
-    modes: LEADERBOARD_DIFFICULTIES.filter((difficulty) => difficulty !== "endless"),
   },
   {
     id: "streaks",
     label: "Best streaks",
     title: "Best streaks",
     metricLabel: "Puzzles beaten",
-    modes: ["endless"],
   },
 ];
+
+const LEADERBOARD_MODE_FAMILY_LABELS: Record<LeaderboardModeFamily, string> = {
+  color: "Classic",
+  "black-and-white": "B&W",
+};
+
+function isSolveCategoryId(
+  categoryId: LeaderboardCategoryId,
+): categoryId is SolveLeaderboardCategoryId {
+  return categoryId !== "streaks";
+}
 
 function getLeaderboardRank(position: number) {
   const value = position + 1;
@@ -98,10 +110,13 @@ export function LeaderboardModal({
   onClose,
 }: Readonly<LeaderboardModalProps>) {
   const [activeCategoryId, setActiveCategoryId] = useState<LeaderboardCategoryId>("fastest");
-  const [selectedModes, setSelectedModes] = useState<Record<LeaderboardCategoryId, LeaderboardDifficulty>>({
+  const [selectedFamilies, setSelectedFamilies] = useState<Record<SolveLeaderboardCategoryId, LeaderboardModeFamily>>({
+    fastest: "color",
+    moves: "color",
+  });
+  const [selectedDifficulties, setSelectedDifficulties] = useState<Record<SolveLeaderboardCategoryId, PresetDifficultyKey>>({
     fastest: "normal",
     moves: "normal",
-    streaks: "endless",
   });
   const [rows, setRows] = useState<LeaderboardApiRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -125,7 +140,12 @@ export function LeaderboardModal({
   const activeCategory =
     LEADERBOARD_CATEGORIES.find((category) => category.id === activeCategoryId) ??
     LEADERBOARD_CATEGORIES[0];
-  const activeMode = selectedModes[activeCategory.id];
+  const activeMode = isSolveCategoryId(activeCategory.id)
+    ? getLeaderboardDifficultyForFamily(
+        selectedFamilies[activeCategory.id],
+        selectedDifficulties[activeCategory.id],
+      )
+    : "endless";
 
   useEffect(() => {
     if (!isOpen) {
@@ -235,29 +255,57 @@ export function LeaderboardModal({
             </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-            {activeCategory.modes.map((mode) => {
-              const isActive = selectedModes[activeCategory.id] === mode;
+          {isSolveCategoryId(activeCategory.id) && (
+            <>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                {LEADERBOARD_MODE_FAMILIES.map((family) => {
+                  const isActive = selectedFamilies[activeCategory.id] === family;
 
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() =>
-                    setSelectedModes((currentModes) => ({
-                      ...currentModes,
-                      [activeCategory.id]: mode,
-                    }))
-                  }
-                  className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
-                    isActive ? "theme-button-primary" : "theme-button-secondary"
-                  }`}
-                >
-                  {DIFFICULTY_LABELS[mode]}
-                </button>
-              );
-            })}
-          </div>
+                  return (
+                    <button
+                      key={family}
+                      type="button"
+                      onClick={() =>
+                        setSelectedFamilies((currentFamilies) => ({
+                          ...currentFamilies,
+                          [activeCategory.id]: family,
+                        }))
+                      }
+                      className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
+                        isActive ? "theme-button-primary" : "theme-button-secondary"
+                      }`}
+                    >
+                      {LEADERBOARD_MODE_FAMILY_LABELS[family]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+                {LEADERBOARD_PRESET_DIFFICULTIES.map((difficulty) => {
+                  const isActive = selectedDifficulties[activeCategory.id] === difficulty;
+
+                  return (
+                    <button
+                      key={difficulty}
+                      type="button"
+                      onClick={() =>
+                        setSelectedDifficulties((currentDifficulties) => ({
+                          ...currentDifficulties,
+                          [activeCategory.id]: difficulty,
+                        }))
+                      }
+                      className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
+                        isActive ? "theme-button-primary" : "theme-button-secondary"
+                      }`}
+                    >
+                      {DIFFICULTY_LABELS[difficulty]}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           <div className="mt-5 flex max-h-[20rem] flex-col gap-2 overflow-hidden">
             {isLoading && (

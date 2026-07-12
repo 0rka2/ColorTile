@@ -29,6 +29,7 @@ import {
   generateSolvedBoard,
   getBoardDensityClass,
   getEndlessConfig,
+  getEndlessPuzzleStyle,
   getEndlessSwapBudget,
   getEndlessThreeStarMoveLimit,
   getGameModeConfig,
@@ -38,7 +39,7 @@ import {
   isTileLocked,
   scrambleBoard,
 } from "./game/game-logic";
-import type { BestStats, DifficultyConfig, DifficultyKey, Tile } from "./game/game-types";
+import type { BestStats, DifficultyConfig, DifficultyKey, ModeStyle, Tile } from "./game/game-types";
 import { getGradientQuality } from "./game/gradient-quality";
 import { countdownSound, timeUpSound } from "./lib/sounds";
 import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./game/personal-best";
@@ -258,6 +259,7 @@ export default function Home() {
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
   const [endlessPuzzleNumber, setEndlessPuzzleNumber] = useState(1);
+  const [endlessPuzzleStyle, setEndlessPuzzleStyle] = useState<ModeStyle>("color");
   const [endlessStreak, setEndlessStreak] = useState(0);
   const [endlessLastClear, setEndlessLastClear] = useState<{
     isThreeStar: boolean;
@@ -296,7 +298,10 @@ export default function Home() {
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
   const currentBest = bestStats[difficulty];
   const isEndlessMode = difficulty === "endless";
-  const isBlackAndWhiteRun = isBlackAndWhiteMode(difficulty);
+  const isBlackAndWhiteRun =
+    isBlackAndWhiteMode(difficulty) ||
+    (isEndlessMode && endlessPuzzleStyle === "black-and-white");
+  const endlessPuzzleStyleLabel = endlessPuzzleStyle === "black-and-white" ? "B&W" : "Classic";
   const endlessSwapBudget = getEndlessSwapBudget(activeConfig.size, endlessStreak);
   const endlessThreeStarMoveLimit = getEndlessThreeStarMoveLimit(endlessSwapBudget);
   const bestSolveTime = getBestSolveTime(currentBest, activeConfig.time);
@@ -431,7 +436,7 @@ export default function Home() {
     setPreviewCountdown(null);
   }, []);
 
-  const startGame = useCallback((config: DifficultyConfig) => {
+  const startGame = useCallback((config: DifficultyConfig, useBlackAndWhitePreview: boolean) => {
     const corners = generateCornerColors(config.size);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
     const nextBoard = scrambleBoard(nextSolvedBoard);
@@ -450,7 +455,7 @@ export default function Home() {
     setEndlessLastClear(null);
     setBoardVisualMode("color");
 
-    if (isBlackAndWhiteMode(difficulty)) {
+    if (useBlackAndWhitePreview) {
       setPreviewActive(true);
       setPreviewCountdown(3);
       setTimerStarted(false);
@@ -476,14 +481,14 @@ export default function Home() {
 
     setPreviewActive(false);
     setTimerStarted(true);
-  }, [clearBlackAndWhitePreview, clearDragSession, clearPendingSwapAnimation, difficulty, resetWinSequence, updateBoard]);
+  }, [clearBlackAndWhitePreview, clearDragSession, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
 
   useEffect(() => {
     if (difficulty === "endless") {
       return;
     }
 
-    startGame(activeConfig);
+    startGame(activeConfig, isBlackAndWhiteMode(difficulty));
   }, [difficulty, startGame]);
 
   useEffect(() => {
@@ -589,7 +594,10 @@ export default function Home() {
     setLoseState(false);
     timeUpSound.play();
     clearDragSessionRef.current();
-    startGame(getEndlessConfig(1));
+    const nextConfig = getEndlessConfig(1);
+    const nextStyle = getEndlessPuzzleStyle(nextConfig.size);
+    setEndlessPuzzleStyle(nextStyle);
+    startGame(nextConfig, nextStyle === "black-and-white");
   }, [board, endlessSwapBudget, isEndlessMode, loseState, moves, startGame, winState]);
 
   useEffect(() => {
@@ -643,7 +651,7 @@ export default function Home() {
     resetWinSequence();
 
     if (nextDifficulty === difficulty) {
-      startGame(getGameModeConfig(nextDifficulty));
+      startGame(getGameModeConfig(nextDifficulty), isBlackAndWhiteMode(nextDifficulty));
       return;
     }
 
@@ -656,19 +664,25 @@ export default function Home() {
     setBoardVisualMode("color");
     setDifficulty("endless");
     setEndlessPuzzleNumber(1);
+    const nextConfig = getEndlessConfig(1);
+    const nextStyle = getEndlessPuzzleStyle(nextConfig.size);
+    setEndlessPuzzleStyle(nextStyle);
     setEndlessStreak(0);
-    startGame(getEndlessConfig(1));
+    startGame(nextConfig, nextStyle === "black-and-white");
   };
 
   const handleEndlessReplay = () => {
-    startGame(activeConfig);
+    startGame(activeConfig, endlessPuzzleStyle === "black-and-white");
   };
 
   const handleEndlessNextPuzzle = () => {
     const nextPuzzleNumber = endlessPuzzleNumber + 1;
+    const nextConfig = getEndlessConfig(nextPuzzleNumber);
+    const nextStyle = getEndlessPuzzleStyle(nextConfig.size);
 
     setEndlessPuzzleNumber(nextPuzzleNumber);
-    startGame(getEndlessConfig(nextPuzzleNumber));
+    setEndlessPuzzleStyle(nextStyle);
+    startGame(nextConfig, nextStyle === "black-and-white");
   };
 
   const handleEndlessBack = () => {
@@ -782,6 +796,7 @@ export default function Home() {
               bestTimeDisplay={bestTimeDisplay}
               endlessInfo={isEndlessMode ? {
                 puzzleNumber: endlessPuzzleNumber,
+                styleLabel: endlessPuzzleStyleLabel,
                 swapBudget: endlessSwapBudget,
               } : undefined}
               gradientQuality={gradientQuality}
@@ -840,7 +855,7 @@ export default function Home() {
           >
             <button
               type="button"
-              onClick={() => startGame(activeConfig)}
+              onClick={() => startGame(activeConfig, isBlackAndWhiteRun)}
               aria-label="Restart game"
               className="theme-button-primary restart-button font-fredoka-strong flex h-14 w-full max-w-[20rem] items-center justify-center gap-2 rounded-full px-7 py-3 text-base shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
             >
@@ -878,7 +893,7 @@ export default function Home() {
             }
             loseState={loseState}
             moves={moves}
-            onRestart={() => startGame(activeConfig)}
+            onRestart={() => startGame(activeConfig, isBlackAndWhiteRun)}
             personalBestStatus={personalBestStatus}
             timeDisplay={formatTime(solveTime)}
             winState={winModalVisible}

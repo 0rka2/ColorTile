@@ -8,6 +8,7 @@ type HudProps = {
   bestTimeDisplay: string;
   endlessInfo?: {
     puzzleNumber: number;
+    styleLabel: string;
     swapBudget: number;
   };
   gradientQuality: number;
@@ -72,7 +73,9 @@ export function GameHud({
   const qualityFill = getGradientQualityFill(animatedQuality);
   const moveDisplay = endlessInfo ? `${moves}/${endlessInfo.swapBudget}` : moves;
   const moveLabel = endlessInfo ? "Swaps" : "Moves";
-  const progressLabel = endlessInfo ? `Puzzle ${endlessInfo.puzzleNumber}` : "Progress";
+  const progressLabel = endlessInfo
+    ? `Puzzle ${endlessInfo.puzzleNumber} · ${endlessInfo.styleLabel}`
+    : "Progress";
 
   return (
     <section className="flex w-full max-w-none flex-col gap-[clamp(0.3rem,0.7vw,0.75rem)]">

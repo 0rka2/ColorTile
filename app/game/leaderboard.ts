@@ -1,8 +1,10 @@
 import {
   BLACK_AND_WHITE_PRESET_MODE_KEYS,
   COLOR_PRESET_MODE_KEYS,
+  getPresetModeKey,
+  PRESET_MODE_DIFFICULTIES,
 } from "./game-logic";
-import type { DifficultyKey } from "./game-types";
+import type { DifficultyKey, ModeStyle, PresetDifficultyKey } from "./game-types";
 
 export const LEADERBOARD_CATEGORIES = ["fastest", "moves", "streaks"] as const;
 export type LeaderboardCategory = (typeof LEADERBOARD_CATEGORIES)[number];
@@ -14,6 +16,22 @@ export const LEADERBOARD_DIFFICULTIES = [
 ] as const satisfies readonly DifficultyKey[];
 
 export type LeaderboardDifficulty = (typeof LEADERBOARD_DIFFICULTIES)[number];
+
+export const LEADERBOARD_MODE_FAMILIES = [
+  "color",
+  "black-and-white",
+] as const satisfies readonly ModeStyle[];
+
+export type LeaderboardModeFamily = (typeof LEADERBOARD_MODE_FAMILIES)[number];
+
+export const LEADERBOARD_PRESET_DIFFICULTIES = PRESET_MODE_DIFFICULTIES;
+
+export function getLeaderboardDifficultyForFamily(
+  family: LeaderboardModeFamily,
+  difficulty: PresetDifficultyKey,
+): LeaderboardDifficulty {
+  return getPresetModeKey(family, difficulty);
+}
 
 export function isLeaderboardCategory(value: string | null): value is LeaderboardCategory {
   return value !== null && LEADERBOARD_CATEGORIES.includes(value as LeaderboardCategory);

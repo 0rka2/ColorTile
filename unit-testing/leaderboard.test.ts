@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   canUseLeaderboardCategory,
+  getLeaderboardDifficultyForFamily,
   isLeaderboardDifficulty,
 } from "../app/game/leaderboard";
 
@@ -16,4 +17,12 @@ test("black and white modes are valid for solve leaderboards and invalid for str
   assert.equal(canUseLeaderboardCategory("moves", "black-and-white-extreme"), true);
   assert.equal(canUseLeaderboardCategory("streaks", "black-and-white-hard"), false);
   assert.equal(canUseLeaderboardCategory("streaks", "endless"), true);
+});
+
+test("leaderboard mode family helper resolves preset difficulty keys", () => {
+  assert.equal(getLeaderboardDifficultyForFamily("color", "hard"), "hard");
+  assert.equal(
+    getLeaderboardDifficultyForFamily("black-and-white", "hard"),
+    "black-and-white-hard",
+  );
 });

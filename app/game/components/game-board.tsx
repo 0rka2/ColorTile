@@ -4,11 +4,10 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { hoverSound } from "../../lib/sounds";
 import {
-  getBlackAndWhiteRevealStainEdges,
+  hexToHsl,
   hexToRgb,
-  isBlackAndWhiteTileInRevealSplash,
 } from "../game-logic";
-import type { RevealStainEdge, Tile } from "../game-types";
+import type { Tile } from "../game-types";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
@@ -25,18 +24,16 @@ const TILE_INTERACTION_SPRING = {
   damping: 30,
   mass: 0.58,
 };
-const STAIN_CLASS_NAMES: Record<RevealStainEdge, string> = {
-  top: "inset-x-0 top-0 h-[68%]",
-  right: "inset-y-0 right-0 w-[68%]",
-  bottom: "inset-x-0 bottom-0 h-[68%]",
-  left: "inset-y-0 left-0 w-[68%]",
-};
-const STAIN_GRADIENT_SHAPES: Record<RevealStainEdge, string> = {
-  top: "ellipse 92% 112% at top",
-  right: "ellipse 112% 92% at right",
-  bottom: "ellipse 92% 112% at bottom",
-  left: "ellipse 112% 92% at left",
-};
+const COLOR_FAMILY_HINTS = [
+  { maxHue: 22, color: "#fb7185" },
+  { maxHue: 52, color: "#fb923c" },
+  { maxHue: 82, color: "#facc15" },
+  { maxHue: 160, color: "#34d399" },
+  { maxHue: 215, color: "#38bdf8" },
+  { maxHue: 270, color: "#818cf8" },
+  { maxHue: 330, color: "#c084fc" },
+  { maxHue: 360, color: "#fb7185" },
+];
 
 function CheckMark() {
   return (
@@ -70,13 +67,9 @@ function getVisualModeBackgroundColor(color: string, visualMode: "color" | "gray
   return `rgb(${gentleGray}, ${gentleGray}, ${gentleGray})`;
 }
 
-function getRgbText(color: string) {
-  const { r, g, b } = hexToRgb(color);
-  return `${r}, ${g}, ${b}`;
-}
-
-function getStainBackground(edge: RevealStainEdge, rgbText: string) {
-  return `radial-gradient(${STAIN_GRADIENT_SHAPES[edge]}, rgba(${rgbText}, 0.88) 0%, rgba(${rgbText}, 0.5) 46%, rgba(${rgbText}, 0.18) 72%, transparent 96%)`;
+function getColorFamilyHintColor(color: string) {
+  const { h } = hexToHsl(color);
+  return COLOR_FAMILY_HINTS.find(({ maxHue }) => h <= maxHue)?.color ?? COLOR_FAMILY_HINTS[0].color;
 }
 
 type BoardProps = {
@@ -124,7 +117,6 @@ type TileButtonProps = {
   isPressed: boolean;
   tile: Tile;
   tileRadiusClass: string;
-  stainEdges: RevealStainEdge[];
   visualMode: BoardProps["visualMode"];
   winWaveActive: boolean;
   winWaveDelay: number;
@@ -144,7 +136,6 @@ const TileButton = memo(function TileButton({
   isPressed,
   tile,
   tileRadiusClass,
-  stainEdges,
   visualMode,
   winWaveActive,
   winWaveDelay,
@@ -176,7 +167,7 @@ const TileButton = memo(function TileButton({
     setTilt({ rotateX, rotateY });
   };
 
-  const tileRgbText = getRgbText(tile.color);
+  const showColorFamilyHint = visualMode === "grayscale" && !isCorrect;
 
   return (
     <motion.button
@@ -248,22 +239,25 @@ const TileButton = memo(function TileButton({
       }}
       aria-label={`Tile ${index + 1}${tile.isCorner ? ", fixed corner tile" : ""}${isCorrect ? ", correct position" : ""}${!canDrag && !tile.isCorner ? ", locked" : ""}`}
     >
-      {stainEdges.length > 0 && (
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
-          {stainEdges.map((edge) => (
-            <span
-              key={edge}
-              className={`absolute ${STAIN_CLASS_NAMES[edge]}`}
-              style={{
-                background: getStainBackground(edge, tileRgbText),
-              }}
-            />
-          ))}
-        </span>
+      {showColorFamilyHint && (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-0 ${tileRadiusClass}`}
+          style={{
+            boxShadow: `inset 0 0 0 3px ${getColorFamilyHintColor(tile.color)}`,
+          }}
+        />
       )}
       <span aria-hidden="true" className="tile-glass-sheen" />
       {isCorrect && (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <motion.span
+            aria-hidden="true"
+            className={`absolute inset-[-12%] ${tileRadiusClass} border-4 border-white/60`}
+            initial={{ opacity: 0.72, scale: 0.82 }}
+            animate={{ opacity: 0, scale: 1.12 }}
+            transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
+          />
           <CheckMark />
         </span>
       )}
@@ -279,7 +273,6 @@ const TileButton = memo(function TileButton({
     previousProps.isCorrect === nextProps.isCorrect &&
     previousProps.isDragging === nextProps.isDragging &&
     previousProps.isPressed === nextProps.isPressed &&
-    previousProps.stainEdges.join(",") === nextProps.stainEdges.join(",") &&
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
     previousProps.visualMode === nextProps.visualMode &&
@@ -405,16 +398,7 @@ export const GameBoard = memo(function GameBoard({
                 !interactionDisabled &&
                 (allowHoverWhenLocked || (!winState && !loseState && (canDrag || isCorrect)));
               const columnIndex = index % size;
-              const hasRevealSplash =
-                visualMode === "grayscale" && isBlackAndWhiteTileInRevealSplash(board, index, size);
-              const stainEdges =
-                visualMode === "grayscale"
-                  ? getBlackAndWhiteRevealStainEdges(board, index, size)
-                  : [];
-              const tileVisualMode =
-                hasRevealSplash && isCorrect
-                  ? "color"
-                  : visualMode;
+              const tileVisualMode = visualMode === "grayscale" && isCorrect ? "color" : visualMode;
 
               return (
                 <TileButton
@@ -428,7 +412,6 @@ export const GameBoard = memo(function GameBoard({
                   isPressed={pressedTileIndex === index}
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
-                  stainEdges={stainEdges}
                   visualMode={tileVisualMode}
                   winWaveActive={winWaveActive}
                   winWaveDelay={columnIndex * 0.045}

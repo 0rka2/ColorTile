@@ -10,8 +10,6 @@ export type PresetDifficultyKey = "normal" | "hard" | "expert" | "extreme";
 
 export type ModeStyle = "color" | "black-and-white";
 
-export type RevealStainEdge = "top" | "right" | "bottom" | "left";
-
 export type BlackAndWhiteModeKey =
   | "black-and-white-normal"
   | "black-and-white-hard"
