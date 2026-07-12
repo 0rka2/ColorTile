@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { FaShoppingCart } from "react-icons/fa";
 import { IoMdTrophy } from "react-icons/io";
+import { TbTargetArrow } from "react-icons/tb";
 import { VscStarFull } from "react-icons/vsc";
 
 import { GradientText } from "../components/ui/gradient-text";
@@ -756,6 +757,14 @@ export default function Home() {
         <section ref={contentRef} className="relative flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
           <div className="fixed left-[clamp(0.75rem,3vw,2rem)] top-1/2 z-10 -translate-y-1/2">
             <motion.div {...hudFeedbackMotion} className="flex flex-col gap-3">
+              <button
+                type="button"
+                aria-label="Daily puzzle"
+                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              >
+                <TbTargetArrow className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setModeModalOpen(true)}
