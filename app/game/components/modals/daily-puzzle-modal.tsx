@@ -1,9 +1,32 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 
 import { formatTime } from "../../game-logic";
 import type { DailyPuzzleRecord, ModeStyle } from "../../game-types";
+
+function getDailyResetSeconds() {
+  const now = new Date();
+  const nextReset = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+
+  return Math.max(0, Math.ceil((nextReset - now.getTime()) / 1000));
+}
+
+function formatDailyResetTime(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
 
 type DailyPuzzleModalProps = {
   dateKey: string;
@@ -26,6 +49,8 @@ export function DailyPuzzleModal({
   style,
   swapBudget,
 }: Readonly<DailyPuzzleModalProps>) {
+  const [resetSeconds, setResetSeconds] = useState(getDailyResetSeconds);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -40,6 +65,19 @@ export function DailyPuzzleModal({
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setResetSeconds(getDailyResetSeconds());
+    const intervalId = window.setInterval(() => {
+      setResetSeconds(getDailyResetSeconds());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isOpen]);
 
   if (!isOpen || typeof document === "undefined") {
     return null;
@@ -65,7 +103,7 @@ export function DailyPuzzleModal({
         role="dialog"
         aria-modal="true"
         aria-label="Daily puzzle"
-        className="theme-modal relative w-full max-w-[30rem] rounded-[1.5rem] border p-6 sm:rounded-[1.75rem] sm:p-8"
+        className="theme-modal relative max-h-[calc(100dvh-1.5rem)] w-full max-w-[38rem] overflow-y-auto rounded-[1.5rem] border p-[clamp(1.25rem,4vw,2.5rem)] sm:rounded-[1.75rem]"
         initial={{ opacity: 0, y: 18, scale: 0.94 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
@@ -79,47 +117,52 @@ export function DailyPuzzleModal({
           {"\u00D7"}
         </button>
 
-        <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.24em]">
-          {dateKey}
-        </p>
-        <h2 className="theme-text-primary font-fredoka-display mt-3 text-[2rem] leading-none sm:text-[2.35rem]">
-          Daily Puzzle
-        </h2>
+        <div className="pr-14">
+          <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.24em] sm:text-[0.8rem]">
+            {dateKey}
+          </p>
+          <p className="theme-text-muted font-fredoka-regular mt-2 text-sm leading-5 sm:text-base">
+            Next in {formatDailyResetTime(resetSeconds)}
+          </p>
+          <h2 className="theme-text-primary font-fredoka-display mt-4 text-[2.35rem] leading-none sm:text-[3rem]">
+            Daily Puzzle
+          </h2>
+        </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-2 text-center">
-          <div className="theme-card rounded-[1rem] border px-2 py-3">
-            <p className="theme-text-primary font-fredoka-display text-xl leading-none">5x5</p>
-            <p className="theme-text-muted font-fredoka-regular mt-1 text-xs">size</p>
+        <div className="mt-7 grid grid-cols-3 gap-3 text-center sm:mt-8 sm:gap-4">
+          <div className="theme-card rounded-[1rem] border px-3 py-4 sm:rounded-[1.25rem] sm:px-4 sm:py-5">
+            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">5x5</p>
+            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">size</p>
           </div>
-          <div className="theme-card rounded-[1rem] border px-2 py-3">
-            <p className="theme-text-primary font-fredoka-display text-xl leading-none">{styleLabel}</p>
-            <p className="theme-text-muted font-fredoka-regular mt-1 text-xs">mode</p>
+          <div className="theme-card rounded-[1rem] border px-3 py-4 sm:rounded-[1.25rem] sm:px-4 sm:py-5">
+            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">{styleLabel}</p>
+            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">mode</p>
           </div>
-          <div className="theme-card rounded-[1rem] border px-2 py-3">
-            <p className="theme-text-primary font-fredoka-display text-xl leading-none">{swapBudget}</p>
-            <p className="theme-text-muted font-fredoka-regular mt-1 text-xs">swaps</p>
+          <div className="theme-card rounded-[1rem] border px-3 py-4 sm:rounded-[1.25rem] sm:px-4 sm:py-5">
+            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">{swapBudget}</p>
+            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">swaps</p>
           </div>
         </div>
 
-        <div className="theme-panel-muted mt-4 rounded-[1rem] p-4">
+        <div className="theme-panel-muted mt-5 rounded-[1.15rem] p-5 sm:mt-6 sm:rounded-[1.35rem] sm:p-6">
           {isFailed ? (
             <>
-              <p className="theme-text-primary font-fredoka-strong text-base">Swap limit reached</p>
-              <p className="theme-text-muted font-fredoka-regular mt-2 text-sm leading-6">
+              <p className="theme-text-primary font-fredoka-strong text-lg">Swap limit reached</p>
+              <p className="theme-text-muted font-fredoka-regular mt-3 text-base leading-7">
                 Today&apos;s puzzle is ready to replay with the same board.
               </p>
             </>
           ) : todaysRecord?.completed ? (
             <>
-              <p className="theme-text-primary font-fredoka-strong text-base">Completed today</p>
-              <p className="theme-text-muted font-fredoka-regular mt-2 text-sm leading-6">
+              <p className="theme-text-primary font-fredoka-strong text-lg">Completed today</p>
+              <p className="theme-text-muted font-fredoka-regular mt-3 text-base leading-7">
                 Best time {formatTime(todaysRecord.bestSolveTime ?? 0)}s | Fewest moves {todaysRecord.fewestMoves ?? "-"}.
               </p>
             </>
           ) : (
             <>
-              <p className="theme-text-primary font-fredoka-strong text-base">Today&apos;s challenge</p>
-              <p className="theme-text-muted font-fredoka-regular mt-2 text-sm leading-6">
+              <p className="theme-text-primary font-fredoka-strong text-lg">Today&apos;s challenge</p>
+              <p className="theme-text-muted font-fredoka-regular mt-3 text-base leading-7">
                 One puzzle for the day. Solve it before the swap limit and come back tomorrow for a new one.
               </p>
             </>
@@ -129,7 +172,7 @@ export function DailyPuzzleModal({
         <button
           type="button"
           onClick={onStart}
-          className="theme-button-primary font-fredoka-strong mt-5 w-full rounded-full px-5 py-3 text-sm sm:text-base"
+          className="theme-button-primary font-fredoka-strong mt-6 flex min-h-14 w-full items-center justify-center rounded-full px-6 py-3 text-base sm:min-h-16 sm:text-lg"
         >
           {actionLabel}
         </button>
