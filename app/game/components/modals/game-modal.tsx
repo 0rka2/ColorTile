@@ -94,6 +94,11 @@ type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
   completion: number;
+  dailyResult?: {
+    onBack: () => void;
+    onReplay: () => void;
+    swapBudget: number;
+  };
   endlessResult?: {
     isThreeStar: boolean;
     onBack: () => void;
@@ -115,6 +120,7 @@ export function GameModal({
   activeConfig,
   accuracy,
   completion,
+  dailyResult,
   endlessResult,
   loseState,
   moves,
@@ -145,7 +151,50 @@ export function GameModal({
       >
         <div className="relative z-10 flex flex-col">
           {winState ? (
-            endlessResult ? (
+            dailyResult ? (
+              <div className="mx-auto max-w-lg">
+                <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Daily Puzzle</p>
+                <h2 className="theme-text-primary font-fredoka-display mt-3 text-[2rem] leading-none sm:text-[2.4rem]">
+                  Cleared
+                </h2>
+                <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.18em] text-emerald-500 sm:mt-5 sm:text-lg">
+                  {renderStars(3)}
+                </div>
+                <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.95rem] leading-6 sm:text-[1.05rem] sm:leading-7">
+                  Today&apos;s puzzle cleared in {moves} swaps.
+                </p>
+                <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
+                  <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{timeDisplay}</p>
+                  </div>
+                  <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Swaps</p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{moves}/{dailyResult.swapBudget}</p>
+                  </div>
+                  <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Progress</p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{completion}%</p>
+                  </div>
+                </div>
+                <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={dailyResult.onBack}
+                    className="theme-button-secondary font-fredoka-strong rounded-full px-5 py-3 text-sm sm:text-base"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={dailyResult.onReplay}
+                    className="theme-button-primary font-fredoka-strong rounded-full px-5 py-3 text-sm shadow-[0_18px_34px_rgba(15,23,42,0.2)] sm:text-base"
+                  >
+                    Replay Today
+                  </button>
+                </div>
+              </div>
+            ) : endlessResult ? (
               <div className="mx-auto max-w-lg">
                 <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Endless</p>
                 <h2 className="theme-text-primary font-fredoka-display mt-3 text-[2rem] leading-none sm:text-[2.4rem]">
@@ -259,7 +308,7 @@ export function GameModal({
             </div>
           )}
 
-          {!endlessResult && (
+          {!dailyResult && !endlessResult && (
             <button
               type="button"
               onClick={onRestart}

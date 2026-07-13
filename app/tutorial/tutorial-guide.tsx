@@ -811,6 +811,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           onPointerDown={handlePointerDown}
           pressedTileIndex={pressedTileIndex}
           setDragOverlayRef={setDragOverlayRef}
+          showCorrectTilePulse={false}
           tileRadiusClass={tileRadiusClass}
           visualMode="color"
           winState={!canInteractWithBoard}

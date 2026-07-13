@@ -11,6 +11,7 @@ import { GradientText } from "../components/ui/gradient-text";
 import { GameBoard } from "./game/components/game-board";
 import { GameControls } from "./game/components/game-controls";
 import { GameHud } from "./game/components/game-hud";
+import { DailyPuzzleModal } from "./game/components/modals/daily-puzzle-modal";
 import { GameModal } from "./game/components/modals/game-modal";
 import { GameModeModal } from "./game/components/modals/game-mode-modal";
 import { LeaderboardModal } from "./game/components/modals/leaderboard-modal";
@@ -19,16 +20,21 @@ import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
 import { useBoardSize } from "./game/hooks/use-board-size";
+import { usePersistentDailyPuzzle } from "./game/hooks/use-persistent-daily-puzzle";
 import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
 import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
 import { useWinSequence } from "./game/hooks/use-win-sequence";
 import type { LeaderboardDifficulty } from "./game/leaderboard";
 import {
   checkCompletion,
+  createSeededRandom,
   formatTime,
   generateCornerColors,
   generateSolvedBoard,
   getBoardDensityClass,
+  getDailyPuzzleConfig,
+  getDailyPuzzleDateKey,
+  getDailyPuzzleStyle,
   getEndlessConfig,
   getEndlessPuzzleStyle,
   getEndlessSwapBudget,
@@ -259,6 +265,10 @@ export default function Home() {
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
   const [loseState, setLoseState] = useState(false);
+  const [isDailyMode, setIsDailyMode] = useState(true);
+  const [dailyModalOpen, setDailyModalOpen] = useState(false);
+  const [dailyAttemptFailed, setDailyAttemptFailed] = useState(false);
+  const [dailyDateKey, setDailyDateKey] = useState(() => getDailyPuzzleDateKey());
   const [endlessPuzzleNumber, setEndlessPuzzleNumber] = useState(1);
   const [endlessPuzzleStyle, setEndlessPuzzleStyle] = useState<ModeStyle>("color");
   const [endlessStreak, setEndlessStreak] = useState(0);
@@ -288,20 +298,29 @@ export default function Home() {
   const blackAndWhitePreviewIntervalRef = useRef<number | null>(null);
 
   const { bestStats, setBestStats } = usePersistentBestStats();
+  const { dailyRecord, setDailyRecord } = usePersistentDailyPuzzle();
   const { endlessStats, setEndlessStats } = usePersistentEndlessStats();
 
+  const dailyConfig = getDailyPuzzleConfig();
+  const dailyPuzzleStyle = getDailyPuzzleStyle(createSeededRandom(`${dailyDateKey}:style`)());
+  const dailyPuzzleStyleLabel = dailyPuzzleStyle === "black-and-white" ? "B&W" : "Classic";
+  const dailySwapBudget = getEndlessSwapBudget(dailyConfig.size, 0);
+  const dailyRecordForToday = dailyRecord?.dateKey === dailyDateKey ? dailyRecord : null;
   const activeConfig =
-    difficulty === "endless"
+    isDailyMode
+      ? dailyConfig
+      : difficulty === "endless"
       ? getEndlessConfig(endlessPuzzleNumber)
       : getGameModeConfig(difficulty);
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
   const currentBest = bestStats[difficulty];
-  const isEndlessMode = difficulty === "endless";
-  const isBlackAndWhiteRun =
-    isBlackAndWhiteMode(difficulty) ||
-    (isEndlessMode && endlessPuzzleStyle === "black-and-white");
+  const isEndlessMode = !isDailyMode && difficulty === "endless";
+  const isBlackAndWhiteRun = isDailyMode
+    ? dailyPuzzleStyle === "black-and-white"
+    : isBlackAndWhiteMode(difficulty) ||
+      (isEndlessMode && endlessPuzzleStyle === "black-and-white");
   const endlessPuzzleStyleLabel = endlessPuzzleStyle === "black-and-white" ? "B&W" : "Classic";
   const endlessSwapBudget = getEndlessSwapBudget(activeConfig.size, endlessStreak);
   const endlessThreeStarMoveLimit = getEndlessThreeStarMoveLimit(endlessSwapBudget);
@@ -437,10 +456,10 @@ export default function Home() {
     setPreviewCountdown(null);
   }, []);
 
-  const startGame = useCallback((config: DifficultyConfig, useBlackAndWhitePreview: boolean) => {
-    const corners = generateCornerColors(config.size);
+  const startGame = useCallback((config: DifficultyConfig, useBlackAndWhitePreview: boolean, random = Math.random) => {
+    const corners = generateCornerColors(config.size, random);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
-    const nextBoard = scrambleBoard(nextSolvedBoard);
+    const nextBoard = scrambleBoard(nextSolvedBoard, random);
 
     clearBlackAndWhitePreview();
     clearDragSession();
@@ -485,12 +504,12 @@ export default function Home() {
   }, [clearBlackAndWhitePreview, clearDragSession, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
 
   useEffect(() => {
-    if (difficulty === "endless") {
+    if (isDailyMode || difficulty === "endless") {
       return;
     }
 
-    startGame(activeConfig, isBlackAndWhiteMode(difficulty));
-  }, [difficulty, startGame]);
+    startGame(getGameModeConfig(difficulty), isBlackAndWhiteMode(difficulty));
+  }, [difficulty, isDailyMode, startGame]);
 
   useEffect(() => {
     if (!board.length || winState || loseState) {
@@ -502,6 +521,29 @@ export default function Home() {
 
     if (nextCompletion === 100) {
       const finalSolveTime = timeLeft;
+
+      if (isDailyMode) {
+        setDailyRecord((currentRecord) => {
+          const isSameDay = currentRecord?.dateKey === dailyDateKey;
+          return {
+            bestSolveTime:
+              isSameDay && currentRecord.bestSolveTime !== undefined
+                ? Math.min(currentRecord.bestSolveTime, finalSolveTime)
+                : finalSolveTime,
+            completed: true,
+            dateKey: dailyDateKey,
+            fewestMoves:
+              isSameDay && currentRecord.fewestMoves !== undefined
+                ? Math.min(currentRecord.fewestMoves, moves)
+                : moves,
+            style: dailyPuzzleStyle,
+          };
+        });
+        setWinState(true);
+        setWinPhase("boardWave");
+        clearDragSession();
+        return;
+      }
 
       if (isEndlessMode) {
         const completedPuzzleNumber = endlessPuzzleNumber;
@@ -582,7 +624,7 @@ export default function Home() {
         };
       });
     }
-  }, [activeConfig.time, board, clearDragSession, currentBest, difficulty, endlessPuzzleNumber, endlessStats.bestStreak, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, isEndlessMode, loseState, moves, setBestStats, setEndlessStats, setWinPhase, timeLeft, winState]);
+  }, [activeConfig.time, board, clearDragSession, currentBest, dailyDateKey, dailyPuzzleStyle, difficulty, endlessPuzzleNumber, endlessStats.bestStreak, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, isDailyMode, isEndlessMode, loseState, moves, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, timeLeft, winState]);
 
   useEffect(() => {
     if (!isEndlessMode || !board.length || winState || loseState || moves <= endlessSwapBudget || checkCompletion(board) === 100) {
@@ -600,6 +642,20 @@ export default function Home() {
     setEndlessPuzzleStyle(nextStyle);
     startGame(nextConfig, nextStyle === "black-and-white");
   }, [board, endlessSwapBudget, isEndlessMode, loseState, moves, startGame, winState]);
+
+  useEffect(() => {
+    if (!isDailyMode || !board.length || winState || loseState || moves <= dailySwapBudget || checkCompletion(board) === 100) {
+      return;
+    }
+
+    resetWinSequenceRef.current();
+    setLoseState(false);
+    setDailyModalOpen(true);
+    setDailyAttemptFailed(true);
+    setTimerStarted(false);
+    timeUpSound.play();
+    clearDragSessionRef.current();
+  }, [board, dailySwapBudget, isDailyMode, loseState, moves, winState]);
 
   useEffect(() => {
     if (activeView !== "game" || !board.length || winState || loseState || !timerStarted) {
@@ -641,6 +697,10 @@ export default function Home() {
 
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
     clearBlackAndWhitePreview();
+    setIsDailyMode(false);
+    setDailyModalOpen(false);
+    setDailyAttemptFailed(false);
+    setDailyAttemptFailed(false);
     setPreviewActive(false);
     setBoardVisualMode(isBlackAndWhiteMode(nextDifficulty) ? "grayscale" : "color");
 
@@ -661,6 +721,9 @@ export default function Home() {
 
   const handleEndlessStart = () => {
     clearBlackAndWhitePreview();
+    setIsDailyMode(false);
+    setDailyModalOpen(false);
+    setDailyAttemptFailed(false);
     setPreviewActive(false);
     setBoardVisualMode("color");
     setDifficulty("endless");
@@ -670,6 +733,58 @@ export default function Home() {
     setEndlessPuzzleStyle(nextStyle);
     setEndlessStreak(0);
     startGame(nextConfig, nextStyle === "black-and-white");
+  };
+
+  const startDailyPuzzle = useCallback((dateKey: string) => {
+    const nextStyle = getDailyPuzzleStyle(createSeededRandom(`${dateKey}:style`)());
+    const boardRandom = createSeededRandom(`${dateKey}:board`);
+
+    clearBlackAndWhitePreview();
+    setDailyDateKey(dateKey);
+    setDailyModalOpen(false);
+    setIsDailyMode(true);
+    setPreviewActive(false);
+    setBoardVisualMode("color");
+    startGame(getDailyPuzzleConfig(), nextStyle === "black-and-white", boardRandom);
+  }, [clearBlackAndWhitePreview, startGame]);
+
+  useEffect(() => {
+    if (!isOnboardingComplete || activeView !== "game" || !isDailyMode || board.length > 0) {
+      return;
+    }
+
+    startDailyPuzzle(dailyDateKey);
+  }, [activeView, board.length, dailyDateKey, isDailyMode, isOnboardingComplete, startDailyPuzzle]);
+
+  const handleDailyOpen = () => {
+    setDailyDateKey(getDailyPuzzleDateKey());
+    setModeModalOpen(false);
+    setShopModalOpen(false);
+    setLeaderboardModalOpen(false);
+    setDailyModalOpen(true);
+  };
+
+  const handleDailyStart = () => {
+    startDailyPuzzle(dailyDateKey);
+  };
+
+  const handleDailyReplay = () => {
+    startDailyPuzzle(dailyDateKey);
+  };
+
+  const handleDailyBack = () => {
+    resetWinSequence();
+    setDailyModalOpen(true);
+    setTimerStarted(false);
+  };
+
+  const handleRestartGame = () => {
+    if (isDailyMode) {
+      handleDailyReplay();
+      return;
+    }
+
+    startGame(activeConfig, isBlackAndWhiteRun);
   };
 
   const handleEndlessReplay = () => {
@@ -711,6 +826,7 @@ export default function Home() {
       setModeModalOpen(false);
       setShopModalOpen(false);
       setLeaderboardModalOpen(false);
+      setDailyModalOpen(false);
       setTimerStarted(true);
     }
 
@@ -759,6 +875,7 @@ export default function Home() {
             <motion.div {...hudFeedbackMotion} className="flex flex-col gap-3">
               <button
                 type="button"
+                onClick={handleDailyOpen}
                 aria-label="Daily puzzle"
                 className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
               >
@@ -803,11 +920,22 @@ export default function Home() {
             <GameHud
               bestMoves={currentBest?.fewestMoves ?? null}
               bestTimeDisplay={bestTimeDisplay}
-              endlessInfo={isEndlessMode ? {
-                puzzleNumber: endlessPuzzleNumber,
-                styleLabel: endlessPuzzleStyleLabel,
-                swapBudget: endlessSwapBudget,
-              } : undefined}
+              endlessInfo={
+                isDailyMode
+                  ? {
+                      label: `Daily ${dailyPuzzleStyleLabel}`,
+                      puzzleNumber: 1,
+                      styleLabel: dailyPuzzleStyleLabel,
+                      swapBudget: dailySwapBudget,
+                    }
+                  : isEndlessMode
+                    ? {
+                        puzzleNumber: endlessPuzzleNumber,
+                        styleLabel: endlessPuzzleStyleLabel,
+                        swapBudget: endlessSwapBudget,
+                      }
+                    : undefined
+              }
               gradientQuality={gradientQuality}
               moves={moves}
               timeDisplay={formatTime(timeLeft)}
@@ -828,7 +956,7 @@ export default function Home() {
               dragSession={dragSession}
               draggedIndex={draggedIndex}
               getTileRef={getTileRef}
-              interactionDisabled={previewActive}
+              interactionDisabled={previewActive || dailyAttemptFailed}
               previewCountdown={previewActive ? previewCountdown : null}
               setDragOverlayRef={setDragOverlayRef}
               tileRadiusClass={tileRadiusClass}
@@ -864,7 +992,7 @@ export default function Home() {
           >
             <button
               type="button"
-              onClick={() => startGame(activeConfig, isBlackAndWhiteRun)}
+              onClick={handleRestartGame}
               aria-label="Restart game"
               className="theme-button-primary restart-button font-fredoka-strong flex h-14 w-full max-w-[20rem] items-center justify-center gap-2 rounded-full px-7 py-3 text-base shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
             >
@@ -890,6 +1018,15 @@ export default function Home() {
             activeConfig={activeConfig}
             accuracy={accuracy}
             completion={completion}
+            dailyResult={
+              isDailyMode
+                ? {
+                    onBack: handleDailyBack,
+                    onReplay: handleDailyReplay,
+                    swapBudget: dailySwapBudget,
+                  }
+                : undefined
+            }
             endlessResult={
               isEndlessMode && endlessLastClear
                 ? {
@@ -902,7 +1039,7 @@ export default function Home() {
             }
             loseState={loseState}
             moves={moves}
-            onRestart={() => startGame(activeConfig, isBlackAndWhiteRun)}
+            onRestart={handleRestartGame}
             personalBestStatus={personalBestStatus}
             timeDisplay={formatTime(solveTime)}
             winState={winModalVisible}
@@ -920,6 +1057,16 @@ export default function Home() {
           <ShopComingSoonModal
             isOpen={shopModalOpen}
             onClose={() => setShopModalOpen(false)}
+          />
+          <DailyPuzzleModal
+            dateKey={dailyDateKey}
+            isFailed={dailyAttemptFailed}
+            isOpen={dailyModalOpen}
+            onClose={() => setDailyModalOpen(false)}
+            onStart={handleDailyStart}
+            record={dailyRecordForToday}
+            style={dailyPuzzleStyle}
+            swapBudget={dailySwapBudget}
           />
           <LeaderboardModal
             isOpen={leaderboardModalOpen}

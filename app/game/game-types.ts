@@ -40,3 +40,11 @@ export type EndlessStats = {
   threeStarClears: number;
   bestStreak: number;
 };
+
+export type DailyPuzzleRecord = {
+  bestSolveTime?: number;
+  completed: boolean;
+  dateKey: string;
+  fewestMoves?: number;
+  style: ModeStyle;
+};

@@ -98,6 +98,7 @@ type BoardProps = {
   setDragOverlayRef: (element: HTMLDivElement | null) => void;
   tileRadiusClass: string;
   visualMode: "color" | "grayscale";
+  showCorrectTilePulse?: boolean;
   winWaveActive: boolean;
   winState: boolean;
   loseState: boolean;
@@ -118,6 +119,7 @@ type TileButtonProps = {
   tile: Tile;
   tileRadiusClass: string;
   visualMode: BoardProps["visualMode"];
+  showCorrectTilePulse: boolean;
   winWaveActive: boolean;
   winWaveDelay: number;
   winState: boolean;
@@ -137,6 +139,7 @@ const TileButton = memo(function TileButton({
   tile,
   tileRadiusClass,
   visualMode,
+  showCorrectTilePulse,
   winWaveActive,
   winWaveDelay,
   winState,
@@ -251,13 +254,15 @@ const TileButton = memo(function TileButton({
       <span aria-hidden="true" className="tile-glass-sheen" />
       {isCorrect && (
         <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <motion.span
-            aria-hidden="true"
-            className={`absolute inset-[-12%] ${tileRadiusClass} border-4 border-white/60`}
-            initial={{ opacity: 0.72, scale: 0.82 }}
-            animate={{ opacity: 0, scale: 1.12 }}
-            transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
-          />
+          {showCorrectTilePulse && (
+            <motion.span
+              aria-hidden="true"
+              className={`absolute inset-[-12%] ${tileRadiusClass} border-4 border-white/60`}
+              initial={{ opacity: 0.72, scale: 0.82 }}
+              animate={{ opacity: 0, scale: 1.12 }}
+              transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
+            />
+          )}
           <CheckMark />
         </span>
       )}
@@ -276,6 +281,7 @@ const TileButton = memo(function TileButton({
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
     previousProps.visualMode === nextProps.visualMode &&
+    previousProps.showCorrectTilePulse === nextProps.showCorrectTilePulse &&
     previousProps.winWaveActive === nextProps.winWaveActive &&
     previousProps.winWaveDelay === nextProps.winWaveDelay &&
     previousProps.winState === nextProps.winState &&
@@ -296,6 +302,7 @@ export const GameBoard = memo(function GameBoard({
   setDragOverlayRef,
   tileRadiusClass,
   visualMode,
+  showCorrectTilePulse = true,
   winWaveActive,
   winState,
   loseState,
@@ -413,6 +420,7 @@ export const GameBoard = memo(function GameBoard({
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
                   visualMode={tileVisualMode}
+                  showCorrectTilePulse={showCorrectTilePulse}
                   winWaveActive={winWaveActive}
                   winWaveDelay={columnIndex * 0.045}
                   winState={winState}

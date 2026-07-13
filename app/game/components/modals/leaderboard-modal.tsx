@@ -255,11 +255,14 @@ export function LeaderboardModal({
             </button>
           </div>
 
-          {isSolveCategoryId(activeCategory.id) && (
+          {isSolveCategoryId(activeCategory.id) && (() => {
+            const activeSolveCategoryId = activeCategory.id;
+
+            return (
             <>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 {LEADERBOARD_MODE_FAMILIES.map((family) => {
-                  const isActive = selectedFamilies[activeCategory.id] === family;
+                  const isActive = selectedFamilies[activeSolveCategoryId] === family;
 
                   return (
                     <button
@@ -268,7 +271,7 @@ export function LeaderboardModal({
                       onClick={() =>
                         setSelectedFamilies((currentFamilies) => ({
                           ...currentFamilies,
-                          [activeCategory.id]: family,
+                          [activeSolveCategoryId]: family,
                         }))
                       }
                       className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
@@ -283,7 +286,7 @@ export function LeaderboardModal({
 
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
                 {LEADERBOARD_PRESET_DIFFICULTIES.map((difficulty) => {
-                  const isActive = selectedDifficulties[activeCategory.id] === difficulty;
+                  const isActive = selectedDifficulties[activeSolveCategoryId] === difficulty;
 
                   return (
                     <button
@@ -292,7 +295,7 @@ export function LeaderboardModal({
                       onClick={() =>
                         setSelectedDifficulties((currentDifficulties) => ({
                           ...currentDifficulties,
-                          [activeCategory.id]: difficulty,
+                          [activeSolveCategoryId]: difficulty,
                         }))
                       }
                       className={`font-fredoka-strong rounded-[1rem] border px-3 py-3 text-sm leading-tight ${
@@ -305,7 +308,8 @@ export function LeaderboardModal({
                 })}
               </div>
             </>
-          )}
+            );
+          })()}
 
           <div className="mt-5 flex max-h-[20rem] flex-col gap-2 overflow-hidden">
             {isLoading && (

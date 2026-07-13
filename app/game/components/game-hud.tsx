@@ -7,6 +7,7 @@ type HudProps = {
   bestMoves: number | null;
   bestTimeDisplay: string;
   endlessInfo?: {
+    label?: string;
     puzzleNumber: number;
     styleLabel: string;
     swapBudget: number;
@@ -74,7 +75,7 @@ export function GameHud({
   const moveDisplay = endlessInfo ? `${moves}/${endlessInfo.swapBudget}` : moves;
   const moveLabel = endlessInfo ? "Swaps" : "Moves";
   const progressLabel = endlessInfo
-    ? `Puzzle ${endlessInfo.puzzleNumber} · ${endlessInfo.styleLabel}`
+    ? endlessInfo.label ?? `Puzzle ${endlessInfo.puzzleNumber} · ${endlessInfo.styleLabel}`
     : "Progress";
 
   return (

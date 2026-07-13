@@ -9,8 +9,13 @@ import {
   PRESET_DIFFICULTIES,
   checkCompletion,
   clamp,
+  createSeededRandom,
   formatTime,
+  generateCornerColors,
   generateSolvedBoard,
+  getDailyPuzzleConfig,
+  getDailyPuzzleDateKey,
+  getDailyPuzzleStyle,
   getGameModeConfig,
   getBoardDensityClass,
   getEndlessPuzzleStyle,
@@ -33,6 +38,12 @@ import type { Tile } from "../app/game/game-types";
 
 function buildSolvedBoard(size = 4) {
   return generateSolvedBoard(size, ["#ff0000", "#00ff00", "#0000ff", "#ffffff"]);
+}
+
+function buildSeededBoard(dateKey: string) {
+  const random = createSeededRandom(`${dateKey}:board`);
+  const corners = generateCornerColors(getDailyPuzzleConfig().size, random);
+  return scrambleBoard(generateSolvedBoard(getDailyPuzzleConfig().size, corners), random);
 }
 
 function withMockedRandom(values: number[], callback: () => void) {
@@ -175,6 +186,47 @@ test("endless puzzle style is only black and white for hard-sized puzzles below 
   assert.equal(getEndlessPuzzleStyle(5, 0.3), "color");
   assert.equal(getEndlessPuzzleStyle(6, 0), "color");
   assert.equal(getEndlessPuzzleStyle(7, 0.1), "color");
+});
+
+test("daily puzzle date key uses UTC dates", () => {
+  assert.equal(getDailyPuzzleDateKey(new Date("2026-07-13T23:59:59.000Z")), "2026-07-13");
+});
+
+test("daily puzzle style uses the hard-sized black and white threshold", () => {
+  assert.equal(getDailyPuzzleStyle(0.29), "black-and-white");
+  assert.equal(getDailyPuzzleStyle(0.3), "color");
+});
+
+test("seeded daily board generation is stable for a date and changes across dates", () => {
+  const firstBoard = buildSeededBoard("2026-07-13");
+  const repeatedBoard = buildSeededBoard("2026-07-13");
+  const nextDayBoard = buildSeededBoard("2026-07-14");
+  const summarizeBoard = (board: Tile[]) =>
+    board.map((tile) => `${tile.id}:${tile.currentIndex}:${tile.color}`);
+
+  assert.deepEqual(summarizeBoard(repeatedBoard), summarizeBoard(firstBoard));
+  assert.notDeepEqual(summarizeBoard(nextDayBoard), summarizeBoard(firstBoard));
+});
+
+test("board random helpers still use Math.random by default", () => {
+  let defaultCorners: [string, string, string, string] = ["", "", "", ""];
+  let injectedCorners: [string, string, string, string] = ["", "", "", ""];
+  const randomValues = [0.25, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+
+  withMockedRandom(randomValues, () => {
+    defaultCorners = generateCornerColors(5);
+  });
+
+  let randomIndex = 0;
+  const injectedRandom = () => {
+    const nextValue = randomValues[randomIndex];
+    randomIndex += 1;
+    return nextValue ?? randomValues[randomValues.length - 1];
+  };
+
+  injectedCorners = generateCornerColors(5, injectedRandom);
+
+  assert.deepEqual(defaultCorners, injectedCorners);
 });
 
 test("endless swap budget tightens with streak but keeps a minimum", () => {

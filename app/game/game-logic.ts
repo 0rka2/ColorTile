@@ -8,6 +8,8 @@ import {
   Tile,
 } from "./game-types";
 
+type RandomSource = () => number;
+
 export const PRESET_DIFFICULTIES: Record<PresetDifficultyKey, DifficultyConfig> = {
   normal: { label: "Normal", size: 4, time: 120 },
   hard: { label: "Hard", size: 5, time: 240 },
@@ -164,6 +166,39 @@ export function getEndlessPuzzleStyle(size: number, randomValue = Math.random())
   return randomValue < 0.3 ? "black-and-white" : "color";
 }
 
+export function getDailyPuzzleDateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+export function createSeededRandom(seed: string): RandomSource {
+  let hash = 2166136261;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return () => {
+    hash += 0x6d2b79f5;
+    let value = hash;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function getDailyPuzzleStyle(randomValue: number): ModeStyle {
+  return getEndlessPuzzleStyle(PRESET_DIFFICULTIES.hard.size, randomValue);
+}
+
+export function getDailyPuzzleConfig(): DifficultyConfig {
+  return {
+    label: "Daily Puzzle",
+    size: PRESET_DIFFICULTIES.hard.size,
+    time: 0,
+  };
+}
+
 export function getEndlessConfig(puzzleNumber: number): DifficultyConfig {
   const size = getEndlessPuzzleSize(puzzleNumber);
 
@@ -224,8 +259,8 @@ function remapCenteredRatio(value: number, strength: number) {
   return clamp(0.5 + centered * (1 + strength), 0, 1);
 }
 
-export function generateCornerColors(size: number): [string, string, string, string] {
-  const hue = Math.random() * 360;
+export function generateCornerColors(size: number, random: RandomSource = Math.random): [string, string, string, string] {
+  const hue = random() * 360;
   const contrastBoost = getGradientContrastBoost(size);
   const topRightOffset = 45 + contrastBoost * 6;
   const bottomLeftOffset = 190 + contrastBoost * 4;
@@ -233,8 +268,8 @@ export function generateCornerColors(size: number): [string, string, string, str
   const build = (offset: number) =>
     hslToHex(
       (hue + offset) % 360,
-      clamp(78 + contrastBoost * 12 + Math.random() * 5, 74, 88),
-      clamp(74 - contrastBoost * 11 + (Math.random() - 0.5) * (18 + contrastBoost * 10), 40, 78),
+      clamp(78 + contrastBoost * 12 + random() * 5, 74, 88),
+      clamp(74 - contrastBoost * 11 + (random() - 0.5) * (18 + contrastBoost * 10), 40, 78),
     );
 
   return [build(0), build(topRightOffset), build(bottomLeftOffset), build(bottomRightOffset)];
@@ -379,12 +414,12 @@ export function generateSolvedBoard(size: number, corners: [string, string, stri
   });
 }
 
-export function scrambleBoard(solvedBoard: Tile[]): Tile[] {
+export function scrambleBoard(solvedBoard: Tile[], random: RandomSource = Math.random): Tile[] {
   const movableTiles = solvedBoard.filter((tile) => !tile.isCorner);
   const shuffled = [...movableTiles];
 
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const swapIndex = Math.floor(random() * (index + 1));
     [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
 
