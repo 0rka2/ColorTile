@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { GlobalButtonSounds } from "./global-button-sounds";
+import { CookieConsentBanner } from "./components/cookie-consent-banner";
+import { GlobalButtonSounds } from "./game/components/global-button-sounds";
 import "./globals.css";
 
 const fredoka = localFont({
@@ -26,6 +27,7 @@ export default function RootLayout({
       <body className={fredoka.variable}>
         <GlobalButtonSounds />
         {children}
+        {/* <CookieConsentBanner /> */}
       </body>
     </html>
   );

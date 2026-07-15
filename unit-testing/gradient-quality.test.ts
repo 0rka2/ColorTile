@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getGradientQuality, getGradientQualityFill } from "../app/gradient-quality";
+import { getGradientQuality, getGradientQualityFill } from "../app/game/gradient-quality";
 
 test("getGradientQuality preserves exact endpoints", () => {
   assert.equal(getGradientQuality(0), 0);

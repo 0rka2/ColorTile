@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "../app/personal-best";
+import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "../app/game/personal-best";
 
 test("getPersonalBestStatus treats a first win as a new best time", () => {
   assert.deepEqual(

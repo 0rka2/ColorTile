@@ -2,24 +2,51 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  BLACK_AND_WHITE_PRESET_MODE_KEYS,
+  COLOR_PRESET_MODE_KEYS,
+  DIFFICULTY_LABELS,
+  GAME_MODE_DEFINITIONS,
+  PRESET_DIFFICULTIES,
   checkCompletion,
   clamp,
+  createSeededRandom,
   formatTime,
+  generateCornerColors,
   generateSolvedBoard,
+  getDailyPuzzleConfig,
+  getDailyPuzzleDateKey,
+  getDailyPuzzleStyle,
+  getGameModeConfig,
   getBoardDensityClass,
+  getEndlessCountdownDuration,
+  getEndlessPuzzleSwapBudget,
+  getEndlessPuzzleStyle,
+  getEndlessPuzzleSize,
+  getEndlessPuzzleType,
+  getEndlessSwapBudget,
+  getModeStyle,
+  getPresetModeKey,
+  getEndlessThreeStarMoveLimit,
   getTileRadiusClass,
   hexToRgb,
   hslToHex,
   interpolateHue,
+  isBlackAndWhiteMode,
   isSolved,
   isTileLocked,
   scrambleBoard,
   swapTiles,
-} from "../app/game-logic";
-import type { Tile } from "../app/game-types";
+} from "../app/game/game-logic";
+import type { Tile } from "../app/game/game-types";
 
 function buildSolvedBoard(size = 4) {
   return generateSolvedBoard(size, ["#ff0000", "#00ff00", "#0000ff", "#ffffff"]);
+}
+
+function buildSeededBoard(dateKey: string) {
+  const random = createSeededRandom(`${dateKey}:board`);
+  const corners = generateCornerColors(getDailyPuzzleConfig().size, random);
+  return scrambleBoard(generateSolvedBoard(getDailyPuzzleConfig().size, corners), random);
 }
 
 function withMockedRandom(values: number[], callback: () => void) {
@@ -133,10 +160,113 @@ test("isTileLocked only locks corners and correct tiles", () => {
   assert.equal(isTileLocked(swappedBoard[1], 1), false);
 });
 
-test("formatTime never returns negative time and keeps leading zeroes", () => {
-  assert.equal(formatTime(-4), "0:00");
-  assert.equal(formatTime(9), "0:09");
+test("formatTime uses compact stopwatch formatting", () => {
+  assert.equal(formatTime(-4), "0.0");
+  assert.equal(formatTime(0.9), "0.9");
+  assert.equal(formatTime(7.1), "7.1");
+  assert.equal(formatTime(9.9), "9.9");
+  assert.equal(formatTime(10), "10.0");
+  assert.equal(formatTime(59.9), "59.9");
+  assert.equal(formatTime(60), "1:00");
+  assert.equal(formatTime(119.9), "1:59");
+  assert.equal(formatTime(119.9, { roundUp: true }), "2:00");
   assert.equal(formatTime(125), "2:05");
+});
+
+test("endless puzzle sizes increase at the planned puzzle thresholds", () => {
+  assert.equal(getEndlessPuzzleSize(1), 4);
+  assert.equal(getEndlessPuzzleSize(5), 4);
+  assert.equal(getEndlessPuzzleSize(6), 5);
+  assert.equal(getEndlessPuzzleSize(10), 5);
+  assert.equal(getEndlessPuzzleSize(11), 6);
+  assert.equal(getEndlessPuzzleSize(15), 6);
+  assert.equal(getEndlessPuzzleSize(16), 7);
+});
+
+test("endless puzzle style is only black and white for hard-sized puzzles below the chance threshold", () => {
+  assert.equal(getEndlessPuzzleStyle(4, 0), "color");
+  assert.equal(getEndlessPuzzleStyle(5, 0.29), "black-and-white");
+  assert.equal(getEndlessPuzzleStyle(5, 0.3), "color");
+  assert.equal(getEndlessPuzzleStyle(6, 0), "color");
+  assert.equal(getEndlessPuzzleStyle(7, 0.1), "color");
+});
+
+test("endless countdown puzzle types only appear on normal and hard sized boards", () => {
+  assert.equal(getEndlessPuzzleType(4, 0.1), "countdown");
+  assert.equal(getEndlessPuzzleType(4, 0.5), "countdown-swaps");
+  assert.equal(getEndlessPuzzleType(4, 0.8), "classic");
+  assert.equal(getEndlessPuzzleType(5, 0.2), "black-and-white");
+  assert.equal(getEndlessPuzzleType(5, 0.4), "countdown");
+  assert.equal(getEndlessPuzzleType(5, 0.7), "countdown-swaps");
+  assert.equal(getEndlessPuzzleType(6, 0), "classic");
+  assert.equal(getEndlessPuzzleType(7, 0.5), "classic");
+});
+
+test("endless countdown durations match normal and hard sized boards", () => {
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.normal.size), 150);
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.hard.size), 210);
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.expert.size), 0);
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.extreme.size), 0);
+});
+
+test("endless countdown swap puzzles get a generous swap budget", () => {
+  const baseBudget = getEndlessSwapBudget(5, 6);
+
+  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "countdown-swaps"), baseBudget + 3);
+  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "classic"), baseBudget);
+});
+
+test("daily puzzle date key uses UTC dates", () => {
+  assert.equal(getDailyPuzzleDateKey(new Date("2026-07-13T23:59:59.000Z")), "2026-07-13");
+});
+
+test("daily puzzle style uses the hard-sized black and white threshold", () => {
+  assert.equal(getDailyPuzzleStyle(0.29), "black-and-white");
+  assert.equal(getDailyPuzzleStyle(0.3), "color");
+});
+
+test("seeded daily board generation is stable for a date and changes across dates", () => {
+  const firstBoard = buildSeededBoard("2026-07-13");
+  const repeatedBoard = buildSeededBoard("2026-07-13");
+  const nextDayBoard = buildSeededBoard("2026-07-14");
+  const summarizeBoard = (board: Tile[]) =>
+    board.map((tile) => `${tile.id}:${tile.currentIndex}:${tile.color}`);
+
+  assert.deepEqual(summarizeBoard(repeatedBoard), summarizeBoard(firstBoard));
+  assert.notDeepEqual(summarizeBoard(nextDayBoard), summarizeBoard(firstBoard));
+});
+
+test("board random helpers still use Math.random by default", () => {
+  let defaultCorners: [string, string, string, string] = ["", "", "", ""];
+  let injectedCorners: [string, string, string, string] = ["", "", "", ""];
+  const randomValues = [0.25, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+
+  withMockedRandom(randomValues, () => {
+    defaultCorners = generateCornerColors(5);
+  });
+
+  let randomIndex = 0;
+  const injectedRandom = () => {
+    const nextValue = randomValues[randomIndex];
+    randomIndex += 1;
+    return nextValue ?? randomValues[randomValues.length - 1];
+  };
+
+  injectedCorners = generateCornerColors(5, injectedRandom);
+
+  assert.deepEqual(defaultCorners, injectedCorners);
+});
+
+test("endless swap budget tightens with streak but keeps a minimum", () => {
+  assert.equal(getEndlessSwapBudget(4, 0), 15);
+  assert.equal(getEndlessSwapBudget(4, 3), 14);
+  assert.equal(getEndlessSwapBudget(4, 99), 8);
+  assert.equal(getEndlessSwapBudget(7, 0), 48);
+});
+
+test("endless three-star limit is seventy percent rounded up", () => {
+  assert.equal(getEndlessThreeStarMoveLimit(15), 11);
+  assert.equal(getEndlessThreeStarMoveLimit(14), 10);
 });
 
 test("tile radius and board density classes change at the expected thresholds", () => {
@@ -148,4 +278,36 @@ test("tile radius and board density classes change at the expected thresholds", 
   assert.equal(getBoardDensityClass(4), "board-grid--default");
   assert.equal(getBoardDensityClass(10), "board-grid--compact");
   assert.equal(getBoardDensityClass(18), "board-grid--dense");
+});
+
+test("black and white modes mirror preset board sizes and times", () => {
+  assert.deepEqual(COLOR_PRESET_MODE_KEYS, ["normal", "hard", "expert", "extreme"]);
+  assert.deepEqual(BLACK_AND_WHITE_PRESET_MODE_KEYS, [
+    "black-and-white-normal",
+    "black-and-white-hard",
+    "black-and-white-expert",
+    "black-and-white-extreme",
+  ]);
+
+  assert.deepEqual(getGameModeConfig("black-and-white-normal"), {
+    label: "B&W Normal",
+    size: PRESET_DIFFICULTIES.normal.size,
+    time: PRESET_DIFFICULTIES.normal.time,
+  });
+  assert.deepEqual(getGameModeConfig("black-and-white-extreme"), {
+    label: "B&W Extreme",
+    size: PRESET_DIFFICULTIES.extreme.size,
+    time: PRESET_DIFFICULTIES.extreme.time,
+  });
+});
+
+test("mode helpers resolve style and keys for black and white runs", () => {
+  assert.equal(getPresetModeKey("color", "hard"), "hard");
+  assert.equal(getPresetModeKey("black-and-white", "hard"), "black-and-white-hard");
+  assert.equal(getModeStyle("expert"), "color");
+  assert.equal(getModeStyle("black-and-white-expert"), "black-and-white");
+  assert.equal(isBlackAndWhiteMode("black-and-white-normal"), true);
+  assert.equal(isBlackAndWhiteMode("normal"), false);
+  assert.equal(DIFFICULTY_LABELS["black-and-white-hard"], "B&W Hard");
+  assert.equal(GAME_MODE_DEFINITIONS.endless.isEndless, true);
 });

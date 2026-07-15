@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getThemeModeLabel, resolveThemeMode, THEME_MODE_STORAGE_KEY, THEME_MODES } from "../app/settings-options";
+import { getThemeModeLabel, resolveThemeMode, THEME_MODE_STORAGE_KEY, THEME_MODES } from "../app/game/settings-options";
 
 test("THEME_MODES exposes light and dark in a stable order", () => {
   assert.deepEqual(

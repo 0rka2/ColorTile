@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getConfettiViewportSize } from "../app/confetti-logic";
+import { getConfettiViewportSize } from "../app/game/confetti-logic";
 
 test("getConfettiViewportSize returns zero dimensions when viewport is missing", () => {
   assert.deepEqual(getConfettiViewportSize(), { width: 0, height: 0 });
