@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { IoMdTrophy } from "react-icons/io";
 
 import { formatTime } from "../game-logic";
+import { LEADERBOARD_REFRESH_EVENT } from "../leaderboard";
 import type { DifficultyKey } from "../game-types";
 
 type CompactLeaderboardRow = {
@@ -112,10 +113,16 @@ export function CompactLeaderboardPanel({
       }
     }
 
-    void loadLeaderboard();
+    const refreshLeaderboard = () => {
+      void loadLeaderboard();
+    };
+
+    refreshLeaderboard();
+    window.addEventListener(LEADERBOARD_REFRESH_EVENT, refreshLeaderboard);
 
     return () => {
       isCancelled = true;
+      window.removeEventListener(LEADERBOARD_REFRESH_EVENT, refreshLeaderboard);
     };
   }, [isLargeScreen, query]);
 

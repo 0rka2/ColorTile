@@ -6,6 +6,7 @@ import {
   getLeaderboardDifficultyForFamily,
   LEADERBOARD_MODE_FAMILIES,
   LEADERBOARD_PRESET_DIFFICULTIES,
+  LEADERBOARD_REFRESH_EVENT,
   type LeaderboardDifficulty,
   type LeaderboardModeFamily,
 } from "../../leaderboard";
@@ -187,10 +188,16 @@ export function LeaderboardModal({
       }
     }
 
-    void loadLeaderboard();
+    const refreshLeaderboard = () => {
+      void loadLeaderboard();
+    };
+
+    refreshLeaderboard();
+    window.addEventListener(LEADERBOARD_REFRESH_EVENT, refreshLeaderboard);
 
     return () => {
       isCancelled = true;
+      window.removeEventListener(LEADERBOARD_REFRESH_EVENT, refreshLeaderboard);
     };
   }, [activeCategory.id, activeMode, isOpen]);
 
@@ -209,7 +216,7 @@ export function LeaderboardModal({
       <div className="relative z-10 flex w-full max-w-[48rem] flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         <motion.nav
           aria-label="Leaderboard categories"
-          className="theme-modal order-2 flex w-full gap-2 overflow-x-auto rounded-[1.35rem] border p-3 sm:order-1 sm:w-[11.5rem] sm:flex-col sm:overflow-visible"
+          className="theme-modal order-2 grid w-full grid-cols-3 gap-2 rounded-[1.35rem] border p-2 sm:order-1 sm:w-[11.5rem] sm:grid-cols-1 sm:p-3"
           initial={{ opacity: 0, x: -14, scale: 0.96 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
@@ -222,7 +229,7 @@ export function LeaderboardModal({
                 key={category.id}
                 type="button"
                 onClick={() => setActiveCategoryId(category.id)}
-                className={`font-fredoka-strong min-w-[9.5rem] rounded-[1rem] px-4 py-3 text-sm leading-tight sm:min-w-0 ${
+                className={`font-fredoka-strong min-w-0 rounded-[1rem] px-2 py-3 text-xs leading-tight sm:px-4 sm:text-sm ${
                   isActive ? "theme-button-primary" : "theme-button-secondary"
                 }`}
               >

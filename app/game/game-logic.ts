@@ -248,6 +248,28 @@ export function getDailyPuzzleDateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+export function getDailyResetSeconds(date = new Date()) {
+  const nextReset = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
+
+  return Math.max(0, Math.ceil((nextReset - date.getTime()) / 1000));
+}
+
+export function formatDailyResetTime(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
 export function createSeededRandom(seed: string): RandomSource {
   let hash = 2166136261;
 

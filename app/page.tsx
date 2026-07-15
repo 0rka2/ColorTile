@@ -25,7 +25,7 @@ import { usePersistentDailyPuzzle } from "./game/hooks/use-persistent-daily-puzz
 import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
 import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
 import { useWinSequence } from "./game/hooks/use-win-sequence";
-import type { LeaderboardDifficulty } from "./game/leaderboard";
+import { LEADERBOARD_REFRESH_EVENT, type LeaderboardDifficulty } from "./game/leaderboard";
 import {
   checkCompletion,
   createSeededRandom,
@@ -106,12 +106,16 @@ function getLeaderboardPlayerName() {
   return fallbackName;
 }
 
+function notifyLeaderboardRefresh() {
+  window.dispatchEvent(new Event(LEADERBOARD_REFRESH_EVENT));
+}
+
 async function submitLeaderboardScore(entry: {
   difficulty: LeaderboardDifficulty;
   moves: number;
   solveTime: number;
 }) {
-  await fetch("/api/leaderboard", {
+  const response = await fetch("/api/leaderboard", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -121,6 +125,10 @@ async function submitLeaderboardScore(entry: {
       playerName: getLeaderboardPlayerName(),
     }),
   });
+
+  if (response.ok) {
+    notifyLeaderboardRefresh();
+  }
 }
 
 async function submitDailyLeaderboardScore(entry: {
@@ -129,7 +137,7 @@ async function submitDailyLeaderboardScore(entry: {
   solveTime: number;
   style: ModeStyle;
 }) {
-  await fetch("/api/leaderboard", {
+  const response = await fetch("/api/leaderboard", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -143,12 +151,16 @@ async function submitDailyLeaderboardScore(entry: {
       style: entry.style,
     }),
   });
+
+  if (response.ok) {
+    notifyLeaderboardRefresh();
+  }
 }
 
 async function submitEndlessStreak(entry: {
   streakCount: number;
 }) {
-  await fetch("/api/leaderboard", {
+  const response = await fetch("/api/leaderboard", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -160,6 +172,10 @@ async function submitEndlessStreak(entry: {
       streakCount: entry.streakCount,
     }),
   });
+
+  if (response.ok) {
+    notifyLeaderboardRefresh();
+  }
 }
 
 function getAccuracyScore(size: number, moves: number) {
@@ -849,9 +865,9 @@ export default function Home() {
     startDailyPuzzle(dailyDateKey);
   };
 
-  const handleDailyBack = () => {
+  const handleDailyModes = () => {
     resetWinSequence();
-    setDailyModalOpen(true);
+    setModeModalOpen(true);
     setTimerStarted(false);
   };
 
@@ -952,47 +968,7 @@ export default function Home() {
         <Header ref={headerRef} onLogoClick={handleLogoClick} onNavigateView={handleNavigateView} />
 
         {activeView === "game" ? (
-        <section ref={contentRef} className="relative flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
-          <div className="fixed left-[clamp(0.75rem,3vw,2rem)] top-1/2 z-10 -translate-y-1/2">
-            <motion.div {...hudFeedbackMotion} className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={handleDailyOpen}
-                aria-label="Daily puzzle"
-                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
-              >
-                <TbTargetArrow className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setModeModalOpen(true)}
-                aria-label="Open modes"
-                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
-              >
-                <VscStarFull className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShopModalOpen(true)}
-                aria-label="Open shop"
-                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
-              >
-                <FaShoppingCart className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLeaderboardModalOpen(true)}
-                aria-label="Open leaderboard"
-                className="side-action-button theme-card inline-flex aspect-square w-[clamp(4rem,6vw,5rem)] items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
-              >
-                <IoMdTrophy className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
-              </button>
-            </motion.div>
-          </div>
-
+        <section ref={contentRef} className="game-play-section relative flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
           <motion.div
             {...hudFeedbackMotion}
             ref={hudRef}
@@ -1002,6 +978,16 @@ export default function Home() {
             <GameHud
               bestMoves={currentBest?.fewestMoves ?? null}
               bestTimeDisplay={bestTimeDisplay}
+              dailyInfo={
+                isDailyMode
+                  ? {
+                      dateKey: dailyDateKey,
+                      size: dailyConfig.size,
+                      styleLabel: dailyPuzzleStyleLabel,
+                      swapBudget: dailySwapBudget,
+                    }
+                  : undefined
+              }
               endlessInfo={
                 isDailyMode
                   ? {
@@ -1091,6 +1077,46 @@ export default function Home() {
               <span>Restart</span>
             </button>
           </motion.div>
+
+          <div className="side-actions-rail">
+            <motion.div {...hudFeedbackMotion} className="side-actions-list">
+              <button
+                type="button"
+                onClick={handleDailyOpen}
+                aria-label="Daily puzzle"
+                className="side-action-button theme-card inline-flex aspect-square items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              >
+                <TbTargetArrow className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModeModalOpen(true)}
+                aria-label="Open modes"
+                className="side-action-button theme-card inline-flex aspect-square items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              >
+                <VscStarFull className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShopModalOpen(true)}
+                aria-label="Open shop"
+                className="side-action-button theme-card inline-flex aspect-square items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              >
+                <FaShoppingCart className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLeaderboardModalOpen(true)}
+                aria-label="Open leaderboard"
+                className="side-action-button theme-card inline-flex aspect-square items-center justify-center rounded-[1.15rem] border px-2 text-center shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+              >
+                <IoMdTrophy className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
+              </button>
+            </motion.div>
+          </div>
         </section>
         ) : (
           <section className="relative flex min-h-0 flex-1 flex-col items-stretch justify-start py-6">
@@ -1110,7 +1136,7 @@ export default function Home() {
             dailyResult={
               isDailyMode
                 ? {
-                    onBack: handleDailyBack,
+                    onModes: handleDailyModes,
                     onReplay: handleDailyReplay,
                     swapBudget: dailySwapBudget,
                   }

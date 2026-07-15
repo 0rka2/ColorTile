@@ -2,31 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 
-import { formatTime } from "../../game-logic";
+import { formatDailyResetTime, formatTime, getDailyResetSeconds } from "../../game-logic";
 import type { DailyPuzzleRecord, ModeStyle } from "../../game-types";
-
-function getDailyResetSeconds() {
-  const now = new Date();
-  const nextReset = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-
-  return Math.max(0, Math.ceil((nextReset - now.getTime()) / 1000));
-}
-
-function formatDailyResetTime(totalSeconds: number) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-
-  return `${seconds}s`;
-}
 
 type DailyPuzzleModalProps = {
   dateKey: string;

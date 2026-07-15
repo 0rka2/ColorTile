@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
+import { formatDailyResetTime, getDailyResetSeconds } from "../game-logic";
 import { getGradientQualityFill } from "../gradient-quality";
 
 type HudProps = {
   bestMoves: number | null;
   bestTimeDisplay: string;
+  dailyInfo?: {
+    dateKey: string;
+    size: number;
+    styleLabel: string;
+    swapBudget: number;
+  };
   endlessInfo?: {
     label?: string;
     puzzleNumber: number;
@@ -21,6 +28,7 @@ type HudProps = {
 export function GameHud({
   bestMoves,
   bestTimeDisplay,
+  dailyInfo,
   endlessInfo,
   gradientQuality,
   moves,
@@ -28,7 +36,21 @@ export function GameHud({
   timeWarning,
 }: Readonly<HudProps>) {
   const [animatedQuality, setAnimatedQuality] = useState(gradientQuality);
+  const [dailyResetSeconds, setDailyResetSeconds] = useState(getDailyResetSeconds);
   const animationFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!dailyInfo) {
+      return;
+    }
+
+    setDailyResetSeconds(getDailyResetSeconds());
+    const intervalId = window.setInterval(() => {
+      setDailyResetSeconds(getDailyResetSeconds());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [dailyInfo?.dateKey]);
 
   useEffect(() => {
     const startValue = animatedQuality;
@@ -145,6 +167,18 @@ export function GameHud({
   </div>
   )}
 
+  {dailyInfo && (
+    <div className="theme-card flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 rounded-xl border px-4 py-2.5 backdrop-blur">
+      <p className="theme-text-primary font-fredoka-strong text-base leading-6">Today&apos;s puzzle</p>
+      <p className="theme-text-muted font-fredoka-strong text-base leading-6">
+        {dailyInfo.dateKey} / {dailyInfo.size}x{dailyInfo.size} / {dailyInfo.styleLabel} / {dailyInfo.swapBudget} swaps
+      </p>
+      <p className="theme-text-muted font-fredoka-strong text-base leading-6">
+        Next in {formatDailyResetTime(dailyResetSeconds)}
+      </p>
+    </div>
+  )}
+
   <div className="theme-panel relative overflow-hidden rounded-2xl border px-3 py-2 backdrop-blur">
     <div className="grid min-w-0 grid-cols-3 gap-2">
       <div className="min-w-0 text-left">
@@ -187,6 +221,7 @@ export function GameHud({
       />
     </div>
   </div>
+
 </div>
     </section>
   );

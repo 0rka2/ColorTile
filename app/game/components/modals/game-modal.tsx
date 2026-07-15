@@ -95,7 +95,7 @@ type ModalProps = {
   accuracy: number;
   completion: number;
   dailyResult?: {
-    onBack: () => void;
+    onModes: () => void;
     onReplay: () => void;
     swapBudget: number;
   };
@@ -155,8 +155,8 @@ export function GameModal({
             dailyResult ? (
               <div className="mx-auto max-w-lg">
                 <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Daily Puzzle</p>
-                <h2 className="theme-text-primary font-fredoka-display mt-3 text-[2rem] leading-none sm:text-[2.4rem]">
-                  Cleared
+                <h2 className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] sm:text-[2.4rem]">
+                  <span className="theme-text-primary px-1">{renderWaveText("Puzzle Cleared")}</span>
                 </h2>
                 <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.18em] text-emerald-500 sm:mt-5 sm:text-lg">
                   {renderStars(3)}
@@ -181,10 +181,10 @@ export function GameModal({
                 <div className="mt-8 grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
-                    onClick={dailyResult.onBack}
+                    onClick={dailyResult.onModes}
                     className="theme-button-secondary font-fredoka-strong rounded-full px-5 py-3 text-sm sm:text-base"
                   >
-                    Back
+                    Other Modes
                   </button>
                   <button
                     type="button"

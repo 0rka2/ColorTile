@@ -25,6 +25,7 @@ export const LEADERBOARD_MODE_FAMILIES = [
 export type LeaderboardModeFamily = (typeof LEADERBOARD_MODE_FAMILIES)[number];
 
 export const LEADERBOARD_PRESET_DIFFICULTIES = PRESET_MODE_DIFFICULTIES;
+export const LEADERBOARD_REFRESH_EVENT = "colortile-leaderboard-refresh";
 
 export function getLeaderboardDifficultyForFamily(
   family: LeaderboardModeFamily,

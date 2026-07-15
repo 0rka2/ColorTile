@@ -227,7 +227,22 @@ select {
   box-shadow: var(--shadow-card);
 }
 
+.side-actions-rail {
+  position: fixed;
+  left: clamp(0.75rem, 3vw, 2rem);
+  top: 50%;
+  z-index: 10;
+  transform: translateY(-50%);
+}
+
+.side-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .side-action-button {
+  width: clamp(4rem, 6vw, 5rem);
   transform-origin: center;
   transition:
     transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -483,7 +498,30 @@ html[data-theme="dark"] .restart-button:hover {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 799px) {
+  .game-play-section {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .side-actions-rail {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    left: 50%;
+    top: auto;
+    width: min(calc(100vw - 1.5rem), 20rem);
+    transform: translateX(-50%);
+  }
+
+  .side-actions-list {
+    flex-direction: row;
+    justify-content: center;
+    gap: clamp(0.45rem, 2vw, 0.75rem);
+  }
+
+  .side-action-button {
+    width: clamp(3.68rem, 16.1vw, 4.6rem);
+    border-radius: 0.95rem;
+  }
+
   .board-grid--default {
     --tile-gap: 1.05%;
     --board-padding: clamp(0.16rem, 0.42vw, 0.34rem);
