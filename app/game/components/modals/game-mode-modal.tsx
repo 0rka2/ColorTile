@@ -43,7 +43,7 @@ const MODE_DETAILS: Record<ModeFamily, {
     shortLabel: "Color puzzle",
   },
   endless: {
-    description: "Clear puzzle after puzzle with a tightening swap limit and build a streak.",
+    description: "Clear puzzle after puzzle as swaps, timers, and memory challenges rotate through the streak.",
     label: "Endless",
     shortLabel: "Streak chase",
   },

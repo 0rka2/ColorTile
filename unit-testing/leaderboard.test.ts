@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   canUseLeaderboardCategory,
   getLeaderboardDifficultyForFamily,
+  isDailyLeaderboardDateKey,
+  isLeaderboardCategory,
   isLeaderboardDifficulty,
 } from "../app/game/leaderboard";
 
@@ -25,4 +27,16 @@ test("leaderboard mode family helper resolves preset difficulty keys", () => {
     getLeaderboardDifficultyForFamily("black-and-white", "hard"),
     "black-and-white-hard",
   );
+});
+
+test("daily leaderboard category and date keys are validated", () => {
+  assert.equal(isLeaderboardCategory("daily"), true);
+  assert.equal(isDailyLeaderboardDateKey("2026-07-13"), true);
+  assert.equal(isDailyLeaderboardDateKey("2026-7-13"), false);
+  assert.equal(isDailyLeaderboardDateKey(null), false);
+});
+
+test("daily leaderboard category is separate from difficulty leaderboards", () => {
+  assert.equal(canUseLeaderboardCategory("daily", "normal"), false);
+  assert.equal(canUseLeaderboardCategory("daily", "endless"), false);
 });

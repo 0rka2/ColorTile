@@ -18,8 +18,11 @@ import {
   getDailyPuzzleStyle,
   getGameModeConfig,
   getBoardDensityClass,
+  getEndlessCountdownDuration,
+  getEndlessPuzzleSwapBudget,
   getEndlessPuzzleStyle,
   getEndlessPuzzleSize,
+  getEndlessPuzzleType,
   getEndlessSwapBudget,
   getModeStyle,
   getPresetModeKey,
@@ -186,6 +189,31 @@ test("endless puzzle style is only black and white for hard-sized puzzles below 
   assert.equal(getEndlessPuzzleStyle(5, 0.3), "color");
   assert.equal(getEndlessPuzzleStyle(6, 0), "color");
   assert.equal(getEndlessPuzzleStyle(7, 0.1), "color");
+});
+
+test("endless countdown puzzle types only appear on normal and hard sized boards", () => {
+  assert.equal(getEndlessPuzzleType(4, 0.1), "countdown");
+  assert.equal(getEndlessPuzzleType(4, 0.5), "countdown-swaps");
+  assert.equal(getEndlessPuzzleType(4, 0.8), "classic");
+  assert.equal(getEndlessPuzzleType(5, 0.2), "black-and-white");
+  assert.equal(getEndlessPuzzleType(5, 0.4), "countdown");
+  assert.equal(getEndlessPuzzleType(5, 0.7), "countdown-swaps");
+  assert.equal(getEndlessPuzzleType(6, 0), "classic");
+  assert.equal(getEndlessPuzzleType(7, 0.5), "classic");
+});
+
+test("endless countdown durations match normal and hard sized boards", () => {
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.normal.size), 150);
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.hard.size), 210);
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.expert.size), 0);
+  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.extreme.size), 0);
+});
+
+test("endless countdown swap puzzles get a generous swap budget", () => {
+  const baseBudget = getEndlessSwapBudget(5, 6);
+
+  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "countdown-swaps"), baseBudget + 3);
+  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "classic"), baseBudget);
 });
 
 test("daily puzzle date key uses UTC dates", () => {

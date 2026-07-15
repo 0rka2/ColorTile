@@ -1,10 +1,12 @@
 import { getSql } from "@/app/lib/db";
 import {
   canUseLeaderboardCategory,
+  isDailyLeaderboardDateKey,
   isLeaderboardCategory,
   isLeaderboardDifficulty,
   type LeaderboardDifficulty,
 } from "@/app/game/leaderboard";
+import type { ModeStyle } from "@/app/game/game-types";
 
 async function ensureLeaderboardTable() {
   const sql = getSql();
@@ -29,14 +31,56 @@ async function ensureLeaderboardTable() {
       created_at timestamptz not null default now()
     )
   `;
+
+  await sql`
+    create table if not exists daily_leaderboard (
+      id bigint generated always as identity primary key,
+      player_name text not null,
+      date_key text not null,
+      style text not null,
+      moves integer not null check (moves > 0),
+      solve_time double precision not null check (solve_time > 0),
+      created_at timestamptz not null default now()
+    )
+  `;
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const categoryParam = searchParams.get("category");
   const difficultyParam = searchParams.get("difficulty");
+  const dateKeyParam = searchParams.get("dateKey");
 
-  if (!isLeaderboardCategory(categoryParam) || !isLeaderboardDifficulty(difficultyParam)) {
+  if (!isLeaderboardCategory(categoryParam)) {
+    return Response.json(
+      { error: "Invalid leaderboard query." },
+      { status: 400 },
+    );
+  }
+
+  await ensureLeaderboardTable();
+  const sql = getSql();
+
+  if (categoryParam === "daily") {
+    if (!isDailyLeaderboardDateKey(dateKeyParam)) {
+      return Response.json(
+        { error: "Invalid daily leaderboard date." },
+        { status: 400 },
+      );
+    }
+
+    const rows = await sql`
+      select id, player_name, date_key, style, moves, solve_time, created_at
+      from daily_leaderboard
+      where date_key = ${dateKeyParam}
+      order by solve_time asc, moves asc, created_at asc
+      limit 10
+    `;
+
+    return Response.json(rows);
+  }
+
+  if (!isLeaderboardDifficulty(difficultyParam)) {
     return Response.json(
       { error: "Invalid leaderboard query." },
       { status: 400 },
@@ -49,9 +93,6 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   }
-
-  await ensureLeaderboardTable();
-  const sql = getSql();
 
   if (categoryParam === "streaks") {
     const rows = await sql`
@@ -88,18 +129,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<{
     category: string;
+    dateKey: string;
     difficulty: string;
     moves: number;
     playerName: string;
     solveTime: number;
     streakCount: number;
+    style: ModeStyle;
   }>;
-
-  if (!isLeaderboardDifficulty(body.difficulty ?? null)) {
-    return Response.json({ error: "Invalid difficulty." }, { status: 400 });
-  }
-
-  const difficulty = body.difficulty as LeaderboardDifficulty;
 
   const playerName = body.playerName?.trim();
   const moves = body.moves;
@@ -108,6 +145,39 @@ export async function POST(request: Request) {
   if (!playerName || playerName.length > 24) {
     return Response.json({ error: "Player name is required." }, { status: 400 });
   }
+
+  if (body.category === "daily") {
+    if (!isDailyLeaderboardDateKey(body.dateKey ?? null)) {
+      return Response.json({ error: "Invalid daily leaderboard date." }, { status: 400 });
+    }
+
+    if (body.style !== "color" && body.style !== "black-and-white") {
+      return Response.json({ error: "Invalid daily puzzle style." }, { status: 400 });
+    }
+
+    if (typeof moves !== "number" || !Number.isInteger(moves) || moves <= 0) {
+      return Response.json({ error: "Moves must be a positive integer." }, { status: 400 });
+    }
+
+    if (typeof solveTime !== "number" || !Number.isFinite(solveTime) || solveTime <= 0) {
+      return Response.json({ error: "Solve time must be a positive number." }, { status: 400 });
+    }
+
+    await ensureLeaderboardTable();
+    const sql = getSql();
+    await sql`
+      insert into daily_leaderboard (player_name, date_key, style, moves, solve_time)
+      values (${playerName}, ${body.dateKey}, ${body.style}, ${moves}, ${solveTime})
+    `;
+
+    return Response.json({ ok: true }, { status: 201 });
+  }
+
+  if (!isLeaderboardDifficulty(body.difficulty ?? null)) {
+    return Response.json({ error: "Invalid difficulty." }, { status: 400 });
+  }
+
+  const difficulty = body.difficulty as LeaderboardDifficulty;
 
   if (body.category === "streaks") {
     const streakCount = body.streakCount;

@@ -9,6 +9,7 @@ import { VscStarFull } from "react-icons/vsc";
 
 import { GradientText } from "../components/ui/gradient-text";
 import { GameBoard } from "./game/components/game-board";
+import { CompactLeaderboardPanel } from "./game/components/compact-leaderboard-panel";
 import { GameControls } from "./game/components/game-controls";
 import { GameHud } from "./game/components/game-hud";
 import { DailyPuzzleModal } from "./game/components/modals/daily-puzzle-modal";
@@ -35,18 +36,24 @@ import {
   getDailyPuzzleConfig,
   getDailyPuzzleDateKey,
   getDailyPuzzleStyle,
+  getEndlessCountdownDuration,
   getEndlessConfig,
-  getEndlessPuzzleStyle,
+  getEndlessPuzzleSwapBudget,
+  getEndlessPuzzleType,
+  getEndlessPuzzleTypeLabel,
   getEndlessSwapBudget,
   getEndlessThreeStarMoveLimit,
+  getEndlessTypeStyle,
   getGameModeConfig,
   getTileRadiusClass,
+  endlessTypeUsesCountdown,
+  endlessTypeUsesSwapLimit,
   isBlackAndWhiteMode,
   isTileCorrect,
   isTileLocked,
   scrambleBoard,
 } from "./game/game-logic";
-import type { BestStats, DifficultyConfig, DifficultyKey, ModeStyle, Tile } from "./game/game-types";
+import type { BestStats, DifficultyConfig, DifficultyKey, EndlessPuzzleType, ModeStyle, Tile } from "./game/game-types";
 import { getGradientQuality } from "./game/gradient-quality";
 import { countdownSound, timeUpSound } from "./lib/sounds";
 import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./game/personal-best";
@@ -112,6 +119,28 @@ async function submitLeaderboardScore(entry: {
     body: JSON.stringify({
       ...entry,
       playerName: getLeaderboardPlayerName(),
+    }),
+  });
+}
+
+async function submitDailyLeaderboardScore(entry: {
+  dateKey: string;
+  moves: number;
+  solveTime: number;
+  style: ModeStyle;
+}) {
+  await fetch("/api/leaderboard", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      category: "daily",
+      dateKey: entry.dateKey,
+      moves: entry.moves,
+      playerName: getLeaderboardPlayerName(),
+      solveTime: entry.solveTime,
+      style: entry.style,
     }),
   });
 }
@@ -271,12 +300,14 @@ export default function Home() {
   const [dailyDateKey, setDailyDateKey] = useState(() => getDailyPuzzleDateKey());
   const [endlessPuzzleNumber, setEndlessPuzzleNumber] = useState(1);
   const [endlessPuzzleStyle, setEndlessPuzzleStyle] = useState<ModeStyle>("color");
+  const [endlessPuzzleType, setEndlessPuzzleType] = useState<EndlessPuzzleType>("classic");
   const [endlessStreak, setEndlessStreak] = useState(0);
   const [endlessLastClear, setEndlessLastClear] = useState<{
     isThreeStar: boolean;
     puzzleNumber: number;
-    swapBudget: number;
+    swapBudget: number | null;
     threeStarMoveLimit: number;
+    usesSwapLimit: boolean;
   } | null>(null);
   const [modeModalOpen, setModeModalOpen] = useState(false);
   const [shopModalOpen, setShopModalOpen] = useState(false);
@@ -321,12 +352,15 @@ export default function Home() {
     ? dailyPuzzleStyle === "black-and-white"
     : isBlackAndWhiteMode(difficulty) ||
       (isEndlessMode && endlessPuzzleStyle === "black-and-white");
-  const endlessPuzzleStyleLabel = endlessPuzzleStyle === "black-and-white" ? "B&W" : "Classic";
-  const endlessSwapBudget = getEndlessSwapBudget(activeConfig.size, endlessStreak);
+  const endlessPuzzleStyleLabel = getEndlessPuzzleTypeLabel(endlessPuzzleType);
+  const endlessUsesCountdown = isEndlessMode && endlessTypeUsesCountdown(endlessPuzzleType);
+  const endlessUsesSwapLimit = isEndlessMode && endlessTypeUsesSwapLimit(endlessPuzzleType);
+  const endlessCountdownDuration = getEndlessCountdownDuration(activeConfig.size);
+  const endlessSwapBudget = getEndlessPuzzleSwapBudget(activeConfig.size, endlessStreak, endlessPuzzleType);
   const endlessThreeStarMoveLimit = getEndlessThreeStarMoveLimit(endlessSwapBudget);
   const bestSolveTime = getBestSolveTime(currentBest, activeConfig.time);
   const bestTimeDisplay = bestSolveTime === undefined ? "-" : formatTime(bestSolveTime);
-  const solveTime = timeLeft;
+  const solveTime = endlessUsesCountdown ? endlessCountdownDuration - timeLeft : timeLeft;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
   const gradientQuality = getGradientQuality(completion);
   const allowHoverWhenLocked = false;
@@ -456,7 +490,7 @@ export default function Home() {
     setPreviewCountdown(null);
   }, []);
 
-  const startGame = useCallback((config: DifficultyConfig, useBlackAndWhitePreview: boolean, random = Math.random) => {
+  const startGame = useCallback((config: DifficultyConfig, useBlackAndWhitePreview: boolean, random = Math.random, initialTime = 0) => {
     const corners = generateCornerColors(config.size, random);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
     const nextBoard = scrambleBoard(nextSolvedBoard, random);
@@ -468,7 +502,7 @@ export default function Home() {
     clearPendingSwapAnimation();
     updateBoard(nextBoard);
     setMoves(0);
-    setTimeLeft(0);
+    setTimeLeft(initialTime);
     setCompletion(checkCompletion(nextBoard));
     setWinState(false);
     setLoseState(false);
@@ -511,6 +545,20 @@ export default function Home() {
     startGame(getGameModeConfig(difficulty), isBlackAndWhiteMode(difficulty));
   }, [difficulty, isDailyMode, startGame]);
 
+  const startEndlessPuzzle = useCallback((puzzleNumber: number) => {
+    const nextConfig = getEndlessConfig(puzzleNumber);
+    const nextType = getEndlessPuzzleType(nextConfig.size);
+    const nextStyle = getEndlessTypeStyle(nextType);
+    const initialTime = endlessTypeUsesCountdown(nextType)
+      ? getEndlessCountdownDuration(nextConfig.size)
+      : 0;
+
+    setEndlessPuzzleNumber(puzzleNumber);
+    setEndlessPuzzleType(nextType);
+    setEndlessPuzzleStyle(nextStyle);
+    startGame(nextConfig, nextStyle === "black-and-white", Math.random, initialTime);
+  }, [startGame]);
+
   useEffect(() => {
     if (!board.length || winState || loseState) {
       return;
@@ -520,7 +568,7 @@ export default function Home() {
     setCompletion(nextCompletion);
 
     if (nextCompletion === 100) {
-      const finalSolveTime = timeLeft;
+      const finalSolveTime = solveTime;
 
       if (isDailyMode) {
         setDailyRecord((currentRecord) => {
@@ -542,12 +590,22 @@ export default function Home() {
         setWinState(true);
         setWinPhase("boardWave");
         clearDragSession();
+
+        void submitDailyLeaderboardScore({
+          dateKey: dailyDateKey,
+          moves,
+          solveTime: finalSolveTime,
+          style: dailyPuzzleStyle,
+        }).catch(() => {
+          // Ignore leaderboard submission failures so local progress still works.
+        });
+
         return;
       }
 
       if (isEndlessMode) {
         const completedPuzzleNumber = endlessPuzzleNumber;
-        const completedSwapBudget = endlessSwapBudget;
+        const completedSwapBudget = endlessUsesSwapLimit ? endlessSwapBudget : null;
         const completedThreeStarMoveLimit = endlessThreeStarMoveLimit;
         const isThreeStar = moves <= completedThreeStarMoveLimit;
         const nextStreak = endlessStreak + 1;
@@ -558,6 +616,7 @@ export default function Home() {
           puzzleNumber: completedPuzzleNumber,
           swapBudget: completedSwapBudget,
           threeStarMoveLimit: completedThreeStarMoveLimit,
+          usesSwapLimit: endlessUsesSwapLimit,
         });
         setEndlessStreak(nextStreak);
         setEndlessStats((currentStats) => ({
@@ -624,24 +683,20 @@ export default function Home() {
         };
       });
     }
-  }, [activeConfig.time, board, clearDragSession, currentBest, dailyDateKey, dailyPuzzleStyle, difficulty, endlessPuzzleNumber, endlessStats.bestStreak, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, isDailyMode, isEndlessMode, loseState, moves, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, timeLeft, winState]);
+  }, [activeConfig.time, board, clearDragSession, currentBest, dailyDateKey, dailyPuzzleStyle, difficulty, endlessPuzzleNumber, endlessStats.bestStreak, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, loseState, moves, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, winState]);
 
   useEffect(() => {
-    if (!isEndlessMode || !board.length || winState || loseState || moves <= endlessSwapBudget || checkCompletion(board) === 100) {
+    if (!isEndlessMode || !endlessUsesSwapLimit || !board.length || winState || loseState || moves <= endlessSwapBudget || checkCompletion(board) === 100) {
       return;
     }
 
-    setEndlessPuzzleNumber(1);
     setEndlessStreak(0);
     resetWinSequenceRef.current();
     setLoseState(false);
     timeUpSound.play();
     clearDragSessionRef.current();
-    const nextConfig = getEndlessConfig(1);
-    const nextStyle = getEndlessPuzzleStyle(nextConfig.size);
-    setEndlessPuzzleStyle(nextStyle);
-    startGame(nextConfig, nextStyle === "black-and-white");
-  }, [board, endlessSwapBudget, isEndlessMode, loseState, moves, startGame, winState]);
+    startEndlessPuzzle(1);
+  }, [board, endlessSwapBudget, endlessUsesSwapLimit, isEndlessMode, loseState, moves, startEndlessPuzzle, winState]);
 
   useEffect(() => {
     if (!isDailyMode || !board.length || winState || loseState || moves <= dailySwapBudget || checkCompletion(board) === 100) {
@@ -658,12 +713,38 @@ export default function Home() {
   }, [board, dailySwapBudget, isDailyMode, loseState, moves, winState]);
 
   useEffect(() => {
+    if (
+      !isEndlessMode ||
+      !endlessUsesCountdown ||
+      !board.length ||
+      winState ||
+      loseState ||
+      timeLeft > 0 ||
+      (endlessUsesSwapLimit && moves > endlessSwapBudget) ||
+      checkCompletion(board) === 100
+    ) {
+      return;
+    }
+
+    setEndlessStreak(0);
+    resetWinSequenceRef.current();
+    setLoseState(false);
+    timeUpSound.play();
+    clearDragSessionRef.current();
+    startEndlessPuzzle(1);
+  }, [board, endlessSwapBudget, endlessUsesCountdown, endlessUsesSwapLimit, isEndlessMode, loseState, moves, startEndlessPuzzle, timeLeft, winState]);
+
+  useEffect(() => {
     if (activeView !== "game" || !board.length || winState || loseState || !timerStarted) {
       return;
     }
 
     const interval = window.setInterval(() => {
       setTimeLeft((current) => {
+        if (endlessUsesCountdown) {
+          return Math.max(0, Math.round((current - 0.1) * 10) / 10);
+        }
+
         return Math.round((current + 0.1) * 10) / 10;
       });
     }, 100);
@@ -671,7 +752,7 @@ export default function Home() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeView, board.length, loseState, timerStarted, winState]);
+  }, [activeView, board.length, endlessUsesCountdown, loseState, timerStarted, winState]);
 
   useEffect(() => {
     if (!modeModalOpen) {
@@ -727,12 +808,8 @@ export default function Home() {
     setPreviewActive(false);
     setBoardVisualMode("color");
     setDifficulty("endless");
-    setEndlessPuzzleNumber(1);
-    const nextConfig = getEndlessConfig(1);
-    const nextStyle = getEndlessPuzzleStyle(nextConfig.size);
-    setEndlessPuzzleStyle(nextStyle);
     setEndlessStreak(0);
-    startGame(nextConfig, nextStyle === "black-and-white");
+    startEndlessPuzzle(1);
   };
 
   const startDailyPuzzle = useCallback((dateKey: string) => {
@@ -784,21 +861,26 @@ export default function Home() {
       return;
     }
 
-    startGame(activeConfig, isBlackAndWhiteRun);
+    startGame(
+      activeConfig,
+      isBlackAndWhiteRun,
+      Math.random,
+      endlessUsesCountdown ? getEndlessCountdownDuration(activeConfig.size) : 0,
+    );
   };
 
   const handleEndlessReplay = () => {
-    startGame(activeConfig, endlessPuzzleStyle === "black-and-white");
+    startGame(
+      activeConfig,
+      endlessPuzzleStyle === "black-and-white",
+      Math.random,
+      endlessUsesCountdown ? getEndlessCountdownDuration(activeConfig.size) : 0,
+    );
   };
 
   const handleEndlessNextPuzzle = () => {
     const nextPuzzleNumber = endlessPuzzleNumber + 1;
-    const nextConfig = getEndlessConfig(nextPuzzleNumber);
-    const nextStyle = getEndlessPuzzleStyle(nextConfig.size);
-
-    setEndlessPuzzleNumber(nextPuzzleNumber);
-    setEndlessPuzzleStyle(nextStyle);
-    startGame(nextConfig, nextStyle === "black-and-white");
+    startEndlessPuzzle(nextPuzzleNumber);
   };
 
   const handleEndlessBack = () => {
@@ -930,18 +1012,25 @@ export default function Home() {
                     }
                   : isEndlessMode
                     ? {
+                        label: `Puzzle ${endlessPuzzleNumber} · ${endlessPuzzleStyleLabel}`,
                         puzzleNumber: endlessPuzzleNumber,
                         styleLabel: endlessPuzzleStyleLabel,
-                        swapBudget: endlessSwapBudget,
+                        swapBudget: endlessUsesSwapLimit ? endlessSwapBudget : null,
                       }
                     : undefined
               }
               gradientQuality={gradientQuality}
               moves={moves}
               timeDisplay={formatTime(timeLeft)}
-              timeWarning={false}
+              timeWarning={endlessUsesCountdown && timeLeft <= 10}
             />
           </motion.div>
+
+          <CompactLeaderboardPanel
+            dailyDateKey={dailyDateKey}
+            difficulty={difficulty}
+            isDailyMode={isDailyMode}
+          />
 
           <motion.div
             {...hudFeedbackMotion}

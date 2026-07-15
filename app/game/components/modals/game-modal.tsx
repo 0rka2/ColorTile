@@ -105,8 +105,9 @@ type ModalProps = {
     onNextPuzzle: () => void;
     onReplay: () => void;
     puzzleNumber: number;
-    swapBudget: number;
+    swapBudget: number | null;
     threeStarMoveLimit: number;
+    usesSwapLimit: boolean;
   };
   loseState: boolean;
   moves: number;
@@ -204,7 +205,7 @@ export function GameModal({
                   {renderStars(endlessResult.isThreeStar ? 3 : 1)}
                 </div>
                 <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.95rem] leading-6 sm:text-[1.05rem] sm:leading-7">
-                  Puzzle {endlessResult.puzzleNumber} cleared in {moves} swaps. Three-star clears need {endlessResult.threeStarMoveLimit} swaps or fewer.
+                  Puzzle {endlessResult.puzzleNumber} cleared in {moves} {endlessResult.usesSwapLimit ? "swaps" : "moves"}. Three-star clears need {endlessResult.threeStarMoveLimit} {endlessResult.usesSwapLimit ? "swaps" : "moves"} or fewer.
                 </p>
                 <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
@@ -212,8 +213,10 @@ export function GameModal({
                     <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{timeDisplay}</p>
                   </div>
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
-                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Swaps</p>
-                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{moves}/{endlessResult.swapBudget}</p>
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">{endlessResult.usesSwapLimit ? "Swaps" : "Moves"}</p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">
+                      {endlessResult.usesSwapLimit ? `${moves}/${endlessResult.swapBudget}` : moves}
+                    </p>
                   </div>
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
                     <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Progress</p>

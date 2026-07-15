@@ -6,7 +6,7 @@ import {
 } from "./game-logic";
 import type { DifficultyKey, ModeStyle, PresetDifficultyKey } from "./game-types";
 
-export const LEADERBOARD_CATEGORIES = ["fastest", "moves", "streaks"] as const;
+export const LEADERBOARD_CATEGORIES = ["fastest", "moves", "streaks", "daily"] as const;
 export type LeaderboardCategory = (typeof LEADERBOARD_CATEGORIES)[number];
 
 export const LEADERBOARD_DIFFICULTIES = [
@@ -41,10 +41,18 @@ export function isLeaderboardDifficulty(value: string | null): value is Leaderbo
   return value !== null && LEADERBOARD_DIFFICULTIES.includes(value as LeaderboardDifficulty);
 }
 
+export function isDailyLeaderboardDateKey(value: string | null): value is string {
+  return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
 export function canUseLeaderboardCategory(
   category: LeaderboardCategory,
   difficulty: LeaderboardDifficulty,
 ) {
+  if (category === "daily") {
+    return false;
+  }
+
   if (category === "streaks") {
     return difficulty === "endless";
   }

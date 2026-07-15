@@ -10,6 +10,8 @@ export type PresetDifficultyKey = "normal" | "hard" | "expert" | "extreme";
 
 export type ModeStyle = "color" | "black-and-white";
 
+export type EndlessPuzzleType = "classic" | "black-and-white" | "countdown" | "countdown-swaps";
+
 export type BlackAndWhiteModeKey =
   | "black-and-white-normal"
   | "black-and-white-hard"

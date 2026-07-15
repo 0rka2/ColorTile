@@ -155,9 +155,20 @@ export function DailyPuzzleModal({
           ) : todaysRecord?.completed ? (
             <>
               <p className="theme-text-primary font-fredoka-strong text-lg">Completed today</p>
-              <p className="theme-text-muted font-fredoka-regular mt-3 text-base leading-7">
-                Best time {formatTime(todaysRecord.bestSolveTime ?? 0)}s | Fewest moves {todaysRecord.fewestMoves ?? "-"}.
-              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:gap-4">
+                <div className="theme-card rounded-[1rem] border px-3 py-4 sm:px-4">
+                  <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">
+                    {formatTime(todaysRecord.bestSolveTime ?? 0)}s
+                  </p>
+                  <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">best time</p>
+                </div>
+                <div className="theme-card rounded-[1rem] border px-3 py-4 sm:px-4">
+                  <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">
+                    {todaysRecord.fewestMoves ?? "-"}
+                  </p>
+                  <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">fewest moves</p>
+                </div>
+              </div>
             </>
           ) : (
             <>

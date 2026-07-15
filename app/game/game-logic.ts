@@ -2,6 +2,7 @@ import {
   BlackAndWhiteModeKey,
   DifficultyConfig,
   DifficultyKey,
+  EndlessPuzzleType,
   ModeStyle,
   PresetDifficultyKey,
   PresetModeKey,
@@ -158,12 +159,89 @@ export function getEndlessThreeStarMoveLimit(swapBudget: number) {
   return Math.ceil(swapBudget * 0.7);
 }
 
+export function getEndlessCountdownDuration(size: number) {
+  if (size === PRESET_DIFFICULTIES.normal.size) {
+    return 150;
+  }
+
+  if (size === PRESET_DIFFICULTIES.hard.size) {
+    return 210;
+  }
+
+  return 0;
+}
+
+export function getEndlessPuzzleType(size: number, randomValue = Math.random()): EndlessPuzzleType {
+  if (size === PRESET_DIFFICULTIES.normal.size) {
+    if (randomValue < 0.35) {
+      return "countdown";
+    }
+
+    if (randomValue < 0.65) {
+      return "countdown-swaps";
+    }
+
+    return "classic";
+  }
+
+  if (size === PRESET_DIFFICULTIES.hard.size) {
+    if (randomValue < 0.3) {
+      return "black-and-white";
+    }
+
+    if (randomValue < 0.55) {
+      return "countdown";
+    }
+
+    if (randomValue < 0.8) {
+      return "countdown-swaps";
+    }
+  }
+
+  return "classic";
+}
+
 export function getEndlessPuzzleStyle(size: number, randomValue = Math.random()): ModeStyle {
   if (size !== PRESET_DIFFICULTIES.hard.size) {
     return "color";
   }
 
   return randomValue < 0.3 ? "black-and-white" : "color";
+}
+
+export function getEndlessTypeStyle(type: EndlessPuzzleType): ModeStyle {
+  return type === "black-and-white" ? "black-and-white" : "color";
+}
+
+export function getEndlessPuzzleTypeLabel(type: EndlessPuzzleType) {
+  switch (type) {
+    case "black-and-white":
+      return "B&W";
+    case "countdown":
+      return "Countdown";
+    case "countdown-swaps":
+      return "Countdown + Swaps";
+    default:
+      return "Classic";
+  }
+}
+
+export function endlessTypeUsesCountdown(type: EndlessPuzzleType) {
+  return type === "countdown" || type === "countdown-swaps";
+}
+
+export function endlessTypeUsesSwapLimit(type: EndlessPuzzleType) {
+  return type === "classic" || type === "black-and-white" || type === "countdown-swaps";
+}
+
+export function getEndlessPuzzleSwapBudget(size: number, streak: number, type: EndlessPuzzleType) {
+  const baseBudget = getEndlessSwapBudget(size, streak);
+
+  if (type === "countdown-swaps") {
+    return baseBudget + 3;
+  }
+
+  return baseBudget;
 }
 
 export function getDailyPuzzleDateKey(date = new Date()) {

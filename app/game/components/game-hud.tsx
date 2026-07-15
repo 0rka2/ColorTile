@@ -10,7 +10,7 @@ type HudProps = {
     label?: string;
     puzzleNumber: number;
     styleLabel: string;
-    swapBudget: number;
+    swapBudget?: number | null;
   };
   gradientQuality: number;
   moves: number;
@@ -72,8 +72,9 @@ export function GameHud({
   }, [gradientQuality]);
 
   const qualityFill = getGradientQualityFill(animatedQuality);
-  const moveDisplay = endlessInfo ? `${moves}/${endlessInfo.swapBudget}` : moves;
-  const moveLabel = endlessInfo ? "Swaps" : "Moves";
+  const hasSwapBudget = endlessInfo?.swapBudget !== undefined && endlessInfo.swapBudget !== null;
+  const moveDisplay = hasSwapBudget ? `${moves}/${endlessInfo.swapBudget}` : moves;
+  const moveLabel = hasSwapBudget ? "Swaps" : "Moves";
   const progressLabel = endlessInfo
     ? endlessInfo.label ?? `Puzzle ${endlessInfo.puzzleNumber} · ${endlessInfo.styleLabel}`
     : "Progress";
