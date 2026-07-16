@@ -156,7 +156,7 @@ const TileButton = memo(function TileButton({
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!canHover || isDragging) {
+    if (!canHover || isDragging || event.pointerType !== "mouse") {
       return;
     }
 
@@ -178,8 +178,8 @@ const TileButton = memo(function TileButton({
       ref={tileRef}
       type="button"
 
-      onPointerEnter={() => {
-        if (!interactionDisabled && !isDragging && canHover) {
+      onPointerEnter={(event) => {
+        if (!interactionDisabled && !isDragging && canHover && event.pointerType === "mouse") {
           hoverSound.play();
         }
       }}
@@ -337,7 +337,7 @@ export const GameBoard = memo(function GameBoard({
               opacity: 1,
               top: 0,
               transform: `translate3d(${initialOverlayX}px, ${initialOverlayY}px, 0) scale(${TILE_DRAG_SCALE}) rotate(0deg)`,
-              transition: "transform 110ms cubic-bezier(0.22, 1, 0.36, 1), filter 240ms ease",
+              transition: "filter 240ms ease",
               filter: dragOverlayVisualMode === "grayscale" ? "grayscale(1)" : "none",
               width: `${dragSession.width}px`,
               zIndex: 50,

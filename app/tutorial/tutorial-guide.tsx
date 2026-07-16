@@ -167,10 +167,15 @@ function getPracticeBoard() {
 
 function getPaddedSpotlightRect(element: HTMLElement): SpotlightRect {
   const rect = element.getBoundingClientRect();
-  const left = Math.max(VIEWPORT_MARGIN_PX, rect.left - SPOTLIGHT_PADDING_PX);
-  const top = Math.max(VIEWPORT_MARGIN_PX, rect.top - SPOTLIGHT_PADDING_PX);
-  const right = Math.min(window.innerWidth - VIEWPORT_MARGIN_PX, rect.right + SPOTLIGHT_PADDING_PX);
-  const bottom = Math.min(window.innerHeight - VIEWPORT_MARGIN_PX, rect.bottom + SPOTLIGHT_PADDING_PX);
+  const viewport = window.visualViewport;
+  const viewportLeft = viewport?.offsetLeft ?? 0;
+  const viewportTop = viewport?.offsetTop ?? 0;
+  const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
+  const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+  const left = Math.max(viewportLeft + VIEWPORT_MARGIN_PX, rect.left - SPOTLIGHT_PADDING_PX);
+  const top = Math.max(viewportTop + VIEWPORT_MARGIN_PX, rect.top - SPOTLIGHT_PADDING_PX);
+  const right = Math.min(viewportRight - VIEWPORT_MARGIN_PX, rect.right + SPOTLIGHT_PADDING_PX);
+  const bottom = Math.min(viewportBottom - VIEWPORT_MARGIN_PX, rect.bottom + SPOTLIGHT_PADDING_PX);
 
   return {
     height: bottom - top,
@@ -181,25 +186,36 @@ function getPaddedSpotlightRect(element: HTMLElement): SpotlightRect {
 }
 
 function getClampedModalLeft(centeredLeft: number, modalWidth: number) {
+  const viewport = window.visualViewport;
+  const viewportLeft = viewport?.offsetLeft ?? 0;
+  const viewportWidth = viewport?.width ?? window.innerWidth;
+
   return Math.max(
-    VIEWPORT_MARGIN_PX,
-    Math.min(centeredLeft, window.innerWidth - modalWidth - VIEWPORT_MARGIN_PX),
+    viewportLeft + VIEWPORT_MARGIN_PX,
+    Math.min(centeredLeft, viewportLeft + viewportWidth - modalWidth - VIEWPORT_MARGIN_PX),
   );
 }
 
 function getTutorialModalPosition(spotlightRect: SpotlightRect, modalSize: ModalSize): ModalPosition {
-  const modalWidth = Math.min(modalSize.width, window.innerWidth - VIEWPORT_MARGIN_PX * 2);
+  const viewport = window.visualViewport;
+  const viewportTop = viewport?.offsetTop ?? 0;
+  const viewportWidth = viewport?.width ?? window.innerWidth;
+  const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+  const modalWidth = Math.min(modalSize.width, viewportWidth - VIEWPORT_MARGIN_PX * 2);
   const modalHeight = modalSize.height;
   const centeredLeft = spotlightRect.left + spotlightRect.width / 2 - modalWidth / 2;
   const belowTop = spotlightRect.top + spotlightRect.height + MODAL_GAP_PX;
   const aboveTop = spotlightRect.top - modalHeight - MODAL_GAP_PX;
-  const maxTop = window.innerHeight - modalHeight - VIEWPORT_MARGIN_PX;
-  const hasRoomBelow = belowTop + modalHeight <= window.innerHeight - VIEWPORT_MARGIN_PX;
-  const hasRoomAbove = aboveTop >= VIEWPORT_MARGIN_PX;
+  const maxTop = viewportBottom - modalHeight - VIEWPORT_MARGIN_PX;
+  const hasRoomBelow = belowTop + modalHeight <= viewportBottom - VIEWPORT_MARGIN_PX;
+  const hasRoomAbove = aboveTop >= viewportTop + VIEWPORT_MARGIN_PX;
 
   return {
     left: getClampedModalLeft(centeredLeft, modalWidth),
-    top: Math.max(VIEWPORT_MARGIN_PX, Math.min(hasRoomBelow || !hasRoomAbove ? belowTop : aboveTop, maxTop)),
+    top: Math.max(
+      viewportTop + VIEWPORT_MARGIN_PX,
+      Math.min(hasRoomBelow || !hasRoomAbove ? belowTop : aboveTop, maxTop),
+    ),
   };
 }
 
@@ -231,6 +247,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
+  const dropTargetRectsRef = useRef<Array<{ index: number; rect: DOMRect }>>([]);
   const stepCompletionTimeoutRef = useRef<number | null>(null);
 
   const stage = stageCopy[stageIndex];
@@ -316,6 +333,8 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
 
     window.addEventListener("resize", updateOnNextFrame);
     window.addEventListener("scroll", updateOnNextFrame, true);
+    window.visualViewport?.addEventListener("resize", updateOnNextFrame);
+    window.visualViewport?.addEventListener("scroll", updateOnNextFrame);
 
     const resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateOnNextFrame);
@@ -340,6 +359,8 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     return () => {
       window.removeEventListener("resize", updateOnNextFrame);
       window.removeEventListener("scroll", updateOnNextFrame, true);
+      window.visualViewport?.removeEventListener("resize", updateOnNextFrame);
+      window.visualViewport?.removeEventListener("scroll", updateOnNextFrame);
       resizeObserver?.disconnect();
     };
   }, [board.length, readyModalOpen, stageIndex, updateSpotlight]);
@@ -437,6 +458,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
+    dropTargetRectsRef.current = [];
     pendingDragStartRef.current = null;
     setPressedTileIndex(null);
     updateHoveredDropTarget(null);
@@ -444,20 +466,14 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
-    if (typeof document === "undefined") {
-      return null;
-    }
+    const target = dropTargetRectsRef.current.find(({ rect }) =>
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom,
+    );
 
-    const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
-    const target = element?.closest<HTMLElement>("[data-tile-index]");
-    const rawIndex = target?.dataset.tileIndex;
-
-    if (!rawIndex) {
-      return null;
-    }
-
-    const nextIndex = Number.parseInt(rawIndex, 10);
-    return Number.isNaN(nextIndex) ? null : nextIndex;
+    return target?.index ?? null;
   }, []);
 
   const updateDragOverlayPosition = useCallback(() => {
@@ -726,6 +742,10 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     event.currentTarget.setPointerCapture(event.pointerId);
     dragPointerTargetRef.current = event.currentTarget;
     dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
+    dropTargetRectsRef.current = board.flatMap((boardTile, tileIndex) => {
+      const element = tileElementsRef.current[boardTile.id];
+      return element ? [{ index: tileIndex, rect: element.getBoundingClientRect() }] : [];
+    });
 
     pendingDragStartRef.current = {
       color: tile.color,
@@ -763,7 +783,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   };
 
   return (
-    <section className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-start gap-[clamp(0.6rem,1.5vw,1rem)] overflow-visible text-center">
+    <section className="tutorial-guide relative flex min-h-0 w-full flex-1 flex-col items-center justify-start gap-[clamp(0.35rem,1.2vw,1rem)] overflow-visible text-center">
       {!readyModalOpen && (
         <motion.div
           className="pointer-events-none fixed inset-0 z-10 bg-slate-950/60"
@@ -791,7 +811,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
 
       <div
         ref={boardSpotlightRef}
-        className={`w-full max-w-[min(92vw,34rem)] transition-all [&_.theme-board-shell]:backdrop-blur-none ${
+        className={`tutorial-board w-full max-w-[min(92vw,34rem)] transition-all [&_.theme-board-shell]:backdrop-blur-none ${
           stage.highlight === "board" && !readyModalOpen ? activeSpotlightClass : inactiveSpotlightClass
         }`}
       >
@@ -832,7 +852,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
       {!readyModalOpen && modalPosition && (
         <motion.div
           ref={modalRef}
-          className="theme-modal fixed z-50 w-[min(92vw,30rem)] rounded-[1.5rem] border p-6 text-left"
+          className="tutorial-message theme-modal fixed z-50 w-[min(92vw,30rem)] overflow-y-auto rounded-[clamp(1rem,4vw,1.5rem)] border p-[clamp(0.85rem,3.5vw,1.5rem)] text-left"
           initial={{ opacity: 0, scale: 0.94, y: 10 }}
           style={{
             left: modalPosition.left,
@@ -855,15 +875,15 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
             </span>
           </div>
 
-          <p className="theme-text-primary font-fredoka-strong mt-5 text-2xl leading-9">
+          <p className="theme-text-primary font-fredoka-strong mt-[clamp(0.65rem,2vh,1.25rem)] text-[clamp(1rem,5vw,1.5rem)] leading-[1.35]">
             {stage.title}
           </p>
 
-          <div className="mt-6 flex items-center justify-end gap-3">
+          <div className="mt-[clamp(0.75rem,2vh,1.5rem)] grid grid-cols-3 items-center gap-[clamp(0.35rem,2vw,0.75rem)]">
             <button
               type="button"
               onClick={onPlay}
-              className="theme-button-secondary rounded-full px-5 py-3 font-fredoka-strong text-lg"
+              className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)]"
             >
               Skip
             </button>
@@ -872,7 +892,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               type="button"
               onClick={handleBack}
               disabled={stageIndex === 0}
-              className="theme-button-secondary rounded-full px-5 py-3 font-fredoka-strong text-lg disabled:cursor-not-allowed disabled:opacity-45"
+              className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)] disabled:cursor-not-allowed disabled:opacity-45"
             >
               Back
             </button>
@@ -881,7 +901,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 disabled
-                className="theme-button-secondary rounded-full px-5 py-3 font-fredoka-strong text-lg opacity-70"
+                className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.7rem,3.4vw,1.125rem)] opacity-70"
               >
                 Swap first
               </button>
@@ -889,7 +909,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 onClick={handleNext}
-                className="theme-button-primary rounded-full px-6 py-3 font-fredoka-strong text-lg"
+                className="theme-button-primary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)]"
               >
                 Next
               </button>
@@ -901,7 +921,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
       {readyModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/60 p-4">
           <motion.div
-            className="theme-modal w-full max-w-[32rem] rounded-[1.75rem] border p-9 text-center"
+            className="theme-modal max-h-[calc(100dvh-2rem)] w-full max-w-[32rem] overflow-y-auto rounded-[clamp(1.25rem,5vw,1.75rem)] border p-[clamp(1.25rem,6vw,2.25rem)] text-center"
             initial={{ opacity: 0, y: 18, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}

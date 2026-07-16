@@ -122,6 +122,7 @@ export function LeaderboardModal({
   const [rows, setRows] = useState<LeaderboardApiRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryRequestId, setRetryRequestId] = useState(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -199,7 +200,7 @@ export function LeaderboardModal({
       isCancelled = true;
       window.removeEventListener(LEADERBOARD_REFRESH_EVENT, refreshLeaderboard);
     };
-  }, [activeCategory.id, activeMode, isOpen]);
+  }, [activeCategory.id, activeMode, isOpen, retryRequestId]);
 
   if (!isOpen || typeof document === "undefined") {
     return null;
@@ -207,16 +208,16 @@ export function LeaderboardModal({
 
   return createPortal(
     <motion.div
-      className="theme-overlay fixed inset-0 z-40 flex items-center justify-center p-3 backdrop-blur-sm sm:p-4"
+      className="leaderboard-overlay theme-overlay fixed inset-0 z-40 flex items-center justify-center backdrop-blur-sm"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
     >
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative z-10 flex w-full max-w-[48rem] flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+      <div className="relative z-10 flex max-h-full w-full max-w-[48rem] flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         <motion.nav
           aria-label="Leaderboard categories"
-          className="theme-modal order-2 grid w-full grid-cols-3 gap-2 rounded-[1.35rem] border p-2 sm:order-1 sm:w-[11.5rem] sm:grid-cols-1 sm:p-3"
+          className="theme-modal order-2 grid w-full shrink-0 grid-cols-3 gap-2 rounded-[1.35rem] border p-2 sm:order-1 sm:w-[11.5rem] sm:grid-cols-1 sm:p-3"
           initial={{ opacity: 0, x: -14, scale: 0.96 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
@@ -243,7 +244,7 @@ export function LeaderboardModal({
           role="dialog"
           aria-modal="true"
           aria-label="Leaderboard"
-          className="theme-modal order-1 relative w-full rounded-[1.5rem] border p-5 sm:order-2 sm:p-7"
+          className="theme-modal order-1 relative flex min-h-0 w-full flex-col overflow-hidden rounded-[1.5rem] border p-[clamp(1rem,4vw,1.75rem)] sm:order-2"
           initial={{ opacity: 0, y: 18, scale: 0.94 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
@@ -318,7 +319,7 @@ export function LeaderboardModal({
             );
           })()}
 
-          <div className="mt-5 flex max-h-[20rem] flex-col gap-2 overflow-hidden">
+          <div className="mt-5 flex min-h-0 max-h-[20rem] flex-col gap-2 overflow-y-auto overscroll-contain pr-0.5">
             {isLoading && (
               <div className="theme-panel-muted theme-text-muted rounded-[0.95rem] px-4 py-5 text-sm">
                 Loading leaderboard...
@@ -326,8 +327,15 @@ export function LeaderboardModal({
             )}
 
             {!isLoading && loadError && (
-              <div className="theme-panel-muted theme-text-muted rounded-[0.95rem] px-4 py-5 text-sm">
-                {loadError}
+              <div className="theme-panel-muted rounded-[0.95rem] px-4 py-5 text-sm">
+                <p className="theme-text-muted">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => setRetryRequestId((currentId) => currentId + 1)}
+                  className="theme-button-primary mt-3 rounded-full px-4 py-2 font-fredoka-strong text-sm"
+                >
+                  Try again
+                </button>
               </div>
             )}
 

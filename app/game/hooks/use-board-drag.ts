@@ -62,6 +62,7 @@ export function useBoardDrag({
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const latestBoardRef = useRef<Tile[]>([]);
+  const dropTargetRectsRef = useRef<Array<{ index: number; rect: DOMRect }>>([]);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -102,7 +103,7 @@ export function useBoardDrag({
 
     const overlayElement = dragOverlayElementRef.current;
     const pointerPosition = dragPointerPositionRef.current;
-    const currentDragSession = dragSession;
+    const currentDragSession = dragSessionRef.current;
 
     if (!overlayElement || !pointerPosition || !currentDragSession) {
       return;
@@ -112,7 +113,8 @@ export function useBoardDrag({
     const nextY = pointerPosition.y - currentDragSession.offsetY;
     const rotate = clamp((pointerPosition.x - currentDragSession.grabX) / 14, -DRAG_ROTATION_MAX_DEGREES, DRAG_ROTATION_MAX_DEGREES);
     overlayElement.style.transform = `translate3d(${nextX}px, ${nextY}px, 0) scale(${TILE_DRAG_SCALE}) rotate(${rotate}deg)`;
-  }, [dragSession]);
+
+  }, []);
 
   const scheduleDragOverlayPositionUpdate = useCallback(() => {
     if (dragAnimationFrameRef.current !== null || typeof window === "undefined") {
@@ -173,6 +175,7 @@ export function useBoardDrag({
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
+    dropTargetRectsRef.current = [];
     pendingDragStartRef.current = null;
     setPressedTileIndex(null);
     updateHoveredDropTarget(null);
@@ -180,23 +183,14 @@ export function useBoardDrag({
   }, [cancelDragAnimationFrame, updateHoveredDropTarget]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
-    if (typeof document === "undefined") {
-      return null;
-    }
+    const target = dropTargetRectsRef.current.find(({ rect }) =>
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom,
+    );
 
-    const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
-    const target = element?.closest<HTMLElement>("[data-tile-index]");
-    if (!target) {
-      return null;
-    }
-
-    const rawIndex = target.dataset.tileIndex;
-    if (!rawIndex) {
-      return null;
-    }
-
-    const nextIndex = Number.parseInt(rawIndex, 10);
-    return Number.isNaN(nextIndex) ? null : nextIndex;
+    return target?.index ?? null;
   }, []);
 
   useEffect(() => {
@@ -275,6 +269,7 @@ export function useBoardDrag({
           : rawTargetIndex;
 
       updateHoveredDropTarget(nextHoveredTargetIndex);
+
     };
 
     const handlePointerEnd = (event: PointerEvent) => {
@@ -419,6 +414,10 @@ export function useBoardDrag({
     event.currentTarget.setPointerCapture(event.pointerId);
     dragPointerTargetRef.current = event.currentTarget;
     dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
+    dropTargetRectsRef.current = board.flatMap((boardTile, tileIndex) => {
+      const element = tileElementsRef.current[boardTile.id];
+      return element ? [{ index: tileIndex, rect: element.getBoundingClientRect() }] : [];
+    });
 
     pendingDragStartRef.current = {
       color: tile.color,

@@ -964,7 +964,7 @@ export default function Home() {
 
   return (
     <main className={`theme-page-bg min-h-dvh overflow-x-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
-      <div ref={pageShellRef} className="mx-auto flex min-h-[100dvh] w-full max-w-[72rem] flex-col gap-[clamp(0.35rem,0.9vw,0.7rem)]">
+      <div ref={pageShellRef} className="game-page-shell mx-auto flex h-[100dvh] min-h-0 w-full max-w-[72rem] flex-col gap-[clamp(0.35rem,0.9vw,0.7rem)]">
         <Header ref={headerRef} onLogoClick={handleLogoClick} onNavigateView={handleNavigateView} />
 
         {activeView === "game" ? (
@@ -1119,7 +1119,7 @@ export default function Home() {
           </div>
         </section>
         ) : (
-          <section className="relative flex min-h-0 flex-1 flex-col items-stretch justify-start py-6">
+          <section className={`relative flex min-h-0 flex-1 flex-col items-stretch justify-start ${activeView === "tutorial" ? "py-1" : "py-6"}`}>
             {activeView === "about" && <AboutView onPlay={() => handleNavigateView("game")} />}
             {activeView === "privacy" && <PrivacyView />}
             {activeView === "tutorial" && <TutorialGuide onPlay={() => handleNavigateView("game")} />}
