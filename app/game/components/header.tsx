@@ -51,7 +51,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
   }, [themeMode]);
 
   return (
-    <header ref={ref} className="flex items-start justify-between gap-[clamp(0.605rem,1.32vw,0.99rem)]">
+    <header ref={ref} className="game-header flex items-start justify-between gap-[clamp(0.605rem,1.32vw,0.99rem)]">
       <div className="flex flex-nowrap items-center gap-[clamp(1rem,2.6vw,2rem)]">
         <button
           type="button"
@@ -64,12 +64,12 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
         </button>
 
         <div className="relative">
-          <div className="theme-header-surface flex items-center rounded-[clamp(0.935rem,1.65vw,1.43rem)] border px-[clamp(0.715rem,1.54vw,1.045rem)] py-[clamp(0.495rem,1.1vw,0.825rem)] backdrop-blur">
+          <div className="game-logo-surface theme-header-surface flex items-center rounded-[clamp(0.935rem,1.65vw,1.43rem)] border px-[clamp(0.715rem,1.54vw,1.045rem)] py-[clamp(0.495rem,1.1vw,0.825rem)] backdrop-blur">
             <button
               type="button"
               onClick={onLogoClick}
               aria-label="Go to ColorTile home"
-              className="font-fredoka-display theme-text-primary shrink-0 text-[clamp(2rem,2.5vw,2.5rem)] font-black leading-none tracking-[-0.05em]"
+              className="game-logo font-fredoka-display theme-text-primary shrink-0 text-[clamp(2rem,2.5vw,2.5rem)] font-black leading-none tracking-[-0.05em]"
             >
               <GradientText className="px-1">ColorTile</GradientText>
             </button>
@@ -92,7 +92,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
           }}
           aria-label={`${soundIsEnabled ? "Turn off" : "Turn on"} sound`}
           aria-pressed={!soundIsEnabled}
-          className="theme-header-surface theme-text-primary flex h-[3.3rem] w-[3.3rem] items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
+          className="header-action-button theme-header-surface theme-text-primary flex h-[3.3rem] w-[3.3rem] items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
         >
           {soundIsEnabled ? (
             <HiOutlineSpeakerWave aria-hidden="true" className="pointer-events-none h-[1.65rem] w-[1.65rem]" />

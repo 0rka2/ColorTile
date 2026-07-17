@@ -8,7 +8,9 @@ import {
 } from "@/app/game/leaderboard";
 import type { ModeStyle } from "@/app/game/game-types";
 
-async function ensureLeaderboardTable() {
+let leaderboardTablePromise: Promise<void> | null = null;
+
+async function createLeaderboardTables() {
   const sql = getSql();
 
   await sql`
@@ -45,7 +47,26 @@ async function ensureLeaderboardTable() {
   `;
 }
 
-export async function GET(request: Request) {
+function ensureLeaderboardTable() {
+  if (!leaderboardTablePromise) {
+    leaderboardTablePromise = createLeaderboardTables().catch((error: unknown) => {
+      leaderboardTablePromise = null;
+      throw error;
+    });
+  }
+
+  return leaderboardTablePromise;
+}
+
+function leaderboardUnavailable(error: unknown) {
+  console.error("Leaderboard database request failed.", error);
+  return Response.json(
+    { error: "Leaderboard is temporarily unavailable." },
+    { status: 503 },
+  );
+}
+
+async function getLeaderboard(request: Request) {
   const { searchParams } = new URL(request.url);
   const categoryParam = searchParams.get("category");
   const difficultyParam = searchParams.get("difficulty");
@@ -126,7 +147,7 @@ export async function GET(request: Request) {
   return Response.json(rows);
 }
 
-export async function POST(request: Request) {
+async function submitLeaderboardScore(request: Request) {
   const body = (await request.json()) as Partial<{
     category: string;
     dateKey: string;
@@ -220,4 +241,20 @@ export async function POST(request: Request) {
   `;
 
   return Response.json({ ok: true }, { status: 201 });
+}
+
+export async function GET(request: Request) {
+  try {
+    return await getLeaderboard(request);
+  } catch (error) {
+    return leaderboardUnavailable(error);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    return await submitLeaderboardScore(request);
+  } catch (error) {
+    return leaderboardUnavailable(error);
+  }
 }

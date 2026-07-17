@@ -67,7 +67,11 @@ export function useBoardSize({
       const paddingBottom = Number.parseFloat(window.getComputedStyle(shellElement).paddingBottom || "0");
       const contentPaddingBottom = Number.parseFloat(window.getComputedStyle(contentElement).paddingBottom || "0");
 
-      const availableWidth = window.innerWidth - paddingLeft - paddingRight;
+      const viewport = window.visualViewport;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const availableWidth =
+        Math.min(shellElement.clientWidth, viewportWidth) - paddingLeft - paddingRight;
       const reservedHeight =
         headerElement.getBoundingClientRect().height +
         hudElement.getBoundingClientRect().height +
@@ -78,12 +82,11 @@ export function useBoardSize({
         paddingTop +
         paddingBottom +
         contentPaddingBottom;
-      const availableHeight = window.innerHeight - reservedHeight;
+      const availableHeight = viewportHeight - reservedHeight;
 
       const measuredBoardSize = Math.max(0, Math.floor(Math.min(availableWidth, availableHeight)));
-      const minimumBoardSize = window.innerWidth < 360 ? 240 : 280;
-      const nextBoardSize = Math.min(availableWidth, GAME_AREA_MAX_WIDTH_PX, Math.max(minimumBoardSize, measuredBoardSize));
-      setBoardSize((currentBoardSize) => Math.max(currentBoardSize, nextBoardSize));
+      const nextBoardSize = Math.min(availableWidth, GAME_AREA_MAX_WIDTH_PX, measuredBoardSize);
+      setBoardSize(Math.max(0, nextBoardSize));
     };
 
     measureBoardSize();
@@ -96,15 +99,19 @@ export function useBoardSize({
     });
 
     window.addEventListener("resize", measureBoardSize);
+    window.visualViewport?.addEventListener("resize", measureBoardSize);
+    window.visualViewport?.addEventListener("scroll", measureBoardSize);
 
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener("resize", measureBoardSize);
+      window.visualViewport?.removeEventListener("resize", measureBoardSize);
+      window.visualViewport?.removeEventListener("scroll", measureBoardSize);
     };
   }, [activeConfigTime, activeConfigSize, activeView, boardLength, boardResetKey, completion, difficulty, loseState, moves, timeLeft, winState]);
 
   return {
-    boardAreaWidth: boardSize > 0 ? `${boardSize}px` : `${GAME_AREA_MAX_WIDTH_PX}px`,
+    boardAreaWidth: boardSize > 0 ? `${boardSize}px` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)`,
     contentRef,
     controlsRef,
     headerRef,
