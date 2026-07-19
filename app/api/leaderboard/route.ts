@@ -1,4 +1,5 @@
 import { getSql } from "@/app/lib/db";
+import { auth } from "@/app/lib/auth";
 import {
   canUseLeaderboardCategory,
   isDailyLeaderboardDateKey,
@@ -24,6 +25,8 @@ async function createLeaderboardTables() {
     )
   `;
 
+  await sql`alter table leaderboard add column if not exists user_id text`;
+
   await sql`
     create table if not exists endless_streak_leaderboard (
       id bigint generated always as identity primary key,
@@ -33,6 +36,8 @@ async function createLeaderboardTables() {
       created_at timestamptz not null default now()
     )
   `;
+
+  await sql`alter table endless_streak_leaderboard add column if not exists user_id text`;
 
   await sql`
     create table if not exists daily_leaderboard (
@@ -45,6 +50,8 @@ async function createLeaderboardTables() {
       created_at timestamptz not null default now()
     )
   `;
+
+  await sql`alter table daily_leaderboard add column if not exists user_id text`;
 }
 
 function ensureLeaderboardTable() {
@@ -148,6 +155,9 @@ async function getLeaderboard(request: Request) {
 }
 
 async function submitLeaderboardScore(request: Request) {
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
   const body = (await request.json()) as Partial<{
     category: string;
     dateKey: string;
@@ -159,7 +169,10 @@ async function submitLeaderboardScore(request: Request) {
     style: ModeStyle;
   }>;
 
-  const playerName = body.playerName?.trim();
+  const playerName = (
+    session?.user.name.trim() || body.playerName?.trim() || ""
+  ).slice(0, 24);
+  const userId = session?.user.id ?? null;
   const moves = body.moves;
   const solveTime = body.solveTime;
 
@@ -187,8 +200,8 @@ async function submitLeaderboardScore(request: Request) {
     await ensureLeaderboardTable();
     const sql = getSql();
     await sql`
-      insert into daily_leaderboard (player_name, date_key, style, moves, solve_time)
-      values (${playerName}, ${body.dateKey}, ${body.style}, ${moves}, ${solveTime})
+      insert into daily_leaderboard (user_id, player_name, date_key, style, moves, solve_time)
+      values (${userId}, ${playerName}, ${body.dateKey}, ${body.style}, ${moves}, ${solveTime})
     `;
 
     return Response.json({ ok: true }, { status: 201 });
@@ -214,8 +227,8 @@ async function submitLeaderboardScore(request: Request) {
     await ensureLeaderboardTable();
     const sql = getSql();
     await sql`
-      insert into endless_streak_leaderboard (player_name, difficulty, streak_count)
-      values (${playerName}, ${difficulty}, ${streakCount})
+      insert into endless_streak_leaderboard (user_id, player_name, difficulty, streak_count)
+      values (${userId}, ${playerName}, ${difficulty}, ${streakCount})
     `;
 
     return Response.json({ ok: true }, { status: 201 });
@@ -236,8 +249,8 @@ async function submitLeaderboardScore(request: Request) {
   await ensureLeaderboardTable();
   const sql = getSql();
   await sql`
-    insert into leaderboard (player_name, difficulty, moves, solve_time)
-    values (${playerName}, ${difficulty}, ${moves}, ${solveTime})
+    insert into leaderboard (user_id, player_name, difficulty, moves, solve_time)
+    values (${userId}, ${playerName}, ${difficulty}, ${moves}, ${solveTime})
   `;
 
   return Response.json({ ok: true }, { status: 201 });

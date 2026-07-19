@@ -852,7 +852,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
       {!readyModalOpen && modalPosition && (
         <motion.div
           ref={modalRef}
-          className="tutorial-message theme-modal fixed z-50 w-[min(92vw,30rem)] overflow-y-auto rounded-[clamp(1rem,4vw,1.5rem)] border p-[clamp(0.85rem,3.5vw,1.5rem)] text-left"
+          className="tutorial-message theme-modal fixed z-50 w-[min(88vw,30rem)] overflow-y-auto rounded-[clamp(1rem,min(4vw,4dvh),1.5rem)] border p-[clamp(0.75rem,min(3.5vw,3.5dvh),1.5rem)] text-left"
           initial={{ opacity: 0, scale: 0.94, y: 10 }}
           style={{
             left: modalPosition.left,
@@ -866,24 +866,24 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="flex items-center gap-4">
-            <span className="theme-chip rounded-full px-5 py-2 font-fredoka-strong text-base text-emerald-700">
+          <div className="flex items-center gap-[clamp(0.75rem,3vw,1rem)]">
+            <span className="theme-chip rounded-full px-[clamp(0.75rem,4vw,1.25rem)] py-[clamp(0.375rem,1.5dvh,0.5rem)] font-fredoka-strong text-[clamp(0.875rem,min(4vw,4dvh),1rem)] text-emerald-700">
               {stageIndex + 1} / 4
             </span>
-            <span className="theme-text-muted font-fredoka-regular text-base">
+            <span className="theme-text-muted font-fredoka-regular text-[clamp(0.875rem,min(4vw,4dvh),1rem)]">
               {stage.eyebrow}
             </span>
           </div>
 
-          <p className="theme-text-primary font-fredoka-strong mt-[clamp(0.65rem,2vh,1.25rem)] text-[clamp(1rem,5vw,1.5rem)] leading-[1.35]">
+          <p className="theme-text-primary font-fredoka-strong mt-[clamp(0.5rem,2dvh,1.25rem)] text-[clamp(1rem,min(5vw,5dvh),1.5rem)] leading-[1.35]">
             {stage.title}
           </p>
 
-          <div className="mt-[clamp(0.75rem,2vh,1.5rem)] grid grid-cols-3 items-center gap-[clamp(0.35rem,2vw,0.75rem)]">
+          <div className="mt-[clamp(0.625rem,2dvh,1.5rem)] grid grid-cols-3 items-center gap-[clamp(0.35rem,2vw,0.75rem)]">
             <button
               type="button"
               onClick={onPlay}
-              className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)]"
+              className="theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
             >
               Skip
             </button>
@@ -892,7 +892,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               type="button"
               onClick={handleBack}
               disabled={stageIndex === 0}
-              className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)] disabled:cursor-not-allowed disabled:opacity-45"
+              className="theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)] disabled:cursor-not-allowed disabled:opacity-45"
             >
               Back
             </button>
@@ -901,7 +901,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 disabled
-                className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.7rem,3.4vw,1.125rem)] opacity-70"
+                className="theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.7rem,min(3.4vw,4dvh),1.125rem)] opacity-70"
               >
                 Swap first
               </button>
@@ -909,7 +909,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 onClick={handleNext}
-                className="theme-button-primary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)]"
+                className="theme-button-primary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
               >
                 Next
               </button>

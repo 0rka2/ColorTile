@@ -5,15 +5,18 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "start": "next start",
     "lint": "next lint",
     "test:unit": "tsc -p unit-testing/tsconfig.json && cd unit-testing/.compiled && node --test"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "better-auth": "^1.6.23",
     "howler": "^2.2.4",
     "motion": "^12.40.0",
     "next": "^15.5.19",
+    "pg": "^8.22.0",
     "react": "19.1.0",
     "react-confetti": "^6.4.0",
     "react-dom": "19.1.0",
@@ -22,6 +25,7 @@
   "devDependencies": {
     "@types/howler": "^2.2.13",
     "@types/node": "22.15.30",
+    "@types/pg": "^8.20.0",
     "@types/react": "19.1.6",
     "@types/react-dom": "19.1.5",
     "autoprefixer": "10.4.21",

@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 
 import type { BestStats } from "../game-types";
-
-const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
+import { BEST_STATS_STORAGE_KEY } from "../player-progress";
 
 export function usePersistentBestStats() {
   const [bestStats, setBestStats] = useState<BestStats>({});
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -23,6 +23,8 @@ export function usePersistentBestStats() {
       setBestStats(JSON.parse(stored) as BestStats);
     } catch {
       // Ignore malformed local storage and start fresh.
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
 
@@ -34,5 +36,5 @@ export function usePersistentBestStats() {
     window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
   }, [bestStats]);
 
-  return { bestStats, setBestStats };
+  return { bestStats, isLoaded, setBestStats };
 }
