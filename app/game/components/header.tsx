@@ -127,14 +127,17 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
         {session ? (
           <Link
             href="/account"
-            aria-label="Open account"
-            className="header-action-button theme-header-surface theme-text-primary flex h-[3.3rem] w-[3.3rem] items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
+            aria-label={`Open ${session.user.name}'s account`}
+            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-[3rem] max-w-[12rem] items-center gap-2 rounded-full border px-3 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:px-3.5"
           >
             <span
               aria-hidden="true"
-              className="font-fredoka-strong text-lg uppercase leading-none"
+              className="account-action-avatar font-fredoka-strong flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm uppercase leading-none"
             >
               {session.user.name.trim().charAt(0) || "P"}
+            </span>
+            <span className="truncate font-fredoka-strong text-sm sm:text-base">
+              {session.user.name}
             </span>
           </Link>
         ) : (
@@ -147,12 +150,15 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
             aria-label="Sign in or create an account"
             aria-haspopup="dialog"
             aria-expanded={authModalOpen}
-            className="header-action-button theme-header-surface theme-text-primary flex h-[3.3rem] w-[3.3rem] items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
+            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-[3rem] items-center gap-2 rounded-full border px-3 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:px-3.5"
           >
             <FaRegUser
               aria-hidden="true"
-              className="pointer-events-none h-[1.45rem] w-[1.45rem]"
+              className="pointer-events-none h-[1.1rem] w-[1.1rem] shrink-0"
             />
+            <span className="font-fredoka-strong whitespace-nowrap text-sm sm:text-base">
+              Sign in
+            </span>
           </button>
         )}
         <button

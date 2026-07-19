@@ -223,6 +223,16 @@ select {
   box-shadow: none;
 }
 
+.account-action-button {
+  background-color: color-mix(in srgb, var(--surface-solid) 72%, transparent);
+  border-color: var(--border-soft);
+}
+
+.account-action-avatar {
+  background-color: var(--text-primary);
+  color: var(--surface-solid);
+}
+
 .theme-panel {
   background-color: var(--surface-primary);
   border-color: var(--border-soft);
@@ -566,6 +576,17 @@ html[data-theme="dark"] .restart-button:hover {
   .game-header .header-action-button {
     width: 2.75rem;
     height: 2.75rem;
+  }
+
+  .game-header .account-action-button {
+    width: auto;
+    max-width: 9.5rem;
+    padding-inline: 0.7rem;
+  }
+
+  .game-header .account-action-avatar {
+    width: 1.75rem;
+    height: 1.75rem;
   }
 
   .game-play-section {

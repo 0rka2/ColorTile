@@ -1,33 +1,26 @@
-import Link from "next/link";
+"use client";
 
-import { GradientText } from "@/components/ui/gradient-text";
+import { Header } from "@/app/game/components/header";
+import type { AppView } from "@/app/views/app-view";
 
 type AccountShellProps = {
   children: React.ReactNode;
 };
 
 export function AccountShell({ children }: Readonly<AccountShellProps>) {
+  function navigateToGameView(view: AppView) {
+    const destination = view === "game" ? "/" : `/?view=${view}`;
+    window.location.assign(destination);
+  }
+
   return (
-    <main className="theme-page-bg min-h-dvh px-4 py-5 sm:px-6 sm:py-8">
-      <div className="mx-auto w-full max-w-5xl">
-        <header className="flex items-center justify-between gap-4">
-          <Link
-            href="/"
-            aria-label="Return to ColorTile"
-            className="theme-header-surface rounded-2xl border px-4 py-3 shadow-[0_14px_26px_rgba(15,23,42,0.12)]"
-          >
-            <GradientText className="font-fredoka-display text-3xl leading-none tracking-[-0.05em]">
-              ColorTile
-            </GradientText>
-          </Link>
-          <Link
-            href="/"
-            className="theme-button-secondary font-fredoka-strong rounded-full px-5 py-2.5 text-sm"
-          >
-            Back to game
-          </Link>
-        </header>
-        {children}
+    <main className="theme-page-bg h-dvh overflow-x-hidden overflow-y-auto px-[clamp(0.5rem,2vw,1.25rem)]">
+      <div className="mx-auto w-full max-w-[72rem]">
+        <Header
+          onLogoClick={() => navigateToGameView("game")}
+          onNavigateView={navigateToGameView}
+        />
+        <div className="mx-auto w-full max-w-5xl">{children}</div>
       </div>
     </main>
   );

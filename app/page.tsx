@@ -333,6 +333,18 @@ export default function Home() {
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
   const [boardResetKey, setBoardResetKey] = useState(0);
   const [activeView, setActiveView] = useState<AppView>("game");
+
+  useEffect(() => {
+    const requestedView = new URLSearchParams(window.location.search).get("view");
+
+    if (
+      requestedView === "about" ||
+      requestedView === "privacy" ||
+      requestedView === "tutorial"
+    ) {
+      setActiveView(requestedView);
+    }
+  }, []);
   const [hudFeedbackKey, setHudFeedbackKey] = useState(0);
   const [introStep, setIntroStep] = useState<IntroStep>("welcome");
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);

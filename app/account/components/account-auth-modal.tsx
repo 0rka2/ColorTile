@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
@@ -29,7 +35,7 @@ type AccountAuthModalProps = {
 };
 
 const inputClassName =
-  "font-fredoka-regular h-14 w-full rounded-xl border border-white/45 bg-white/[0.04] px-4 pt-4 text-base text-[#fffaf2] outline-none transition placeholder:text-transparent focus:border-[#fffaf2] focus:ring-4 focus:ring-white/10";
+  "theme-input font-fredoka-strong h-14 w-full rounded-xl border px-4 pt-4 text-[1.05rem] outline-none transition placeholder:text-transparent focus:border-slate-400 focus:ring-4 focus:ring-slate-400/10 sm:h-16 sm:px-5 sm:pt-5";
 
 function PasswordField({
   autoComplete,
@@ -61,7 +67,7 @@ function PasswordField({
       />
       <label
         htmlFor={id}
-        className="font-fredoka-strong pointer-events-none absolute left-4 top-2.5 text-[0.68rem] uppercase tracking-[0.12em] text-white/55"
+        className="theme-text-muted font-fredoka-strong pointer-events-none absolute left-4 top-2 text-xs uppercase tracking-[0.1em] sm:left-5 sm:top-2.5"
       >
         {label}
       </label>
@@ -70,7 +76,7 @@ function PasswordField({
         onClick={() => setIsVisible((visible) => !visible)}
         aria-label={isVisible ? "Hide password" : "Show password"}
         aria-pressed={isVisible}
-        className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white/60 transition hover:text-white"
+        className="theme-text-muted absolute inset-y-0 right-0 flex w-12 items-center justify-center transition hover:opacity-75 sm:w-14"
       >
         {isVisible ? (
           <HiOutlineEyeSlash aria-hidden="true" className="h-5 w-5" />
@@ -96,8 +102,12 @@ export function AccountAuthModal({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const closeModal = useCallback(() => {
+    setMode("sign-in");
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -106,7 +116,6 @@ export function AccountAuthModal({
 
     setMode(initialMode);
     setError(null);
-    setMessage(null);
 
     setName(
       (currentName) =>
@@ -121,7 +130,7 @@ export function AccountAuthModal({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        closeModal();
       }
     }
 
@@ -131,21 +140,19 @@ export function AccountAuthModal({
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [initialMode, isOpen, onClose]);
+  }, [closeModal, initialMode, isOpen]);
 
   function changeMode(nextMode: AccountAuthMode) {
     setMode(nextMode);
     setPassword("");
     setConfirmPassword("");
     setError(null);
-    setMessage(null);
     window.setTimeout(() => emailInputRef.current?.focus(), 0);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
 
     const sanitizedName = sanitizePlayerName(name);
 
@@ -180,7 +187,7 @@ export function AccountAuthModal({
           return;
         }
 
-        onClose();
+        closeModal();
         router.refresh();
         return;
       }
@@ -198,9 +205,8 @@ export function AccountAuthModal({
       }
 
       window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, sanitizedName);
-      setMessage("Account created. Check your inbox to verify your email.");
-      setPassword("");
-      setConfirmPassword("");
+      closeModal();
+      router.refresh();
     } catch {
       setError("ColorTile accounts are temporarily unavailable.");
     } finally {
@@ -224,10 +230,10 @@ export function AccountAuthModal({
       transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
-          onClose();
+          closeModal();
         }
       }}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 p-3 backdrop-blur-md sm:p-6"
+      className="theme-overlay fixed inset-0 z-[100] flex items-center justify-center p-3 backdrop-blur-md sm:p-6"
     >
       <motion.section
         layout
@@ -238,20 +244,20 @@ export function AccountAuthModal({
         initial={{ opacity: 0, y: 18, scale: 0.94 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-        className={`font-fredoka-regular relative max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto rounded-[1.75rem] border border-white/10 bg-[#070707] px-5 py-8 text-[#fffaf2] shadow-[0_32px_100px_rgba(0,0,0,0.55)] sm:max-h-[calc(100dvh-3rem)] sm:px-10 sm:py-10 ${
-          mode === "sign-up" ? "max-w-[46rem]" : "max-w-[38rem]"
+        className={`theme-modal theme-text-primary font-fredoka-regular relative max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto rounded-[1.75rem] border px-5 py-8 sm:max-h-[calc(100dvh-3rem)] sm:px-12 sm:py-12 ${
+          mode === "sign-up" ? "max-w-[52rem]" : "max-w-[44rem]"
         }`}
       >
         <button
           type="button"
-          onClick={onClose}
+          onClick={closeModal}
           aria-label="Close account dialog"
-          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white sm:right-6 sm:top-6"
+          className="theme-close-button absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border transition sm:right-6 sm:top-6"
         >
           <HiXMark aria-hidden="true" className="h-5 w-5" />
         </button>
 
-        <div className="mx-auto w-full max-w-[36rem]">
+        <div className="mx-auto w-full max-w-[42rem]">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={mode}
@@ -270,7 +276,7 @@ export function AccountAuthModal({
             >
           <div
             aria-hidden="true"
-            className="mx-auto mb-6 flex h-2 w-24 overflow-hidden rounded-full"
+            className="mx-auto mb-7 flex h-2 w-24 overflow-hidden rounded-full sm:mb-8 sm:w-28"
           >
             {["#fb7185", "#f59e0b", "#facc15", "#34d399", "#60a5fa", "#a78bfa"].map(
               (color) => (
@@ -289,13 +295,13 @@ export function AccountAuthModal({
           >
             {mode === "sign-in" ? "Sign in" : "Create your account"}
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-white/55">
+          <p className="theme-text-muted font-fredoka-light mx-auto mt-4 max-w-lg text-center text-base leading-7">
             {mode === "sign-in"
               ? "Continue your ColorTile progress on any device."
               : "Save your records, streaks, and daily puzzle progress."}
           </p>
 
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+          <form className="mt-9 space-y-5 sm:mt-10 sm:space-y-6" onSubmit={handleSubmit}>
             <div className="relative">
               <input
                 id={`${mode}-email`}
@@ -311,7 +317,7 @@ export function AccountAuthModal({
               />
               <label
                 htmlFor={`${mode}-email`}
-                className="font-fredoka-strong pointer-events-none absolute left-4 top-2.5 text-[0.68rem] uppercase tracking-[0.12em] text-white/55"
+                className="theme-text-muted font-fredoka-strong pointer-events-none absolute left-4 top-2 text-xs uppercase tracking-[0.1em] sm:left-5 sm:top-2.5"
               >
                 Email
               </label>
@@ -332,7 +338,7 @@ export function AccountAuthModal({
                 />
                 <label
                   htmlFor="sign-up-player-name"
-                  className="font-fredoka-strong pointer-events-none absolute left-4 top-2.5 text-[0.68rem] uppercase tracking-[0.12em] text-white/55"
+                  className="theme-text-muted font-fredoka-strong pointer-events-none absolute left-4 top-2 text-xs uppercase tracking-[0.1em] sm:left-5 sm:top-2.5"
                 >
                   Player name
                 </label>
@@ -341,7 +347,7 @@ export function AccountAuthModal({
 
             <div
               className={
-                mode === "sign-up" ? "grid gap-4 sm:grid-cols-2" : undefined
+                mode === "sign-up" ? "grid gap-5 sm:grid-cols-2 sm:gap-6" : undefined
               }
             >
               <PasswordField
@@ -366,12 +372,12 @@ export function AccountAuthModal({
             </div>
 
             {mode === "sign-up" ? (
-              <div className="font-fredoka-strong flex flex-wrap gap-2 text-xs text-white/55">
+              <div className="theme-text-muted font-fredoka-strong flex flex-wrap gap-2 text-sm">
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 ${
                     passwordIsLongEnough
                       ? "bg-emerald-400/15 text-emerald-300"
-                      : "bg-white/5"
+                      : "theme-chip"
                   }`}
                 >
                   <HiOutlineCheck aria-hidden="true" className="h-4 w-4" />
@@ -381,7 +387,7 @@ export function AccountAuthModal({
                   className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 ${
                     passwordsMatch
                       ? "bg-emerald-400/15 text-emerald-300"
-                      : "bg-white/5"
+                      : "theme-chip"
                   }`}
                 >
                   <HiOutlineCheck aria-hidden="true" className="h-4 w-4" />
@@ -389,8 +395,8 @@ export function AccountAuthModal({
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-between gap-4 pt-1">
-                <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm text-white/70">
+              <div className="flex items-center justify-between gap-5 pt-1 sm:pt-2">
+                <label className="theme-text-secondary font-fredoka-strong inline-flex cursor-pointer items-center gap-2.5 text-base">
                   <input
                     type="checkbox"
                     checked={rememberMe}
@@ -401,8 +407,8 @@ export function AccountAuthModal({
                 </label>
                 <Link
                   href="/forgot-password"
-                  onClick={onClose}
-                  className="font-fredoka-strong text-sm text-emerald-300 transition hover:text-emerald-200"
+                  onClick={closeModal}
+                  className="font-fredoka-strong text-base text-emerald-300 transition hover:text-emerald-200"
                 >
                   Forgot password?
                 </Link>
@@ -417,19 +423,10 @@ export function AccountAuthModal({
                 {error}
               </p>
             )}
-            {message && (
-              <p
-                role="status"
-                className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm leading-5 text-emerald-200"
-              >
-                {message}
-              </p>
-            )}
-
             <button
               type="submit"
               disabled={isSubmitting}
-              className="font-fredoka-strong flex h-[3.25rem] w-full items-center justify-center gap-2 rounded-xl bg-[#fff8ed] px-6 text-base text-slate-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="theme-button-primary font-fredoka-strong flex h-14 w-full items-center justify-center gap-2 rounded-xl px-6 text-base transition disabled:cursor-not-allowed disabled:opacity-60 sm:h-16 sm:text-lg"
             >
               <span>
                 {isSubmitting
@@ -449,7 +446,7 @@ export function AccountAuthModal({
             onClick={() =>
               changeMode(mode === "sign-in" ? "sign-up" : "sign-in")
             }
-            className="font-fredoka-strong mx-auto mt-6 block text-sm uppercase tracking-[0.08em] text-white/55 transition hover:text-white"
+            className="theme-text-muted font-fredoka-strong mx-auto mt-8 block text-base uppercase tracking-[0.06em] transition hover:opacity-75 sm:mt-10"
           >
             {mode === "sign-in"
               ? "New to ColorTile? Create an account"

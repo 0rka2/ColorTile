@@ -78,7 +78,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
-    requireEmailVerification: true,
+    requireEmailVerification: false,
     revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       await sendAuthEmail({
@@ -89,15 +89,20 @@ export const auth = betterAuth({
     },
   },
   emailVerification: {
-    autoSignInAfterVerification: true,
-    sendOnSignIn: true,
-    sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url }) => {
       await sendAuthEmail({
         to: user.email,
         subject: "Verify your ColorTile account",
-        text: `Verify your ColorTile account using this link:\n\n${url}\n\nIf you did not create this account, you can ignore this email.`,
+        text: `Verify your ColorTile account using this link:\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
       });
+    },
+  },
+  user: {
+    changeEmail: {
+      enabled: true,
+    },
+    deleteUser: {
+      enabled: true,
     },
   },
   secret: process.env.BETTER_AUTH_SECRET,
