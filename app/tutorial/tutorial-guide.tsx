@@ -23,8 +23,8 @@ const TILE_DRAG_SCALE = 1.065;
 const TILE_SWAP_ANIMATION_DURATION_MS = 220;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const STEP_COMPLETION_DELAY_MS = 600;
-const SPOTLIGHT_PADDING_PX = 14;
-const MODAL_GAP_PX = 18;
+const MODAL_GAP_MIN_PX = 8;
+const MODAL_GAP_MAX_PX = 18;
 const MODAL_WIDTH_PX = 480;
 const MODAL_ESTIMATED_HEIGHT_PX = 216;
 const VIEWPORT_MARGIN_PX = 16;
@@ -165,23 +165,14 @@ function getPracticeBoard() {
   return swapTiles(getSolvedTutorialBoard("practice"), 5, 6);
 }
 
-function getPaddedSpotlightRect(element: HTMLElement): SpotlightRect {
+function getElementRect(element: HTMLElement): SpotlightRect {
   const rect = element.getBoundingClientRect();
-  const viewport = window.visualViewport;
-  const viewportLeft = viewport?.offsetLeft ?? 0;
-  const viewportTop = viewport?.offsetTop ?? 0;
-  const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
-  const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
-  const left = Math.max(viewportLeft + VIEWPORT_MARGIN_PX, rect.left - SPOTLIGHT_PADDING_PX);
-  const top = Math.max(viewportTop + VIEWPORT_MARGIN_PX, rect.top - SPOTLIGHT_PADDING_PX);
-  const right = Math.min(viewportRight - VIEWPORT_MARGIN_PX, rect.right + SPOTLIGHT_PADDING_PX);
-  const bottom = Math.min(viewportBottom - VIEWPORT_MARGIN_PX, rect.bottom + SPOTLIGHT_PADDING_PX);
 
   return {
-    height: bottom - top,
-    left,
-    top,
-    width: right - left,
+    height: rect.height,
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
   };
 }
 
@@ -204,17 +195,33 @@ function getTutorialModalPosition(spotlightRect: SpotlightRect, modalSize: Modal
   const modalWidth = Math.min(modalSize.width, viewportWidth - VIEWPORT_MARGIN_PX * 2);
   const modalHeight = modalSize.height;
   const centeredLeft = spotlightRect.left + spotlightRect.width / 2 - modalWidth / 2;
-  const belowTop = spotlightRect.top + spotlightRect.height + MODAL_GAP_PX;
-  const aboveTop = spotlightRect.top - modalHeight - MODAL_GAP_PX;
+  const spotlightBottom = spotlightRect.top + spotlightRect.height;
+  const preferredGap = Math.min(
+    MODAL_GAP_MAX_PX,
+    Math.max(MODAL_GAP_MIN_PX, viewportWidth * 0.02),
+  );
+  const availableSpaceBelow = viewportBottom - spotlightBottom - modalHeight;
+  const bottomMargin = Math.min(
+    VIEWPORT_MARGIN_PX,
+    Math.max(0, availableSpaceBelow),
+  );
+  const availableGapBelow = availableSpaceBelow - bottomMargin;
+  const belowGap = Math.max(0, Math.min(preferredGap, availableGapBelow));
+  const belowTop = spotlightBottom + belowGap;
+  const aboveTop = spotlightRect.top - modalHeight - preferredGap;
   const maxTop = viewportBottom - modalHeight - VIEWPORT_MARGIN_PX;
-  const hasRoomBelow = belowTop + modalHeight <= viewportBottom - VIEWPORT_MARGIN_PX;
+  const hasRoomBelow = availableSpaceBelow >= 0;
   const hasRoomAbove = aboveTop >= viewportTop + VIEWPORT_MARGIN_PX;
+  const preferredTop = !hasRoomBelow && hasRoomAbove ? aboveTop : belowTop;
+  const maximumTop = hasRoomBelow
+    ? viewportBottom - modalHeight - bottomMargin
+    : maxTop;
 
   return {
     left: getClampedModalLeft(centeredLeft, modalWidth),
     top: Math.max(
       viewportTop + VIEWPORT_MARGIN_PX,
-      Math.min(hasRoomBelow || !hasRoomAbove ? belowTop : aboveTop, maxTop),
+      Math.min(preferredTop, maximumTop),
     ),
   };
 }
@@ -259,6 +266,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     ? formatTime(TUTORIAL_TIME_SECONDS - 3)
     : formatTime(TUTORIAL_TIME_SECONDS);
   const draggedIndex = dragSession?.index ?? null;
+  const tutorialModalMounted = !readyModalOpen && modalPosition !== null;
   const tileRadiusClass = getTileRadiusClass(BOARD_SIZE);
   const boardDensityClass = getBoardDensityClass(BOARD_SIZE);
   const activeSpotlightClass =
@@ -271,14 +279,14 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
       return;
     }
 
-    const targetElement = stage.highlight === "hud" ? hudSpotlightRef.current : boardSpotlightRef.current;
-    if (!targetElement) {
+    const positionTargetElement = boardSpotlightRef.current;
+    if (!positionTargetElement) {
       return;
     }
 
-    const nextSpotlightRect = getPaddedSpotlightRect(targetElement);
+    const nextSpotlightRect = getElementRect(positionTargetElement);
     setModalPosition(getTutorialModalPosition(nextSpotlightRect, modalSize));
-  }, [modalSize, readyModalOpen, stage.highlight]);
+  }, [modalSize, readyModalOpen]);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -372,10 +380,9 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     }
 
     const updateModalSize = () => {
-      const rect = modalElement.getBoundingClientRect();
       setModalSize({
-        height: rect.height || MODAL_ESTIMATED_HEIGHT_PX,
-        width: rect.width || MODAL_WIDTH_PX,
+        height: modalElement.offsetHeight || MODAL_ESTIMATED_HEIGHT_PX,
+        width: modalElement.offsetWidth || MODAL_WIDTH_PX,
       });
     };
 
@@ -391,7 +398,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     return () => {
       resizeObserver.disconnect();
     };
-  }, [readyModalOpen, stageIndex]);
+  }, [readyModalOpen, stageIndex, tutorialModalMounted]);
 
   useEffect(() => {
     return () => {
@@ -866,24 +873,24 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="flex items-center gap-[clamp(0.75rem,3vw,1rem)]">
-            <span className="theme-chip rounded-full px-[clamp(0.75rem,4vw,1.25rem)] py-[clamp(0.375rem,1.5dvh,0.5rem)] font-fredoka-strong text-[clamp(0.875rem,min(4vw,4dvh),1rem)] text-emerald-700">
+          <div className="tutorial-message-header flex items-center gap-[clamp(0.75rem,3vw,1rem)]">
+            <span className="tutorial-message-chip theme-chip rounded-full px-[clamp(0.75rem,4vw,1.25rem)] py-[clamp(0.375rem,1.5dvh,0.5rem)] font-fredoka-strong text-[clamp(0.875rem,min(4vw,4dvh),1rem)] text-emerald-700">
               {stageIndex + 1} / 4
             </span>
-            <span className="theme-text-muted font-fredoka-regular text-[clamp(0.875rem,min(4vw,4dvh),1rem)]">
+            <span className="tutorial-message-label theme-text-muted font-fredoka-regular text-[clamp(0.875rem,min(4vw,4dvh),1rem)]">
               {stage.eyebrow}
             </span>
           </div>
 
-          <p className="theme-text-primary font-fredoka-strong mt-[clamp(0.5rem,2dvh,1.25rem)] text-[clamp(1rem,min(5vw,5dvh),1.5rem)] leading-[1.35]">
+          <p className="tutorial-message-title theme-text-primary font-fredoka-strong mt-[clamp(0.5rem,2dvh,1.25rem)] text-[clamp(1rem,min(5vw,5dvh),1.5rem)] leading-[1.35]">
             {stage.title}
           </p>
 
-          <div className="mt-[clamp(0.625rem,2dvh,1.5rem)] grid grid-cols-3 items-center gap-[clamp(0.35rem,2vw,0.75rem)]">
+          <div className="tutorial-message-actions mt-[clamp(0.625rem,2dvh,1.5rem)] grid grid-cols-3 items-center gap-[clamp(0.35rem,2vw,0.75rem)]">
             <button
               type="button"
               onClick={onPlay}
-              className="theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
+              className="tutorial-message-button theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
             >
               Skip
             </button>
@@ -892,7 +899,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               type="button"
               onClick={handleBack}
               disabled={stageIndex === 0}
-              className="theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)] disabled:cursor-not-allowed disabled:opacity-45"
+              className="tutorial-message-button theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)] disabled:cursor-not-allowed disabled:opacity-45"
             >
               Back
             </button>
@@ -901,7 +908,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 disabled
-                className="theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.7rem,min(3.4vw,4dvh),1.125rem)] opacity-70"
+                className="tutorial-message-button theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.7rem,min(3.4vw,4dvh),1.125rem)] opacity-70"
               >
                 Swap first
               </button>
@@ -909,7 +916,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 onClick={handleNext}
-                className="theme-button-primary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
+                className="tutorial-message-button theme-button-primary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
               >
                 Next
               </button>
