@@ -259,6 +259,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     ? formatTime(TUTORIAL_TIME_SECONDS - 3)
     : formatTime(TUTORIAL_TIME_SECONDS);
   const draggedIndex = dragSession?.index ?? null;
+  const tutorialModalMounted = !readyModalOpen && modalPosition !== null;
   const tileRadiusClass = getTileRadiusClass(BOARD_SIZE);
   const boardDensityClass = getBoardDensityClass(BOARD_SIZE);
   const activeSpotlightClass =
@@ -372,10 +373,9 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     }
 
     const updateModalSize = () => {
-      const rect = modalElement.getBoundingClientRect();
       setModalSize({
-        height: rect.height || MODAL_ESTIMATED_HEIGHT_PX,
-        width: rect.width || MODAL_WIDTH_PX,
+        height: modalElement.offsetHeight || MODAL_ESTIMATED_HEIGHT_PX,
+        width: modalElement.offsetWidth || MODAL_WIDTH_PX,
       });
     };
 
@@ -391,7 +391,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     return () => {
       resizeObserver.disconnect();
     };
-  }, [readyModalOpen, stageIndex]);
+  }, [readyModalOpen, stageIndex, tutorialModalMounted]);
 
   useEffect(() => {
     return () => {
