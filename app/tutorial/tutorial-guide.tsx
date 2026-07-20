@@ -15,6 +15,8 @@ import {
   PRESET_DIFFICULTIES,
   swapTiles,
 } from "../game/game-logic";
+import { findNearestTileIndex } from "../game/drop-target";
+import type { DropTargetRect } from "../game/drop-target";
 
 const BOARD_SIZE = 4;
 const DRAG_ROTATION_MAX_DEGREES = 3;
@@ -29,13 +31,6 @@ const MODAL_WIDTH_PX = 480;
 const MODAL_ESTIMATED_HEIGHT_PX = 216;
 const VIEWPORT_MARGIN_PX = 16;
 const TUTORIAL_TIME_SECONDS = PRESET_DIFFICULTIES.normal.time;
-const DROP_TARGET_RING_CLASSES = [
-  "ring-2",
-  "ring-slate-300/70",
-  "ring-offset-2",
-  "ring-offset-white/80",
-];
-
 const tutorialCorners: [string, string, string, string] = [
   "#38bdf8",
   "#7c3aed",
@@ -235,6 +230,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   const [board, setBoard] = useState(() => getSolvedTutorialBoard("goal"));
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
   const [pressedTileIndex, setPressedTileIndex] = useState<number | null>(null);
+  const [dropTargetRect, setDropTargetRect] = useState<DropTargetRect | null>(null);
   const [stepCompletionPending, setStepCompletionPending] = useState(false);
   const [readyModalOpen, setReadyModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState<ModalPosition | null>(null);
@@ -254,7 +250,6 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
-  const dropTargetRectsRef = useRef<Array<{ index: number; rect: DOMRect }>>([]);
   const stepCompletionTimeoutRef = useRef<number | null>(null);
 
   const stage = stageCopy[stageIndex];
@@ -413,39 +408,34 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     }
   }, []);
 
-  const setDropTargetHighlight = useCallback((index: number | null, active: boolean) => {
-    if (index === null) {
-      return;
-    }
-
-    const tile = board[index];
-    if (!tile) {
-      return;
-    }
-
-    const element = tileElementsRef.current[tile.id];
-    if (!element) {
-      return;
-    }
-
-    if (active) {
-      element.classList.add(...DROP_TARGET_RING_CLASSES);
-      return;
-    }
-
-    element.classList.remove(...DROP_TARGET_RING_CLASSES);
-  }, [board]);
-
   const updateHoveredDropTarget = useCallback((nextIndex: number | null) => {
     const previousIndex = hoveredTargetIndexRef.current;
     if (previousIndex === nextIndex) {
       return;
     }
 
-    setDropTargetHighlight(previousIndex, false);
     hoveredTargetIndexRef.current = nextIndex;
-    setDropTargetHighlight(nextIndex, true);
-  }, [setDropTargetHighlight]);
+
+    if (nextIndex === null) {
+      setDropTargetRect(null);
+      return;
+    }
+
+    const tile = board[nextIndex];
+    const element = tile ? tileElementsRef.current[tile.id] : null;
+    if (!element) {
+      setDropTargetRect(null);
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    setDropTargetRect({
+      height: rect.height,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+    });
+  }, [board]);
 
   const clearDragSession = useCallback(() => {
     cancelDragAnimationFrame();
@@ -465,7 +455,6 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
-    dropTargetRectsRef.current = [];
     pendingDragStartRef.current = null;
     setPressedTileIndex(null);
     updateHoveredDropTarget(null);
@@ -473,15 +462,41 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
-    const target = dropTargetRectsRef.current.find(({ rect }) =>
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom,
-    );
+    if (typeof document === "undefined") {
+      return null;
+    }
 
-    return target?.index ?? null;
-  }, []);
+    const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const target = element?.closest<HTMLElement>("[data-tile-index]");
+    const rawIndex = target?.dataset.tileIndex;
+
+    if (rawIndex !== undefined) {
+      const targetIndex = Number.parseInt(rawIndex, 10);
+      if (!Number.isNaN(targetIndex)) {
+        return targetIndex;
+      }
+    }
+
+    return findNearestTileIndex(
+      clientX,
+      clientY,
+      board.flatMap((tile, index) => {
+        const tileElement = tileElementsRef.current[tile.id];
+        if (!tileElement) {
+          return [];
+        }
+
+        const rect = tileElement.getBoundingClientRect();
+        return [{
+          bottom: rect.bottom,
+          index,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+        }];
+      }),
+    );
+  }, [board]);
 
   const updateDragOverlayPosition = useCallback(() => {
     dragAnimationFrameRef.current = null;
@@ -749,10 +764,6 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     event.currentTarget.setPointerCapture(event.pointerId);
     dragPointerTargetRef.current = event.currentTarget;
     dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
-    dropTargetRectsRef.current = board.flatMap((boardTile, tileIndex) => {
-      const element = tileElementsRef.current[boardTile.id];
-      return element ? [{ index: tileIndex, rect: element.getBoundingClientRect() }] : [];
-    });
 
     pendingDragStartRef.current = {
       color: tile.color,
@@ -830,6 +841,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           confettiActive={false}
           dragSession={dragSession}
           draggedIndex={draggedIndex}
+          dropTargetRect={dropTargetRect}
           getTileRef={getTileRef}
           interactionDisabled={!canInteractWithBoard}
           isTileCorrect={isTileCorrect}

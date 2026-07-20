@@ -436,6 +436,7 @@ export default function Home() {
     clearPendingSwapAnimation,
     dragSession,
     draggedIndex,
+    dropTargetRect,
     getTileRef,
     handlePointerDown,
     pressedTileIndex,
@@ -1020,9 +1021,6 @@ export default function Home() {
                 isDailyMode
                   ? {
                       dateKey: dailyDateKey,
-                      size: dailyConfig.size,
-                      styleLabel: dailyPuzzleStyleLabel,
-                      swapBudget: dailySwapBudget,
                     }
                   : undefined
               }
@@ -1068,6 +1066,7 @@ export default function Home() {
               boardDensityClass={boardDensityClass}
               dragSession={dragSession}
               draggedIndex={draggedIndex}
+              dropTargetRect={dropTargetRect}
               getTileRef={getTileRef}
               interactionDisabled={previewActive || dailyAttemptFailed}
               previewCountdown={previewActive ? previewCountdown : null}

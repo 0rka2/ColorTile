@@ -20,7 +20,7 @@ export function AccountShell({ children }: Readonly<AccountShellProps>) {
           onLogoClick={() => navigateToGameView("game")}
           onNavigateView={navigateToGameView}
         />
-        <div className="mx-auto w-full max-w-5xl">{children}</div>
+        <div className="mx-auto w-full max-w-5xl px-2 sm:px-4">{children}</div>
       </div>
     </main>
   );

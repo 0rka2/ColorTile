@@ -681,6 +681,16 @@ html[data-theme="dark"] .restart-button:hover {
   backface-visibility: hidden;
 }
 
+.tile-drop-target-outline {
+  border: 0.2rem solid #0f172a;
+  box-sizing: border-box;
+  opacity: 0.35;
+}
+
+html[data-theme="dark"] .tile-drop-target-outline {
+  border-color: #f8fafc;
+}
+
 .tile-drag-overlay {
   will-change: transform;
   contain: layout style paint;

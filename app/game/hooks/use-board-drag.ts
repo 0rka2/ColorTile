@@ -3,6 +3,8 @@
 import { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { clamp, isTileCorrect, isTileLocked, swapTiles } from "../game-logic";
+import { findNearestTileIndex } from "../drop-target";
+import type { DropTargetRect } from "../drop-target";
 import type { Tile } from "../game-types";
 import { swapSound } from "../../lib/sounds";
 
@@ -11,13 +13,6 @@ const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const DRAG_ROTATION_MAX_DEGREES = 3;
 const DRAG_START_DISTANCE_PX = 6;
 const TILE_DRAG_SCALE = 1.065;
-const DROP_TARGET_RING_CLASSES = [
-  "ring-2",
-  "ring-slate-300/70",
-  "ring-offset-2",
-  "ring-offset-white/80",
-];
-
 export type DragSession = {
   color: string;
   grabX: number;
@@ -52,6 +47,7 @@ export function useBoardDrag({
 }: BoardDragOptions) {
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
   const [pressedTileIndex, setPressedTileIndex] = useState<number | null>(null);
+  const [dropTargetRect, setDropTargetRect] = useState<DropTargetRect | null>(null);
   const dragSessionRef = useRef<DragSession | null>(null);
   const tileElementsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
@@ -62,7 +58,6 @@ export function useBoardDrag({
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const latestBoardRef = useRef<Tile[]>([]);
-  const dropTargetRectsRef = useRef<Array<{ index: number; rect: DOMRect }>>([]);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -124,39 +119,34 @@ export function useBoardDrag({
     dragAnimationFrameRef.current = window.requestAnimationFrame(updateDragOverlayPosition);
   }, [updateDragOverlayPosition]);
 
-  const setDropTargetHighlight = useCallback((index: number | null, active: boolean) => {
-    if (index === null) {
-      return;
-    }
-
-    const tile = latestBoardRef.current[index];
-    if (!tile) {
-      return;
-    }
-
-    const element = tileElementsRef.current[tile.id];
-    if (!element) {
-      return;
-    }
-
-    if (active) {
-      element.classList.add(...DROP_TARGET_RING_CLASSES);
-      return;
-    }
-
-    element.classList.remove(...DROP_TARGET_RING_CLASSES);
-  }, []);
-
   const updateHoveredDropTarget = useCallback((nextIndex: number | null) => {
     const previousIndex = hoveredTargetIndexRef.current;
     if (previousIndex === nextIndex) {
       return;
     }
 
-    setDropTargetHighlight(previousIndex, false);
     hoveredTargetIndexRef.current = nextIndex;
-    setDropTargetHighlight(nextIndex, true);
-  }, [setDropTargetHighlight]);
+
+    if (nextIndex === null) {
+      setDropTargetRect(null);
+      return;
+    }
+
+    const tile = latestBoardRef.current[nextIndex];
+    const element = tile ? tileElementsRef.current[tile.id] : null;
+    if (!element) {
+      setDropTargetRect(null);
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    setDropTargetRect({
+      height: rect.height,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+    });
+  }, []);
 
   const clearDragSession = useCallback(() => {
     cancelDragAnimationFrame();
@@ -175,7 +165,6 @@ export function useBoardDrag({
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
-    dropTargetRectsRef.current = [];
     pendingDragStartRef.current = null;
     setPressedTileIndex(null);
     updateHoveredDropTarget(null);
@@ -183,15 +172,41 @@ export function useBoardDrag({
   }, [cancelDragAnimationFrame, updateHoveredDropTarget]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
-    const target = dropTargetRectsRef.current.find(({ rect }) =>
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom,
-    );
+    if (typeof document === "undefined") {
+      return null;
+    }
 
-    return target?.index ?? null;
-  }, []);
+    const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const target = element?.closest<HTMLElement>("[data-tile-index]");
+    const rawIndex = target?.dataset.tileIndex;
+
+    if (rawIndex !== undefined) {
+      const targetIndex = Number.parseInt(rawIndex, 10);
+      if (!Number.isNaN(targetIndex)) {
+        return targetIndex;
+      }
+    }
+
+    return findNearestTileIndex(
+      clientX,
+      clientY,
+      board.flatMap((tile, index) => {
+        const tileElement = tileElementsRef.current[tile.id];
+        if (!tileElement) {
+          return [];
+        }
+
+        const rect = tileElement.getBoundingClientRect();
+        return [{
+          bottom: rect.bottom,
+          index,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+        }];
+      }),
+    );
+  }, [board]);
 
   useEffect(() => {
     latestBoardRef.current = board;
@@ -414,10 +429,6 @@ export function useBoardDrag({
     event.currentTarget.setPointerCapture(event.pointerId);
     dragPointerTargetRef.current = event.currentTarget;
     dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
-    dropTargetRectsRef.current = board.flatMap((boardTile, tileIndex) => {
-      const element = tileElementsRef.current[boardTile.id];
-      return element ? [{ index: tileIndex, rect: element.getBoundingClientRect() }] : [];
-    });
 
     pendingDragStartRef.current = {
       color: tile.color,
@@ -441,6 +452,7 @@ export function useBoardDrag({
     clearPendingSwapAnimation,
     dragSession,
     draggedIndex: dragSession?.index ?? null,
+    dropTargetRect,
     getTileRef,
     handlePointerDown,
     latestBoardRef,

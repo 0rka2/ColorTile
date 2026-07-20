@@ -259,7 +259,7 @@ export function AccountDashboard({
   }
 
   return (
-    <div className="py-10 sm:py-14">
+    <div className="pt-10 pb-4 sm:pt-14 sm:pb-6">
       <div className="mb-8">
         <p className="theme-text-muted font-fredoka-strong text-sm uppercase tracking-[0.2em]">
           Player account
@@ -635,7 +635,7 @@ export function AccountDashboard({
 
       <section
         aria-labelledby="delete-account-heading"
-        className="mt-10 rounded-[1.75rem] border border-red-500/35 bg-red-500/5 p-6 sm:p-8"
+        className="mt-6 rounded-[1.75rem] border border-red-500/35 bg-red-500/5 p-6 sm:p-8"
       >
         <h2
           id="delete-account-heading"
