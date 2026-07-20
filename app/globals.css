@@ -464,6 +464,7 @@ html[data-theme="dark"] .restart-button:hover {
 
 .tile-surface,
 .tile-drag-overlay {
+  background-clip: padding-box;
   border-color: var(--tile-edge);
 }
 
@@ -680,10 +681,6 @@ html[data-theme="dark"] .restart-button:hover {
   .tile-surface {
     box-shadow: 0 6px 14px rgba(148, 163, 184, 0.1) !important;
   }
-}
-
-.tile-surface {
-  backface-visibility: hidden;
 }
 
 .tile-drop-target-outline {
