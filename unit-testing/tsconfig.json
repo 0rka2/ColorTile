@@ -17,6 +17,7 @@
     "../app/game/confetti-logic.ts",
     "../app/game/gradient-quality.ts",
     "../app/game/personal-best.ts",
+    "../app/game/player-progress.ts",
     "../app/game/win-sequence.ts",
     "../app/lib/cookies.ts",
     "./**/*.ts"

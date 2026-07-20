@@ -3,17 +3,16 @@
 import { useEffect, useState } from "react";
 
 import type { EndlessStats } from "../game-types";
+import {
+  EMPTY_ENDLESS_STATS,
+  ENDLESS_STATS_STORAGE_KEY,
+} from "../player-progress";
 
-const ENDLESS_STATS_STORAGE_KEY = "colortile-endless-stats";
-
-export const EMPTY_ENDLESS_STATS: EndlessStats = {
-  clears: 0,
-  threeStarClears: 0,
-  bestStreak: 0,
-};
+export { EMPTY_ENDLESS_STATS } from "../player-progress";
 
 export function usePersistentEndlessStats() {
   const [endlessStats, setEndlessStats] = useState<EndlessStats>(EMPTY_ENDLESS_STATS);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -32,6 +31,8 @@ export function usePersistentEndlessStats() {
       });
     } catch {
       // Ignore malformed local storage and start fresh.
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
 
@@ -43,5 +44,5 @@ export function usePersistentEndlessStats() {
     window.localStorage.setItem(ENDLESS_STATS_STORAGE_KEY, JSON.stringify(endlessStats));
   }, [endlessStats]);
 
-  return { endlessStats, setEndlessStats };
+  return { endlessStats, isLoaded, setEndlessStats };
 }

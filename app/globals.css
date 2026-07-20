@@ -223,6 +223,16 @@ select {
   box-shadow: none;
 }
 
+.account-action-button {
+  background-color: color-mix(in srgb, var(--surface-solid) 72%, transparent);
+  border-color: var(--border-soft);
+}
+
+.account-action-avatar {
+  background-color: var(--text-primary);
+  color: var(--surface-solid);
+}
+
 .theme-panel {
   background-color: var(--surface-primary);
   border-color: var(--border-soft);
@@ -568,6 +578,17 @@ html[data-theme="dark"] .restart-button:hover {
     height: 2.75rem;
   }
 
+  .game-header .account-action-button {
+    width: auto;
+    max-width: 9.5rem;
+    padding-inline: 0.7rem;
+  }
+
+  .game-header .account-action-avatar {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
   .game-play-section {
     gap: 0.2rem;
     padding-bottom: calc(4.15rem + env(safe-area-inset-bottom));
@@ -595,18 +616,51 @@ html[data-theme="dark"] .restart-button:hover {
     width: clamp(3.15rem, 14.5vw, 3.75rem);
   }
 
-  .tutorial-board {
-    width: min(92vw, 34rem, calc(100dvh - 20rem));
-  }
-
   .tutorial-guide .restart-button {
     height: 3rem !important;
   }
 }
 
 .tutorial-message {
+  width: min(calc(100vw - 2rem), clamp(20rem, 84vw, 30rem));
   max-height: calc(100dvh - 2rem);
+  border-radius: clamp(1rem, 3vw, 1.5rem);
   overscroll-behavior: contain;
+  padding: clamp(0.3125rem, calc(4vw - 0.95rem), 1.5rem);
+}
+
+.tutorial-message .tutorial-message-header {
+  gap: clamp(0.5rem, 2vw, 1rem);
+}
+
+.tutorial-message .tutorial-message-chip {
+  padding:
+    clamp(0.125rem, calc(1.5vw - 0.375rem), 0.5rem)
+    clamp(0.75rem, 3vw, 1.25rem);
+  font-size: clamp(0.75rem, calc(1vw + 0.5rem), 1rem);
+  line-height: clamp(1rem, calc(1vw + 0.75rem), 1.5rem);
+}
+
+.tutorial-message .tutorial-message-label {
+  font-size: clamp(0.75rem, calc(1vw + 0.5rem), 1rem);
+  line-height: clamp(1rem, calc(1vw + 0.75rem), 1.5rem);
+}
+
+.tutorial-message .tutorial-message-title {
+  margin-top: clamp(0.1875rem, calc(2.5vw - 0.625rem), 1.25rem);
+  font-size: clamp(1rem, calc(2vw + 0.375rem), 1.5rem);
+  line-height: 1.25;
+}
+
+.tutorial-message .tutorial-message-actions {
+  margin-top: clamp(0.1875rem, calc(2.5vw - 0.625rem), 1.5rem);
+  gap: clamp(0.35rem, 2vw, 0.75rem);
+}
+
+.tutorial-message .tutorial-message-button {
+  padding: clamp(0.25rem, calc(1.5vw - 0.375rem), 0.75rem) 0.5rem;
+  font-size: clamp(0.75rem, calc(1vw + 0.5rem), 1.125rem);
+  line-height: clamp(1rem, calc(1vw + 0.75rem), 1.375rem);
 }
 
 .leaderboard-overlay {
@@ -625,6 +679,16 @@ html[data-theme="dark"] .restart-button:hover {
 
 .tile-surface {
   backface-visibility: hidden;
+}
+
+.tile-drop-target-outline {
+  border: 0.2rem solid #0f172a;
+  box-sizing: border-box;
+  opacity: 0.35;
+}
+
+html[data-theme="dark"] .tile-drop-target-outline {
+  border-color: #f8fafc;
 }
 
 .tile-drag-overlay {

@@ -9,9 +9,6 @@ type HudProps = {
   bestTimeDisplay: string;
   dailyInfo?: {
     dateKey: string;
-    size: number;
-    styleLabel: string;
-    swapBudget: number;
   };
   endlessInfo?: {
     label?: string;
@@ -171,7 +168,7 @@ export function GameHud({
     <div className="theme-card flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 rounded-xl border px-4 py-2.5 backdrop-blur">
       <p className="theme-text-primary font-fredoka-strong text-base leading-6">Today&apos;s puzzle</p>
       <p className="theme-text-muted font-fredoka-strong text-base leading-6">
-        {dailyInfo.dateKey} / {dailyInfo.size}x{dailyInfo.size} / {dailyInfo.styleLabel} / {dailyInfo.swapBudget} swaps
+        {dailyInfo.dateKey}
       </p>
       <p className="theme-text-muted font-fredoka-strong text-base leading-6">
         Next in {formatDailyResetTime(dailyResetSeconds)}

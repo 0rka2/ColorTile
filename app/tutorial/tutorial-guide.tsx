@@ -15,6 +15,8 @@ import {
   PRESET_DIFFICULTIES,
   swapTiles,
 } from "../game/game-logic";
+import { findNearestTileIndex } from "../game/drop-target";
+import type { DropTargetRect } from "../game/drop-target";
 
 const BOARD_SIZE = 4;
 const DRAG_ROTATION_MAX_DEGREES = 3;
@@ -23,19 +25,12 @@ const TILE_DRAG_SCALE = 1.065;
 const TILE_SWAP_ANIMATION_DURATION_MS = 220;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const STEP_COMPLETION_DELAY_MS = 600;
-const SPOTLIGHT_PADDING_PX = 14;
-const MODAL_GAP_PX = 18;
+const MODAL_GAP_MIN_PX = 8;
+const MODAL_GAP_MAX_PX = 18;
 const MODAL_WIDTH_PX = 480;
 const MODAL_ESTIMATED_HEIGHT_PX = 216;
 const VIEWPORT_MARGIN_PX = 16;
 const TUTORIAL_TIME_SECONDS = PRESET_DIFFICULTIES.normal.time;
-const DROP_TARGET_RING_CLASSES = [
-  "ring-2",
-  "ring-slate-300/70",
-  "ring-offset-2",
-  "ring-offset-white/80",
-];
-
 const tutorialCorners: [string, string, string, string] = [
   "#38bdf8",
   "#7c3aed",
@@ -165,23 +160,14 @@ function getPracticeBoard() {
   return swapTiles(getSolvedTutorialBoard("practice"), 5, 6);
 }
 
-function getPaddedSpotlightRect(element: HTMLElement): SpotlightRect {
+function getElementRect(element: HTMLElement): SpotlightRect {
   const rect = element.getBoundingClientRect();
-  const viewport = window.visualViewport;
-  const viewportLeft = viewport?.offsetLeft ?? 0;
-  const viewportTop = viewport?.offsetTop ?? 0;
-  const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
-  const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
-  const left = Math.max(viewportLeft + VIEWPORT_MARGIN_PX, rect.left - SPOTLIGHT_PADDING_PX);
-  const top = Math.max(viewportTop + VIEWPORT_MARGIN_PX, rect.top - SPOTLIGHT_PADDING_PX);
-  const right = Math.min(viewportRight - VIEWPORT_MARGIN_PX, rect.right + SPOTLIGHT_PADDING_PX);
-  const bottom = Math.min(viewportBottom - VIEWPORT_MARGIN_PX, rect.bottom + SPOTLIGHT_PADDING_PX);
 
   return {
-    height: bottom - top,
-    left,
-    top,
-    width: right - left,
+    height: rect.height,
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
   };
 }
 
@@ -204,17 +190,33 @@ function getTutorialModalPosition(spotlightRect: SpotlightRect, modalSize: Modal
   const modalWidth = Math.min(modalSize.width, viewportWidth - VIEWPORT_MARGIN_PX * 2);
   const modalHeight = modalSize.height;
   const centeredLeft = spotlightRect.left + spotlightRect.width / 2 - modalWidth / 2;
-  const belowTop = spotlightRect.top + spotlightRect.height + MODAL_GAP_PX;
-  const aboveTop = spotlightRect.top - modalHeight - MODAL_GAP_PX;
+  const spotlightBottom = spotlightRect.top + spotlightRect.height;
+  const preferredGap = Math.min(
+    MODAL_GAP_MAX_PX,
+    Math.max(MODAL_GAP_MIN_PX, viewportWidth * 0.02),
+  );
+  const availableSpaceBelow = viewportBottom - spotlightBottom - modalHeight;
+  const bottomMargin = Math.min(
+    VIEWPORT_MARGIN_PX,
+    Math.max(0, availableSpaceBelow),
+  );
+  const availableGapBelow = availableSpaceBelow - bottomMargin;
+  const belowGap = Math.max(0, Math.min(preferredGap, availableGapBelow));
+  const belowTop = spotlightBottom + belowGap;
+  const aboveTop = spotlightRect.top - modalHeight - preferredGap;
   const maxTop = viewportBottom - modalHeight - VIEWPORT_MARGIN_PX;
-  const hasRoomBelow = belowTop + modalHeight <= viewportBottom - VIEWPORT_MARGIN_PX;
+  const hasRoomBelow = availableSpaceBelow >= 0;
   const hasRoomAbove = aboveTop >= viewportTop + VIEWPORT_MARGIN_PX;
+  const preferredTop = !hasRoomBelow && hasRoomAbove ? aboveTop : belowTop;
+  const maximumTop = hasRoomBelow
+    ? viewportBottom - modalHeight - bottomMargin
+    : maxTop;
 
   return {
     left: getClampedModalLeft(centeredLeft, modalWidth),
     top: Math.max(
       viewportTop + VIEWPORT_MARGIN_PX,
-      Math.min(hasRoomBelow || !hasRoomAbove ? belowTop : aboveTop, maxTop),
+      Math.min(preferredTop, maximumTop),
     ),
   };
 }
@@ -228,6 +230,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   const [board, setBoard] = useState(() => getSolvedTutorialBoard("goal"));
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
   const [pressedTileIndex, setPressedTileIndex] = useState<number | null>(null);
+  const [dropTargetRect, setDropTargetRect] = useState<DropTargetRect | null>(null);
   const [stepCompletionPending, setStepCompletionPending] = useState(false);
   const [readyModalOpen, setReadyModalOpen] = useState(false);
   const [modalPosition, setModalPosition] = useState<ModalPosition | null>(null);
@@ -247,7 +250,6 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
-  const dropTargetRectsRef = useRef<Array<{ index: number; rect: DOMRect }>>([]);
   const stepCompletionTimeoutRef = useRef<number | null>(null);
 
   const stage = stageCopy[stageIndex];
@@ -259,6 +261,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     ? formatTime(TUTORIAL_TIME_SECONDS - 3)
     : formatTime(TUTORIAL_TIME_SECONDS);
   const draggedIndex = dragSession?.index ?? null;
+  const tutorialModalMounted = !readyModalOpen && modalPosition !== null;
   const tileRadiusClass = getTileRadiusClass(BOARD_SIZE);
   const boardDensityClass = getBoardDensityClass(BOARD_SIZE);
   const activeSpotlightClass =
@@ -271,14 +274,14 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
       return;
     }
 
-    const targetElement = stage.highlight === "hud" ? hudSpotlightRef.current : boardSpotlightRef.current;
-    if (!targetElement) {
+    const positionTargetElement = boardSpotlightRef.current;
+    if (!positionTargetElement) {
       return;
     }
 
-    const nextSpotlightRect = getPaddedSpotlightRect(targetElement);
+    const nextSpotlightRect = getElementRect(positionTargetElement);
     setModalPosition(getTutorialModalPosition(nextSpotlightRect, modalSize));
-  }, [modalSize, readyModalOpen, stage.highlight]);
+  }, [modalSize, readyModalOpen]);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -372,10 +375,9 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     }
 
     const updateModalSize = () => {
-      const rect = modalElement.getBoundingClientRect();
       setModalSize({
-        height: rect.height || MODAL_ESTIMATED_HEIGHT_PX,
-        width: rect.width || MODAL_WIDTH_PX,
+        height: modalElement.offsetHeight || MODAL_ESTIMATED_HEIGHT_PX,
+        width: modalElement.offsetWidth || MODAL_WIDTH_PX,
       });
     };
 
@@ -391,7 +393,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     return () => {
       resizeObserver.disconnect();
     };
-  }, [readyModalOpen, stageIndex]);
+  }, [readyModalOpen, stageIndex, tutorialModalMounted]);
 
   useEffect(() => {
     return () => {
@@ -406,39 +408,34 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     }
   }, []);
 
-  const setDropTargetHighlight = useCallback((index: number | null, active: boolean) => {
-    if (index === null) {
-      return;
-    }
-
-    const tile = board[index];
-    if (!tile) {
-      return;
-    }
-
-    const element = tileElementsRef.current[tile.id];
-    if (!element) {
-      return;
-    }
-
-    if (active) {
-      element.classList.add(...DROP_TARGET_RING_CLASSES);
-      return;
-    }
-
-    element.classList.remove(...DROP_TARGET_RING_CLASSES);
-  }, [board]);
-
   const updateHoveredDropTarget = useCallback((nextIndex: number | null) => {
     const previousIndex = hoveredTargetIndexRef.current;
     if (previousIndex === nextIndex) {
       return;
     }
 
-    setDropTargetHighlight(previousIndex, false);
     hoveredTargetIndexRef.current = nextIndex;
-    setDropTargetHighlight(nextIndex, true);
-  }, [setDropTargetHighlight]);
+
+    if (nextIndex === null) {
+      setDropTargetRect(null);
+      return;
+    }
+
+    const tile = board[nextIndex];
+    const element = tile ? tileElementsRef.current[tile.id] : null;
+    if (!element) {
+      setDropTargetRect(null);
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    setDropTargetRect({
+      height: rect.height,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+    });
+  }, [board]);
 
   const clearDragSession = useCallback(() => {
     cancelDragAnimationFrame();
@@ -458,7 +455,6 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
 
     dragPointerTargetRef.current = null;
     dragPointerPositionRef.current = null;
-    dropTargetRectsRef.current = [];
     pendingDragStartRef.current = null;
     setPressedTileIndex(null);
     updateHoveredDropTarget(null);
@@ -466,15 +462,41 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
   }, [cancelDragAnimationFrame, dragSession, updateHoveredDropTarget]);
 
   const resolveDropTargetIndex = useCallback((clientX: number, clientY: number) => {
-    const target = dropTargetRectsRef.current.find(({ rect }) =>
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom,
-    );
+    if (typeof document === "undefined") {
+      return null;
+    }
 
-    return target?.index ?? null;
-  }, []);
+    const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const target = element?.closest<HTMLElement>("[data-tile-index]");
+    const rawIndex = target?.dataset.tileIndex;
+
+    if (rawIndex !== undefined) {
+      const targetIndex = Number.parseInt(rawIndex, 10);
+      if (!Number.isNaN(targetIndex)) {
+        return targetIndex;
+      }
+    }
+
+    return findNearestTileIndex(
+      clientX,
+      clientY,
+      board.flatMap((tile, index) => {
+        const tileElement = tileElementsRef.current[tile.id];
+        if (!tileElement) {
+          return [];
+        }
+
+        const rect = tileElement.getBoundingClientRect();
+        return [{
+          bottom: rect.bottom,
+          index,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+        }];
+      }),
+    );
+  }, [board]);
 
   const updateDragOverlayPosition = useCallback(() => {
     dragAnimationFrameRef.current = null;
@@ -742,10 +764,6 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     event.currentTarget.setPointerCapture(event.pointerId);
     dragPointerTargetRef.current = event.currentTarget;
     dragPointerPositionRef.current = { x: event.clientX, y: event.clientY };
-    dropTargetRectsRef.current = board.flatMap((boardTile, tileIndex) => {
-      const element = tileElementsRef.current[boardTile.id];
-      return element ? [{ index: tileIndex, rect: element.getBoundingClientRect() }] : [];
-    });
 
     pendingDragStartRef.current = {
       color: tile.color,
@@ -823,6 +841,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           confettiActive={false}
           dragSession={dragSession}
           draggedIndex={draggedIndex}
+          dropTargetRect={dropTargetRect}
           getTileRef={getTileRef}
           interactionDisabled={!canInteractWithBoard}
           isTileCorrect={isTileCorrect}
@@ -852,7 +871,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
       {!readyModalOpen && modalPosition && (
         <motion.div
           ref={modalRef}
-          className="tutorial-message theme-modal fixed z-50 w-[min(92vw,30rem)] overflow-y-auto rounded-[clamp(1rem,4vw,1.5rem)] border p-[clamp(0.85rem,3.5vw,1.5rem)] text-left"
+          className="tutorial-message theme-modal fixed z-50 w-[min(88vw,30rem)] overflow-y-auto rounded-[clamp(1rem,min(4vw,4dvh),1.5rem)] border p-[clamp(0.75rem,min(3.5vw,3.5dvh),1.5rem)] text-left"
           initial={{ opacity: 0, scale: 0.94, y: 10 }}
           style={{
             left: modalPosition.left,
@@ -866,24 +885,24 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           }}
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="flex items-center gap-4">
-            <span className="theme-chip rounded-full px-5 py-2 font-fredoka-strong text-base text-emerald-700">
+          <div className="tutorial-message-header flex items-center gap-[clamp(0.75rem,3vw,1rem)]">
+            <span className="tutorial-message-chip theme-chip rounded-full px-[clamp(0.75rem,4vw,1.25rem)] py-[clamp(0.375rem,1.5dvh,0.5rem)] font-fredoka-strong text-[clamp(0.875rem,min(4vw,4dvh),1rem)] text-emerald-700">
               {stageIndex + 1} / 4
             </span>
-            <span className="theme-text-muted font-fredoka-regular text-base">
+            <span className="tutorial-message-label theme-text-muted font-fredoka-regular text-[clamp(0.875rem,min(4vw,4dvh),1rem)]">
               {stage.eyebrow}
             </span>
           </div>
 
-          <p className="theme-text-primary font-fredoka-strong mt-[clamp(0.65rem,2vh,1.25rem)] text-[clamp(1rem,5vw,1.5rem)] leading-[1.35]">
+          <p className="tutorial-message-title theme-text-primary font-fredoka-strong mt-[clamp(0.5rem,2dvh,1.25rem)] text-[clamp(1rem,min(5vw,5dvh),1.5rem)] leading-[1.35]">
             {stage.title}
           </p>
 
-          <div className="mt-[clamp(0.75rem,2vh,1.5rem)] grid grid-cols-3 items-center gap-[clamp(0.35rem,2vw,0.75rem)]">
+          <div className="tutorial-message-actions mt-[clamp(0.625rem,2dvh,1.5rem)] grid grid-cols-3 items-center gap-[clamp(0.35rem,2vw,0.75rem)]">
             <button
               type="button"
               onClick={onPlay}
-              className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)]"
+              className="tutorial-message-button theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
             >
               Skip
             </button>
@@ -892,7 +911,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               type="button"
               onClick={handleBack}
               disabled={stageIndex === 0}
-              className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)] disabled:cursor-not-allowed disabled:opacity-45"
+              className="tutorial-message-button theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)] disabled:cursor-not-allowed disabled:opacity-45"
             >
               Back
             </button>
@@ -901,7 +920,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 disabled
-                className="theme-button-secondary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.7rem,3.4vw,1.125rem)] opacity-70"
+                className="tutorial-message-button theme-button-secondary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.7rem,min(3.4vw,4dvh),1.125rem)] opacity-70"
               >
                 Swap first
               </button>
@@ -909,7 +928,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
               <button
                 type="button"
                 onClick={handleNext}
-                className="theme-button-primary rounded-full px-2 py-[clamp(0.55rem,2vh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,4vw,1.125rem)]"
+                className="tutorial-message-button theme-button-primary rounded-full px-2 py-[clamp(0.5rem,2dvh,0.75rem)] font-fredoka-strong text-[clamp(0.8rem,min(4vw,4dvh),1.125rem)]"
               >
                 Next
               </button>

@@ -21,6 +21,7 @@ import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
 import { useBoardSize } from "./game/hooks/use-board-size";
+import { useAccountProgressSync } from "./game/hooks/use-account-progress-sync";
 import { usePersistentDailyPuzzle } from "./game/hooks/use-persistent-daily-puzzle";
 import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
 import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
@@ -332,6 +333,18 @@ export default function Home() {
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
   const [boardResetKey, setBoardResetKey] = useState(0);
   const [activeView, setActiveView] = useState<AppView>("game");
+
+  useEffect(() => {
+    const requestedView = new URLSearchParams(window.location.search).get("view");
+
+    if (
+      requestedView === "about" ||
+      requestedView === "privacy" ||
+      requestedView === "tutorial"
+    ) {
+      setActiveView(requestedView);
+    }
+  }, []);
   const [hudFeedbackKey, setHudFeedbackKey] = useState(0);
   const [introStep, setIntroStep] = useState<IntroStep>("welcome");
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
@@ -344,9 +357,34 @@ export default function Home() {
   const blackAndWhitePreviewTimeoutRef = useRef<number | null>(null);
   const blackAndWhitePreviewIntervalRef = useRef<number | null>(null);
 
-  const { bestStats, setBestStats } = usePersistentBestStats();
-  const { dailyRecord, setDailyRecord } = usePersistentDailyPuzzle();
-  const { endlessStats, setEndlessStats } = usePersistentEndlessStats();
+  const {
+    bestStats,
+    isLoaded: bestStatsAreLoaded,
+    setBestStats,
+  } = usePersistentBestStats();
+  const {
+    dailyRecord,
+    isLoaded: dailyRecordIsLoaded,
+    setDailyRecord,
+  } = usePersistentDailyPuzzle();
+  const {
+    endlessStats,
+    isLoaded: endlessStatsAreLoaded,
+    setEndlessStats,
+  } = usePersistentEndlessStats();
+
+  useAccountProgressSync({
+    bestStats,
+    dailyRecord,
+    endlessStats,
+    isLoaded:
+      bestStatsAreLoaded &&
+      dailyRecordIsLoaded &&
+      endlessStatsAreLoaded,
+    setBestStats,
+    setDailyRecord,
+    setEndlessStats,
+  });
 
   const dailyConfig = getDailyPuzzleConfig();
   const dailyPuzzleStyle = getDailyPuzzleStyle(createSeededRandom(`${dailyDateKey}:style`)());
@@ -398,6 +436,7 @@ export default function Home() {
     clearPendingSwapAnimation,
     dragSession,
     draggedIndex,
+    dropTargetRect,
     getTileRef,
     handlePointerDown,
     pressedTileIndex,
@@ -982,9 +1021,6 @@ export default function Home() {
                 isDailyMode
                   ? {
                       dateKey: dailyDateKey,
-                      size: dailyConfig.size,
-                      styleLabel: dailyPuzzleStyleLabel,
-                      swapBudget: dailySwapBudget,
                     }
                   : undefined
               }
@@ -1030,6 +1066,7 @@ export default function Home() {
               boardDensityClass={boardDensityClass}
               dragSession={dragSession}
               draggedIndex={draggedIndex}
+              dropTargetRect={dropTargetRect}
               getTileRef={getTileRef}
               interactionDisabled={previewActive || dailyAttemptFailed}
               previewCountdown={previewActive ? previewCountdown : null}

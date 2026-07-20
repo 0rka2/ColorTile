@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 
 import type { DailyPuzzleRecord } from "../game-types";
-
-const DAILY_PUZZLE_STORAGE_KEY = "colortile-daily-puzzle";
+import { DAILY_PUZZLE_STORAGE_KEY } from "../player-progress";
 
 export function usePersistentDailyPuzzle() {
   const [dailyRecord, setDailyRecord] = useState<DailyPuzzleRecord | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -23,6 +23,8 @@ export function usePersistentDailyPuzzle() {
       setDailyRecord(JSON.parse(stored) as DailyPuzzleRecord);
     } catch {
       // Ignore malformed local storage and start fresh.
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
 
@@ -38,5 +40,5 @@ export function usePersistentDailyPuzzle() {
     window.localStorage.setItem(DAILY_PUZZLE_STORAGE_KEY, JSON.stringify(dailyRecord));
   }, [dailyRecord]);
 
-  return { dailyRecord, setDailyRecord };
+  return { dailyRecord, isLoaded, setDailyRecord };
 }

@@ -1,8 +1,21 @@
 "use client";
 
-import { forwardRef, useEffect, useLayoutEffect, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from "react";
+import Link from "next/link";
+import { FaRegUser } from "react-icons/fa";
 import { HiOutlineSpeakerWave, HiOutlineSpeakerXMark } from "react-icons/hi2";
 
+import { authClient } from "../../lib/auth-client";
+import {
+  AccountAuthModal,
+  type AccountAuthMode,
+} from "../../account/components/account-auth-modal";
 import type { AppView } from "../../views/app-view";
 import { GradientText } from "../../../components/ui/gradient-text";
 import { GameDrawer, ThemeToggle } from "./game-drawer";
@@ -28,6 +41,14 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [soundIsEnabled, setSoundIsEnabled] = useState(true);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] =
+    useState<AccountAuthMode>("sign-in");
+  const { data: session } = authClient.useSession();
+
+  const closeAuthModal = useCallback(() => {
+    setAuthModalOpen(false);
+  }, []);
 
   useLayoutEffect(() => {
     try {
@@ -50,8 +71,28 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
     }
   }, [themeMode]);
 
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const requestedMode = searchParams.get("auth");
+
+    if (requestedMode !== "sign-in" && requestedMode !== "sign-up") {
+      return;
+    }
+
+    setAuthModalMode(requestedMode);
+    setAuthModalOpen(true);
+    searchParams.delete("auth");
+
+    const nextQuery = searchParams.toString();
+    const nextUrl = `${window.location.pathname}${
+      nextQuery ? `?${nextQuery}` : ""
+    }${window.location.hash}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, []);
+
   return (
-    <header ref={ref} className="game-header flex items-start justify-between gap-[clamp(0.605rem,1.32vw,0.99rem)]">
+    <>
+      <header ref={ref} className="game-header flex items-start justify-between gap-[clamp(0.605rem,1.32vw,0.99rem)]">
       <div className="flex flex-nowrap items-center gap-[clamp(1rem,2.6vw,2rem)]">
         <button
           type="button"
@@ -83,6 +124,43 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
       </div>
 
       <div className="flex shrink-0 items-center gap-[0.75rem] sm:gap-[0.875rem]">
+        {session ? (
+          <Link
+            href="/account"
+            aria-label={`Open ${session.user.name}'s account`}
+            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-[3rem] max-w-[12rem] items-center gap-2 rounded-full border px-3 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:px-3.5"
+          >
+            <span
+              aria-hidden="true"
+              className="account-action-avatar font-fredoka-strong flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm uppercase leading-none"
+            >
+              {session.user.name.trim().charAt(0) || "P"}
+            </span>
+            <span className="truncate font-fredoka-strong text-sm sm:text-base">
+              {session.user.name}
+            </span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setAuthModalMode("sign-in");
+              setAuthModalOpen(true);
+            }}
+            aria-label="Sign in or create an account"
+            aria-haspopup="dialog"
+            aria-expanded={authModalOpen}
+            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-[3rem] items-center gap-2 rounded-full border px-3 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:px-3.5"
+          >
+            <FaRegUser
+              aria-hidden="true"
+              className="pointer-events-none h-[1.1rem] w-[1.1rem] shrink-0"
+            />
+            <span className="font-fredoka-strong whitespace-nowrap text-sm sm:text-base">
+              Sign in
+            </span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -102,6 +180,12 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
         </button>
         <ThemeToggle onThemeModeChange={setThemeMode} themeMode={themeMode} />
       </div>
-    </header>
+      </header>
+      <AccountAuthModal
+        initialMode={authModalMode}
+        isOpen={authModalOpen}
+        onClose={closeAuthModal}
+      />
+    </>
   );
 });

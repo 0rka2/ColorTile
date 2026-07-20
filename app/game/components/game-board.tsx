@@ -7,6 +7,7 @@ import {
   hexToHsl,
   hexToRgb,
 } from "../game-logic";
+import type { DropTargetRect } from "../drop-target";
 import type { Tile } from "../game-types";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
@@ -91,6 +92,7 @@ type BoardProps = {
     width: number;
   } | null;
   draggedIndex: number | null;
+  dropTargetRect: DropTargetRect | null;
   confettiActive: boolean;
   getTileRef: (tileId: string) => (element: HTMLButtonElement | null) => void;
   interactionDisabled: boolean;
@@ -295,6 +297,7 @@ export const GameBoard = memo(function GameBoard({
   boardDensityClass,
   dragSession,
   draggedIndex,
+  dropTargetRect,
   confettiActive,
   getTileRef,
   interactionDisabled,
@@ -346,6 +349,23 @@ export const GameBoard = memo(function GameBoard({
             <span aria-hidden="true" className="tile-glass-sheen" />
             {dragSession.isCorrect && <CheckMark />}
           </div>,
+          document.body,
+        )
+      : null;
+  const dropTargetOutline =
+    dropTargetRect && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            aria-hidden="true"
+            className={`tile-drop-target-outline pointer-events-none fixed ${tileRadiusClass}`}
+            style={{
+              height: `${dropTargetRect.height}px`,
+              left: `${dropTargetRect.left}px`,
+              top: `${dropTargetRect.top}px`,
+              width: `${dropTargetRect.width}px`,
+              zIndex: 60,
+            }}
+          />,
           document.body,
         )
       : null;
@@ -449,6 +469,7 @@ export const GameBoard = memo(function GameBoard({
         </div>
       </motion.div>
       {dragOverlay}
+      {dropTargetOutline}
     </>
   );
 });
