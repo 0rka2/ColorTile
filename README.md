@@ -10,9 +10,8 @@ Each round starts with a scrambled grid generated from four corner colors. Your 
 * 🔄 Tile swapping gameplay
 * ⏱️ Timed puzzle challenges
 * 📊 Move counter and completion tracking
-* 🏆 Planned global leaderboards
-* 📅 Planned daily puzzles
-* ⚔️ Planned multiplayer race mode
+* 🏆 Global leaderboards
+* 📅 Daily puzzles
 * 📱 Mobile-friendly responsive design
 * 🚀 Built with Next.js, TypeScript, and Tailwind CSS
 
@@ -21,15 +20,13 @@ Each round starts with a scrambled grid generated from four corner colors. Your 
 1. Start with a scrambled color grid.
 2. Tap two tiles to swap their positions.
 3. Restore the smooth gradient between all four corner colors.
-4. Complete the board before the timer reaches zero.
-5. Aim for the fastest time and fewest moves possible.
+4. Aim for the fastest time and fewest moves possible.
 
 ## Planned Game Modes
 
 * Practice Mode
 * Timed Challenges
 * Daily Puzzles
-* Ranked Multiplayer
 * Endless Mode
 
 ## Tech Stack
