@@ -1099,7 +1099,7 @@ export default function Home() {
           <motion.div
             {...hudFeedbackMotion}
             ref={restartRef}
-            className="relative z-10 flex w-full justify-center"
+            className="restart-area relative z-10 flex w-full justify-center"
             style={{ width: boardAreaWidth }}
           >
             <button

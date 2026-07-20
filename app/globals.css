@@ -464,6 +464,7 @@ html[data-theme="dark"] .restart-button:hover {
 
 .tile-surface,
 .tile-drag-overlay {
+  background-clip: padding-box;
   border-color: var(--tile-edge);
 }
 
@@ -519,6 +520,10 @@ html[data-theme="dark"] .restart-button:hover {
 @media (max-width: 799px) {
   .game-play-section {
     padding-bottom: calc(4.85rem + env(safe-area-inset-bottom));
+  }
+
+  .restart-area {
+    margin-bottom: 0.75rem;
   }
 
   .side-actions-rail {
@@ -622,45 +627,46 @@ html[data-theme="dark"] .restart-button:hover {
 }
 
 .tutorial-message {
-  width: min(calc(100vw - 2rem), clamp(20rem, 84vw, 30rem));
+  width: min(calc(100vw - 2rem), 34rem);
   max-height: calc(100dvh - 2rem);
   border-radius: clamp(1rem, 3vw, 1.5rem);
   overscroll-behavior: contain;
-  padding: clamp(0.3125rem, calc(4vw - 0.95rem), 1.5rem);
+  padding: clamp(1rem, 3vw, 1.5rem);
 }
 
 .tutorial-message .tutorial-message-header {
-  gap: clamp(0.5rem, 2vw, 1rem);
+  gap: clamp(0.75rem, 2vw, 1rem);
 }
 
 .tutorial-message .tutorial-message-chip {
   padding:
-    clamp(0.125rem, calc(1.5vw - 0.375rem), 0.5rem)
+    clamp(0.375rem, 1vw, 0.5rem)
     clamp(0.75rem, 3vw, 1.25rem);
-  font-size: clamp(0.75rem, calc(1vw + 0.5rem), 1rem);
-  line-height: clamp(1rem, calc(1vw + 0.75rem), 1.5rem);
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.5rem;
 }
 
 .tutorial-message .tutorial-message-label {
-  font-size: clamp(0.75rem, calc(1vw + 0.5rem), 1rem);
-  line-height: clamp(1rem, calc(1vw + 0.75rem), 1.5rem);
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  line-height: 1.5rem;
 }
 
 .tutorial-message .tutorial-message-title {
-  margin-top: clamp(0.1875rem, calc(2.5vw - 0.625rem), 1.25rem);
-  font-size: clamp(1rem, calc(2vw + 0.375rem), 1.5rem);
+  margin-top: clamp(0.75rem, 2vw, 1.25rem);
+  font-size: clamp(1.125rem, 3vw, 1.5rem);
   line-height: 1.25;
 }
 
 .tutorial-message .tutorial-message-actions {
-  margin-top: clamp(0.1875rem, calc(2.5vw - 0.625rem), 1.5rem);
+  margin-top: clamp(1rem, 2.5vw, 1.5rem);
   gap: clamp(0.35rem, 2vw, 0.75rem);
 }
 
 .tutorial-message .tutorial-message-button {
-  padding: clamp(0.25rem, calc(1.5vw - 0.375rem), 0.75rem) 0.5rem;
-  font-size: clamp(0.75rem, calc(1vw + 0.5rem), 1.125rem);
-  line-height: clamp(1rem, calc(1vw + 0.75rem), 1.375rem);
+  min-height: 2.75rem;
+  padding: 0.625rem 0.5rem;
+  font-size: clamp(0.875rem, 2vw, 1.125rem);
+  line-height: 1.375rem;
 }
 
 .leaderboard-overlay {
@@ -675,10 +681,6 @@ html[data-theme="dark"] .restart-button:hover {
   .tile-surface {
     box-shadow: 0 6px 14px rgba(148, 163, 184, 0.1) !important;
   }
-}
-
-.tile-surface {
-  backface-visibility: hidden;
 }
 
 .tile-drop-target-outline {

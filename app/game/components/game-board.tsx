@@ -25,6 +25,8 @@ const TILE_INTERACTION_SPRING = {
   damping: 30,
   mass: 0.58,
 };
+const TILE_TRANSFORM_TEMPLATE = (_transform: unknown, generatedTransform: string) =>
+  generatedTransform || "none";
 const COLOR_FAMILY_HINTS = [
   { maxHue: 22, color: "#fb7185" },
   { maxHue: 52, color: "#fb923c" },
@@ -213,16 +215,16 @@ const TileButton = memo(function TileButton({
             : TILE_REST_SHADOW,
         filter: winWaveActive
           ? [
-              withVisualModeFilter("saturate(1) brightness(1)", visualMode),
+              withVisualModeFilter("none", visualMode),
               withVisualModeFilter("saturate(1.18) brightness(1.08)", visualMode),
               withVisualModeFilter("saturate(1.08) brightness(1.03)", visualMode),
-              withVisualModeFilter("saturate(1) brightness(1)", visualMode),
+              withVisualModeFilter("none", visualMode),
             ]
           : isPressed
             ? withVisualModeFilter("saturate(1.12) brightness(1.04)", visualMode)
           : isHovering && !isDragging
             ? withVisualModeFilter("saturate(1.04) brightness(1.02)", visualMode)
-            : withVisualModeFilter("saturate(1) brightness(1)", visualMode),
+            : withVisualModeFilter("none", visualMode),
       }}
       transition={
         winWaveActive
@@ -235,6 +237,7 @@ const TileButton = memo(function TileButton({
               ...TILE_INTERACTION_SPRING,
             }
       }
+      transformTemplate={TILE_TRANSFORM_TEMPLATE}
       className={`tile-surface relative aspect-square border border-white/75 ${tileRadiusClass} ${
         isDragging ? "pointer-events-none" : ""
       } ${canDrag && !interactionDisabled ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}

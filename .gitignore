@@ -1,7 +1,31 @@
-node_modules/
-.next/
-out/
-dist/
-unit-testing/.compiled/
-.env
-.env.local
+# Dependencies
+/node_modules/
+
+# Next.js and production builds
+/.next/
+/.next-stale-runtime-fix/
+/out/
+/dist/
+
+# Test output
+/unit-testing/.compiled/
+/coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Local environment files
+.env*
+!.env.example
+
+# Logs
+*.log
+*.log.*
+*.err
+
+# Deployment tools
+/.vercel/
+
+# Operating system files
+.DS_Store
+Thumbs.db
