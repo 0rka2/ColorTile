@@ -270,7 +270,7 @@ test("endless three-star limit is seventy percent rounded up", () => {
 });
 
 test("tile radius and board density classes change at the expected thresholds", () => {
-  assert.equal(getTileRadiusClass(4), "rounded-[1.35rem]");
+  assert.equal(getTileRadiusClass(4), "rounded-[18%]");
   assert.equal(getTileRadiusClass(6), "rounded-xl");
   assert.equal(getTileRadiusClass(9), "rounded-lg");
   assert.equal(getTileRadiusClass(12), "rounded-md");

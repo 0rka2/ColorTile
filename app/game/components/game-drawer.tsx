@@ -127,7 +127,7 @@ export function ThemeToggle({
   onThemeModeChange(themeMode === "light" ? "dark" : "light");
 }}
       aria-label={`Switch to ${themeMode === "light" ? "dark" : "light"} theme`}
-      className="header-action-button theme-header-surface flex h-[3.3rem] w-[3.3rem] items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
+      className="header-action-button theme-header-surface flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
     >
       <motion.span
         key={themeMode}

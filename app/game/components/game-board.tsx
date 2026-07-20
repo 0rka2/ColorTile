@@ -213,16 +213,16 @@ const TileButton = memo(function TileButton({
             : TILE_REST_SHADOW,
         filter: winWaveActive
           ? [
-              withVisualModeFilter("saturate(1) brightness(1)", visualMode),
+              withVisualModeFilter("none", visualMode),
               withVisualModeFilter("saturate(1.18) brightness(1.08)", visualMode),
               withVisualModeFilter("saturate(1.08) brightness(1.03)", visualMode),
-              withVisualModeFilter("saturate(1) brightness(1)", visualMode),
+              withVisualModeFilter("none", visualMode),
             ]
           : isPressed
             ? withVisualModeFilter("saturate(1.12) brightness(1.04)", visualMode)
           : isHovering && !isDragging
             ? withVisualModeFilter("saturate(1.04) brightness(1.02)", visualMode)
-            : withVisualModeFilter("saturate(1) brightness(1)", visualMode),
+            : withVisualModeFilter("none", visualMode),
       }}
       transition={
         winWaveActive

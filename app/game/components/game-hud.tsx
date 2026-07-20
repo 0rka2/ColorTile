@@ -139,6 +139,14 @@ export function GameHud({
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
         </div>
+
+        {dailyInfo && (
+          <div className="theme-text-muted font-fredoka-strong mt-1.5 flex items-center justify-between gap-2 text-[0.6rem] leading-none">
+            <span className="theme-text-primary">Today&apos;s puzzle</span>
+            <span>{dailyInfo.dateKey}</span>
+            <span>Next in {formatDailyResetTime(dailyResetSeconds)}</span>
+          </div>
+        )}
       </div>
 
       <div className="game-hud-full flex flex-col gap-2">

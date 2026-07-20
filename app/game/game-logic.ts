@@ -599,7 +599,7 @@ export function getTileRadiusClass(size: number) {
     return "rounded-xl";
   }
 
-  return "rounded-[1.35rem]";
+  return "rounded-[18%]";
 }
 
 export function getBoardDensityClass(size: number) {

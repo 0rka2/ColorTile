@@ -92,25 +92,25 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
 
   return (
     <>
-      <header ref={ref} className="game-header flex items-start justify-between gap-[clamp(0.605rem,1.32vw,0.99rem)]">
-      <div className="flex flex-nowrap items-center gap-[clamp(1rem,2.6vw,2rem)]">
+      <header ref={ref} className="game-header flex items-center justify-between gap-1.5 pt-2 sm:gap-[clamp(0.605rem,1.32vw,0.99rem)]">
+      <div className="flex flex-nowrap items-center gap-2 sm:gap-[clamp(1rem,2.6vw,2rem)]">
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open navigation menu"
           aria-expanded={drawerOpen}
-          className="theme-text-primary shrink-0 text-[clamp(1.5rem,1.98vw,1.595rem)] leading-none"
+          className="theme-text-primary shrink-0 text-xl leading-none sm:text-[clamp(1.5rem,1.98vw,1.595rem)]"
         >
           {"\u2630"}
         </button>
 
         <div className="relative">
-          <div className="game-logo-surface theme-header-surface flex items-center rounded-[clamp(0.935rem,1.65vw,1.43rem)] border px-[clamp(0.715rem,1.54vw,1.045rem)] py-[clamp(0.495rem,1.1vw,0.825rem)] backdrop-blur">
+          <div className="game-logo-surface theme-header-surface flex items-center rounded-[clamp(0.935rem,1.65vw,1.43rem)] border px-1 py-2 backdrop-blur sm:px-[clamp(0.715rem,1.54vw,1.045rem)] sm:py-[clamp(0.495rem,1.1vw,0.825rem)]">
             <button
               type="button"
               onClick={onLogoClick}
               aria-label="Go to ColorTile home"
-              className="game-logo font-fredoka-display theme-text-primary shrink-0 text-[clamp(2rem,2.5vw,2.5rem)] font-black leading-none tracking-[-0.05em]"
+              className="game-logo font-fredoka-display theme-text-primary shrink-0 text-2xl font-black leading-none tracking-[-0.05em] sm:text-[clamp(2rem,2.5vw,2.5rem)]"
             >
               <GradientText className="px-1">ColorTile</GradientText>
             </button>
@@ -123,12 +123,12 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-[0.75rem] sm:gap-[0.875rem]">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-[0.875rem]">
         {session ? (
           <Link
             href="/account"
             aria-label={`Open ${session.user.name}'s account`}
-            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-[3rem] max-w-[12rem] items-center gap-2 rounded-full border px-3 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:px-3.5"
+            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-10 max-w-[6.5rem] items-center gap-1 rounded-full border px-2 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:max-w-[12rem] sm:gap-2 sm:px-3.5"
           >
             <span
               aria-hidden="true"
@@ -150,7 +150,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
             aria-label="Sign in or create an account"
             aria-haspopup="dialog"
             aria-expanded={authModalOpen}
-            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-[3rem] items-center gap-2 rounded-full border px-3 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:px-3.5"
+            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-10 items-center gap-1 rounded-full border px-2 shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:gap-2 sm:px-3.5"
           >
             <FaRegUser
               aria-hidden="true"
@@ -170,7 +170,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
           }}
           aria-label={`${soundIsEnabled ? "Turn off" : "Turn on"} sound`}
           aria-pressed={!soundIsEnabled}
-          className="header-action-button theme-header-surface theme-text-primary flex h-[3.3rem] w-[3.3rem] items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
+          className="header-action-button theme-header-surface theme-text-primary flex h-10 w-10 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.85rem] sm:w-[3.85rem]"
         >
           {soundIsEnabled ? (
             <HiOutlineSpeakerWave aria-hidden="true" className="pointer-events-none h-[1.65rem] w-[1.65rem]" />

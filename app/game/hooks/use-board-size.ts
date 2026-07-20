@@ -6,6 +6,7 @@ import type { AppView } from "../../views/app-view";
 import type { DifficultyKey } from "../game-types";
 
 const GAME_AREA_MAX_WIDTH_PX = 600;
+const MOBILE_BOARD_BREAKPOINT_PX = 640;
 
 type BoardSizeOptions = {
   activeConfigSize: number;
@@ -83,8 +84,11 @@ export function useBoardSize({
         paddingBottom +
         contentPaddingBottom;
       const availableHeight = viewportHeight - reservedHeight;
-
-      const measuredBoardSize = Math.max(0, Math.floor(Math.min(availableWidth, availableHeight)));
+      const boardSizeLimit =
+        viewportWidth <= MOBILE_BOARD_BREAKPOINT_PX
+          ? availableWidth
+          : Math.min(availableWidth, availableHeight);
+      const measuredBoardSize = Math.max(0, Math.floor(boardSizeLimit));
       const nextBoardSize = Math.min(availableWidth, GAME_AREA_MAX_WIDTH_PX, measuredBoardSize);
       setBoardSize(Math.max(0, nextBoardSize));
     };
