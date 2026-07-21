@@ -210,10 +210,10 @@ test("endless countdown durations match normal and hard sized boards", () => {
 });
 
 test("endless countdown swap puzzles get a generous swap budget", () => {
-  const baseBudget = getEndlessSwapBudget(5, 6);
+  const baseBudget = getEndlessSwapBudget(5);
 
-  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "countdown-swaps"), baseBudget + 3);
-  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "classic"), baseBudget);
+  assert.equal(getEndlessPuzzleSwapBudget(5, "countdown-swaps"), 32);
+  assert.equal(getEndlessPuzzleSwapBudget(5, "classic"), baseBudget);
 });
 
 test("daily puzzle date key uses UTC dates", () => {
@@ -257,11 +257,11 @@ test("board random helpers still use Math.random by default", () => {
   assert.deepEqual(defaultCorners, injectedCorners);
 });
 
-test("endless swap budget tightens with streak but keeps a minimum", () => {
-  assert.equal(getEndlessSwapBudget(4, 0), 15);
-  assert.equal(getEndlessSwapBudget(4, 3), 14);
-  assert.equal(getEndlessSwapBudget(4, 99), 8);
-  assert.equal(getEndlessSwapBudget(7, 0), 48);
+test("endless swap budget stays between 30 and 32 based on board difficulty", () => {
+  assert.equal(getEndlessSwapBudget(4), 30);
+  assert.equal(getEndlessSwapBudget(5), 31);
+  assert.equal(getEndlessSwapBudget(6), 32);
+  assert.equal(getEndlessSwapBudget(7), 32);
 });
 
 test("endless three-star limit is seventy percent rounded up", () => {

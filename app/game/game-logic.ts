@@ -132,6 +132,9 @@ export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = Object.fromEntri
   Object.entries(GAME_MODE_DEFINITIONS).map(([key, mode]) => [key, mode.label]),
 ) as Record<DifficultyKey, string>;
 
+const MIN_CONSTRAINED_SWAP_BUDGET = 30;
+const MAX_CONSTRAINED_SWAP_BUDGET = 32;
+
 export const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
@@ -151,8 +154,14 @@ export function getEndlessPuzzleSize(puzzleNumber: number) {
   return 7;
 }
 
-export function getEndlessSwapBudget(size: number, streak: number) {
-  return Math.max(size + 4, size * size - 1 - Math.floor(streak / 3));
+export function getEndlessSwapBudget(size: number) {
+  const normalBoardSize = PRESET_DIFFICULTIES.normal.size;
+
+  return clamp(
+    MIN_CONSTRAINED_SWAP_BUDGET + (size - normalBoardSize),
+    MIN_CONSTRAINED_SWAP_BUDGET,
+    MAX_CONSTRAINED_SWAP_BUDGET,
+  );
 }
 
 export function getEndlessThreeStarMoveLimit(swapBudget: number) {
@@ -234,11 +243,11 @@ export function endlessTypeUsesSwapLimit(type: EndlessPuzzleType) {
   return type === "classic" || type === "black-and-white" || type === "countdown-swaps";
 }
 
-export function getEndlessPuzzleSwapBudget(size: number, streak: number, type: EndlessPuzzleType) {
-  const baseBudget = getEndlessSwapBudget(size, streak);
+export function getEndlessPuzzleSwapBudget(size: number, type: EndlessPuzzleType) {
+  const baseBudget = getEndlessSwapBudget(size);
 
   if (type === "countdown-swaps") {
-    return baseBudget + 3;
+    return Math.min(baseBudget + 3, MAX_CONSTRAINED_SWAP_BUDGET);
   }
 
   return baseBudget;

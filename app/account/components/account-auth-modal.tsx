@@ -8,7 +8,6 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -93,7 +92,6 @@ export function AccountAuthModal({
   isOpen,
   onClose,
 }: Readonly<AccountAuthModalProps>) {
-  const router = useRouter();
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<AccountAuthMode>(initialMode);
   const [email, setEmail] = useState("");
@@ -188,7 +186,6 @@ export function AccountAuthModal({
         }
 
         closeModal();
-        router.refresh();
         return;
       }
 
@@ -206,7 +203,6 @@ export function AccountAuthModal({
 
       window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, sanitizedName);
       closeModal();
-      router.refresh();
     } catch {
       setError("ColorTile accounts are temporarily unavailable.");
     } finally {

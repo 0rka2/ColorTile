@@ -141,10 +141,12 @@ export function GameHud({
         </div>
 
         {dailyInfo && (
-          <div className="theme-text-muted font-fredoka-strong mt-1.5 flex items-center justify-between gap-2 text-[0.6rem] leading-none">
+          <div className="theme-text-muted font-fredoka-strong mt-1.5 flex items-center justify-between gap-2 text-[0.7rem] leading-none">
             <span className="theme-text-primary">Today&apos;s puzzle</span>
             <span>{dailyInfo.dateKey}</span>
-            <span>Next in {formatDailyResetTime(dailyResetSeconds)}</span>
+            <span>
+              {formatDailyResetTime(dailyResetSeconds)}
+            </span>
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { getSql } from "@/app/lib/db";
 import { auth } from "@/app/lib/auth";
+import { getDailyPuzzleDateKey } from "@/app/game/game-logic";
 import {
   canUseLeaderboardCategory,
   isDailyLeaderboardDateKey,
@@ -26,6 +27,7 @@ async function createLeaderboardTables() {
   `;
 
   await sql`alter table leaderboard add column if not exists user_id text`;
+  await sql`create index if not exists leaderboard_created_at_idx on leaderboard (created_at)`;
 
   await sql`
     create table if not exists endless_streak_leaderboard (
@@ -38,6 +40,7 @@ async function createLeaderboardTables() {
   `;
 
   await sql`alter table endless_streak_leaderboard add column if not exists user_id text`;
+  await sql`create index if not exists endless_streak_created_at_idx on endless_streak_leaderboard (created_at)`;
 
   await sql`
     create table if not exists daily_leaderboard (
@@ -52,6 +55,7 @@ async function createLeaderboardTables() {
   `;
 
   await sql`alter table daily_leaderboard add column if not exists user_id text`;
+  await sql`create index if not exists daily_leaderboard_created_at_idx on daily_leaderboard (created_at)`;
 }
 
 function ensureLeaderboardTable() {
@@ -63,6 +67,27 @@ function ensureLeaderboardTable() {
   }
 
   return leaderboardTablePromise;
+}
+
+async function prepareLeaderboardTables() {
+  await ensureLeaderboardTable();
+
+  const sql = getSql();
+  await sql`
+    with deleted_solve_scores as (
+      delete from leaderboard
+      where created_at < date_trunc('year', now() at time zone 'UTC') at time zone 'UTC'
+    ),
+    deleted_endless_scores as (
+      delete from endless_streak_leaderboard
+      where created_at < date_trunc('year', now() at time zone 'UTC') at time zone 'UTC'
+    ),
+    deleted_daily_scores as (
+      delete from daily_leaderboard
+      where created_at < date_trunc('year', now() at time zone 'UTC') at time zone 'UTC'
+    )
+    select 1
+  `;
 }
 
 function leaderboardUnavailable(error: unknown) {
@@ -86,7 +111,7 @@ async function getLeaderboard(request: Request) {
     );
   }
 
-  await ensureLeaderboardTable();
+  await prepareLeaderboardTables();
   const sql = getSql();
 
   if (categoryParam === "daily") {
@@ -98,6 +123,10 @@ async function getLeaderboard(request: Request) {
     }
 
     const rows = await sql`
+      with deleted_old_scores as (
+        delete from daily_leaderboard
+        where date_key < ${getDailyPuzzleDateKey()}
+      )
       select id, player_name, date_key, style, moves, solve_time, created_at
       from daily_leaderboard
       where date_key = ${dateKeyParam}
@@ -197,9 +226,13 @@ async function submitLeaderboardScore(request: Request) {
       return Response.json({ error: "Solve time must be a positive number." }, { status: 400 });
     }
 
-    await ensureLeaderboardTable();
+    await prepareLeaderboardTables();
     const sql = getSql();
     await sql`
+      with deleted_old_scores as (
+        delete from daily_leaderboard
+        where date_key < ${getDailyPuzzleDateKey()}
+      )
       insert into daily_leaderboard (user_id, player_name, date_key, style, moves, solve_time)
       values (${userId}, ${playerName}, ${body.dateKey}, ${body.style}, ${moves}, ${solveTime})
     `;
@@ -224,7 +257,7 @@ async function submitLeaderboardScore(request: Request) {
       return Response.json({ error: "Streak count must be a positive integer." }, { status: 400 });
     }
 
-    await ensureLeaderboardTable();
+    await prepareLeaderboardTables();
     const sql = getSql();
     await sql`
       insert into endless_streak_leaderboard (user_id, player_name, difficulty, streak_count)
@@ -246,7 +279,7 @@ async function submitLeaderboardScore(request: Request) {
     return Response.json({ error: "This difficulty cannot submit solve scores." }, { status: 400 });
   }
 
-  await ensureLeaderboardTable();
+  await prepareLeaderboardTables();
   const sql = getSql();
   await sql`
     insert into leaderboard (user_id, player_name, difficulty, moves, solve_time)

@@ -8,6 +8,10 @@ import { TbTargetArrow } from "react-icons/tb";
 import { VscStarFull } from "react-icons/vsc";
 
 import { GradientText } from "../components/ui/gradient-text";
+import {
+  AccountAuthModal,
+  type AccountAuthMode,
+} from "./account/components/account-auth-modal";
 import { GameBoard } from "./game/components/game-board";
 import { CompactLeaderboardPanel } from "./game/components/compact-leaderboard-panel";
 import { GameControls } from "./game/components/game-controls";
@@ -56,6 +60,12 @@ import {
 } from "./game/game-logic";
 import type { BestStats, DifficultyConfig, DifficultyKey, EndlessPuzzleType, ModeStyle, Tile } from "./game/game-types";
 import { getGradientQuality } from "./game/gradient-quality";
+import {
+  PLAYER_NAME_MAX_LENGTH,
+  PLAYER_NAME_STORAGE_KEY,
+  sanitizePlayerName,
+} from "./game/player-progress";
+import { authClient } from "./lib/auth-client";
 import { countdownSound, timeUpSound } from "./lib/sounds";
 import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./game/personal-best";
 import type { PersonalBestStatus } from "./game/personal-best";
@@ -75,10 +85,10 @@ const HUD_FEEDBACK_ANIMATION = {
 };
 
 const INTRO_COMPLETED_STORAGE_KEY = "colortile-intro-completed";
-const LEADERBOARD_PLAYER_NAME_STORAGE_KEY = "colortile-leaderboard-player-name";
-const PLAYER_NAME_MAX_LENGTH = 24;
 const INTRO_WELCOME_DURATION_MS = 1400;
 const BLACK_AND_WHITE_PREVIEW_DURATION_MS = 3000;
+const INTRO_ACCOUNT_ACTION_CLASS_NAME =
+  "theme-button-secondary font-fredoka-strong inline-flex h-12 items-center justify-center rounded-full border border-[var(--border-soft)] px-6 text-base transition disabled:cursor-not-allowed disabled:opacity-50 sm:px-7 sm:text-lg";
 
 type IntroStep = "welcome" | "name";
 
@@ -86,16 +96,12 @@ function generateGuestPlayerName() {
   return `guest${Math.floor(100 + Math.random() * 900)}`;
 }
 
-function sanitizePlayerName(value: string) {
-  return value.replace(/\s+/g, " ").trim().slice(0, PLAYER_NAME_MAX_LENGTH);
-}
-
 function getLeaderboardPlayerName() {
   if (typeof window === "undefined") {
     return "guest000";
   }
 
-  const storedName = window.localStorage.getItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY);
+  const storedName = window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY);
   const sanitizedStoredName = storedName ? sanitizePlayerName(storedName) : "";
 
   if (sanitizedStoredName) {
@@ -103,7 +109,7 @@ function getLeaderboardPlayerName() {
   }
 
   const fallbackName = generateGuestPlayerName();
-  window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, fallbackName);
+  window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, fallbackName);
   return fallbackName;
 }
 
@@ -199,30 +205,40 @@ function getBestSolveTime(record: BestStats[DifficultyKey], totalTime: number) {
 }
 
 type IntroOnboardingProps = {
+  accountName: string;
   introStep: IntroStep;
+  isSigningOut: boolean;
+  isSignedIn: boolean;
   nameError: string | null;
+  onAccountAction: (mode: AccountAuthMode) => void;
   onNameChange: (value: string) => void;
   onPlay: () => void;
+  onSignOut: () => void;
   playerNameInput: string;
 };
 
 function IntroOnboarding({
+  accountName,
   introStep,
+  isSigningOut,
+  isSignedIn,
   nameError,
+  onAccountAction,
   onNameChange,
   onPlay,
+  onSignOut,
   playerNameInput,
 }: Readonly<IntroOnboardingProps>) {
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (introStep !== "name") {
+    if (introStep !== "name" || isSignedIn) {
       return;
     }
 
     nameInputRef.current?.focus();
     nameInputRef.current?.select();
-  }, [introStep]);
+  }, [introStep, isSignedIn]);
 
   return (
     <div className="theme-page-bg fixed inset-0 z-[80] flex items-center justify-center px-6 py-10">
@@ -273,8 +289,9 @@ function IntroOnboarding({
                   id="player-name"
                   ref={nameInputRef}
                   type="text"
-                  value={playerNameInput}
+                  value={isSignedIn ? accountName : playerNameInput}
                   onChange={(event) => onNameChange(event.target.value)}
+                  readOnly={isSignedIn}
                   maxLength={PLAYER_NAME_MAX_LENGTH}
                   className="theme-input theme-text-primary h-14 w-full rounded-full border px-5 text-center font-fredoka-strong text-lg uppercase outline-none focus:border-slate-400"
                   autoComplete="nickname"
@@ -292,6 +309,37 @@ function IntroOnboarding({
               >
                 Play
               </button>
+
+              {isSignedIn ? (
+                <button
+                  type="button"
+                  disabled={isSigningOut}
+                  onClick={onSignOut}
+                  className={`mt-6 ${INTRO_ACCOUNT_ACTION_CLASS_NAME}`}
+                >
+                  {isSigningOut ? "Signing out..." : "Sign out"}
+                </button>
+              ) : (
+                <div className="mt-6 flex items-center justify-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onAccountAction("sign-in")}
+                    className={INTRO_ACCOUNT_ACTION_CLASS_NAME}
+                  >
+                    Sign in
+                  </button>
+                  <span aria-hidden="true" className="theme-text-muted text-sm">
+                    or
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onAccountAction("sign-up")}
+                    className={INTRO_ACCOUNT_ACTION_CLASS_NAME}
+                  >
+                    Create account
+                  </button>
+                </div>
+              )}
             </form>
           </motion.div>
         )}
@@ -347,10 +395,16 @@ export default function Home() {
   }, []);
   const [hudFeedbackKey, setHudFeedbackKey] = useState(0);
   const [introStep, setIntroStep] = useState<IntroStep>("welcome");
-  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isIntroVisible, setIsIntroVisible] = useState(true);
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
   const [playerNameInput, setPlayerNameInput] = useState("");
   const [playerNameError, setPlayerNameError] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<AccountAuthMode>("sign-in");
+  const { data: session, isPending: sessionIsPending } = authClient.useSession();
+  const accountPlayerName = sanitizePlayerName(session?.user.name ?? "");
   const hudFeedbackControls = useAnimationControls();
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
@@ -389,7 +443,7 @@ export default function Home() {
   const dailyConfig = getDailyPuzzleConfig();
   const dailyPuzzleStyle = getDailyPuzzleStyle(createSeededRandom(`${dailyDateKey}:style`)());
   const dailyPuzzleStyleLabel = dailyPuzzleStyle === "black-and-white" ? "B&W" : "Classic";
-  const dailySwapBudget = getEndlessSwapBudget(dailyConfig.size, 0);
+  const dailySwapBudget = getEndlessSwapBudget(dailyConfig.size);
   const dailyRecordForToday = dailyRecord?.dateKey === dailyDateKey ? dailyRecord : null;
   const activeConfig =
     isDailyMode
@@ -410,7 +464,7 @@ export default function Home() {
   const endlessUsesCountdown = isEndlessMode && endlessTypeUsesCountdown(endlessPuzzleType);
   const endlessUsesSwapLimit = isEndlessMode && endlessTypeUsesSwapLimit(endlessPuzzleType);
   const endlessCountdownDuration = getEndlessCountdownDuration(activeConfig.size);
-  const endlessSwapBudget = getEndlessPuzzleSwapBudget(activeConfig.size, endlessStreak, endlessPuzzleType);
+  const endlessSwapBudget = getEndlessPuzzleSwapBudget(activeConfig.size, endlessPuzzleType);
   const endlessThreeStarMoveLimit = getEndlessThreeStarMoveLimit(endlessSwapBudget);
   const bestSolveTime = getBestSolveTime(currentBest, activeConfig.time);
   const bestTimeDisplay = bestSolveTime === undefined ? "-" : formatTime(bestSolveTime);
@@ -484,17 +538,17 @@ export default function Home() {
 
     const storedIntroCompleted =
       window.localStorage.getItem(INTRO_COMPLETED_STORAGE_KEY) === "true";
-    const storedPlayerName = window.localStorage.getItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY);
+    const storedPlayerName = window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY);
     const nextPlayerName = sanitizePlayerName(storedPlayerName ?? "") || generateGuestPlayerName();
 
     setPlayerNameInput(nextPlayerName);
-    setIsOnboardingComplete(storedIntroCompleted);
+    setHasCompletedOnboarding(storedIntroCompleted);
     setIntroStep(storedIntroCompleted ? "name" : "welcome");
     setIsOnboardingReady(true);
   }, []);
 
   useEffect(() => {
-    if (!isOnboardingReady || isOnboardingComplete) {
+    if (!isOnboardingReady || hasCompletedOnboarding) {
       return;
     }
 
@@ -505,15 +559,15 @@ export default function Home() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [isOnboardingComplete, isOnboardingReady]);
+  }, [hasCompletedOnboarding, isOnboardingReady]);
 
   useEffect(() => {
-    if (!isOnboardingReady || isOnboardingComplete) {
+    if (!isOnboardingReady || !isIntroVisible) {
       return;
     }
 
     setTimerStarted(false);
-  }, [isOnboardingComplete, isOnboardingReady]);
+  }, [isIntroVisible, isOnboardingReady]);
 
   useEffect(() => {
     if (activeView !== "game" || hudFeedbackKey === 0) {
@@ -593,12 +647,12 @@ export default function Home() {
   }, [clearBlackAndWhitePreview, clearDragSession, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
 
   useEffect(() => {
-    if (isDailyMode || difficulty === "endless") {
+    if (isIntroVisible || isDailyMode || difficulty === "endless") {
       return;
     }
 
     startGame(getGameModeConfig(difficulty), isBlackAndWhiteMode(difficulty));
-  }, [difficulty, isDailyMode, startGame]);
+  }, [difficulty, isDailyMode, isIntroVisible, startGame]);
 
   const startEndlessPuzzle = useCallback((puzzleNumber: number) => {
     const nextConfig = getEndlessConfig(puzzleNumber);
@@ -790,7 +844,14 @@ export default function Home() {
   }, [board, endlessSwapBudget, endlessUsesCountdown, endlessUsesSwapLimit, isEndlessMode, loseState, moves, startEndlessPuzzle, timeLeft, winState]);
 
   useEffect(() => {
-    if (activeView !== "game" || !board.length || winState || loseState || !timerStarted) {
+    if (
+      activeView !== "game" ||
+      isIntroVisible ||
+      !board.length ||
+      winState ||
+      loseState ||
+      !timerStarted
+    ) {
       return;
     }
 
@@ -807,7 +868,7 @@ export default function Home() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeView, board.length, endlessUsesCountdown, loseState, timerStarted, winState]);
+  }, [activeView, board.length, endlessUsesCountdown, isIntroVisible, loseState, timerStarted, winState]);
 
   useEffect(() => {
     if (!modeModalOpen) {
@@ -881,12 +942,18 @@ export default function Home() {
   }, [clearBlackAndWhitePreview, startGame]);
 
   useEffect(() => {
-    if (!isOnboardingComplete || activeView !== "game" || !isDailyMode || board.length > 0) {
+    if (
+      !hasCompletedOnboarding ||
+      isIntroVisible ||
+      activeView !== "game" ||
+      !isDailyMode ||
+      board.length > 0
+    ) {
       return;
     }
 
     startDailyPuzzle(dailyDateKey);
-  }, [activeView, board.length, dailyDateKey, isDailyMode, isOnboardingComplete, startDailyPuzzle]);
+  }, [activeView, board.length, dailyDateKey, hasCompletedOnboarding, isDailyMode, isIntroVisible, startDailyPuzzle]);
 
   const handleDailyOpen = () => {
     setDailyDateKey(getDailyPuzzleDateKey());
@@ -980,24 +1047,57 @@ export default function Home() {
     setPlayerNameError(null);
   }, []);
 
-  const handleIntroPlay = useCallback(() => {
-    const sanitizedPlayerName = sanitizePlayerName(playerNameInput);
+  const handleIntroAccountAction = useCallback((mode: AccountAuthMode) => {
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+  }, []);
 
-    window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, sanitizedPlayerName);
+  const handleIntroSignOut = useCallback(async () => {
+    setIsSigningOut(true);
+    setPlayerNameError(null);
+
+    try {
+      const result = await authClient.signOut();
+
+      if (result.error) {
+        setPlayerNameError(result.error.message ?? "Your account could not be signed out.");
+        return;
+      }
+
+      const guestPlayerName = generateGuestPlayerName();
+      window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, guestPlayerName);
+      setPlayerNameInput(guestPlayerName);
+    } catch {
+      setPlayerNameError("Your account could not be signed out.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  }, []);
+
+  const handleIntroPlay = useCallback(() => {
+    const sanitizedPlayerName = session ? accountPlayerName : sanitizePlayerName(playerNameInput);
+
+    if (!sanitizedPlayerName) {
+      setPlayerNameError("Enter a player name.");
+      return;
+    }
+
+    window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, sanitizedPlayerName);
     window.localStorage.setItem(INTRO_COMPLETED_STORAGE_KEY, "true");
     setPlayerNameInput(sanitizedPlayerName);
     setPlayerNameError(null);
-    setIsOnboardingComplete(true);
-    setActiveView("tutorial");
+    setHasCompletedOnboarding(true);
+    setIsIntroVisible(false);
+    setActiveView(hasCompletedOnboarding ? "game" : "tutorial");
     setTimerStarted(true);
-  }, [playerNameInput]);
+  }, [accountPlayerName, hasCompletedOnboarding, playerNameInput, session]);
 
   const hudFeedbackMotion = {
     animate: hudFeedbackControls,
     initial: false,
   };
 
-  if (!isOnboardingReady) {
+  if (!isOnboardingReady || sessionIsPending) {
     return <main className="theme-page-bg min-h-dvh" />;
   }
 
@@ -1221,21 +1321,32 @@ export default function Home() {
             swapBudget={dailySwapBudget}
           />
           <LeaderboardModal
+            dailyDateKey={dailyDateKey}
             isOpen={leaderboardModalOpen}
             onClose={() => setLeaderboardModalOpen(false)}
           />
         </>
       )}
 
-      {activeView === "game" && !isOnboardingComplete && (
+      {activeView === "game" && isIntroVisible && (
         <IntroOnboarding
+          accountName={accountPlayerName}
           introStep={introStep}
+          isSigningOut={isSigningOut}
+          isSignedIn={Boolean(session)}
           nameError={playerNameError}
+          onAccountAction={handleIntroAccountAction}
           onNameChange={handlePlayerNameChange}
           onPlay={handleIntroPlay}
+          onSignOut={handleIntroSignOut}
           playerNameInput={playerNameInput}
         />
       )}
+      <AccountAuthModal
+        initialMode={authModalMode}
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      />
     </main>
   );
 }

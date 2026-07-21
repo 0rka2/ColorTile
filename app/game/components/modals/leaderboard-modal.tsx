@@ -13,8 +13,8 @@ import {
 import { DIFFICULTY_LABELS, formatTime } from "../../game-logic";
 import type { PresetDifficultyKey } from "../../game-types";
 
-type LeaderboardCategoryId = "fastest" | "moves" | "streaks";
-type SolveLeaderboardCategoryId = Exclude<LeaderboardCategoryId, "streaks">;
+type LeaderboardCategoryId = "fastest" | "moves" | "streaks" | "daily";
+type SolveLeaderboardCategoryId = Exclude<LeaderboardCategoryId, "streaks" | "daily">;
 
 type LeaderboardCategory = {
   id: LeaderboardCategoryId;
@@ -25,7 +25,7 @@ type LeaderboardCategory = {
 
 type LeaderboardApiRow = {
   created_at: string;
-  difficulty: LeaderboardDifficulty;
+  difficulty?: LeaderboardDifficulty;
   id: number;
   moves: number;
   player_name: string;
@@ -52,6 +52,12 @@ const LEADERBOARD_CATEGORIES: LeaderboardCategory[] = [
     title: "Best streaks",
     metricLabel: "Puzzles beaten",
   },
+  {
+    id: "daily",
+    label: "Daily puzzle",
+    title: "Daily puzzle",
+    metricLabel: "Time",
+  },
 ];
 
 const LEADERBOARD_MODE_FAMILY_LABELS: Record<LeaderboardModeFamily, string> = {
@@ -62,7 +68,7 @@ const LEADERBOARD_MODE_FAMILY_LABELS: Record<LeaderboardModeFamily, string> = {
 function isSolveCategoryId(
   categoryId: LeaderboardCategoryId,
 ): categoryId is SolveLeaderboardCategoryId {
-  return categoryId !== "streaks";
+  return categoryId !== "streaks" && categoryId !== "daily";
 }
 
 function getLeaderboardRank(position: number) {
@@ -102,11 +108,13 @@ function getLeaderboardValue(categoryId: LeaderboardCategoryId, row: Leaderboard
 }
 
 type LeaderboardModalProps = {
+  dailyDateKey: string;
   isOpen: boolean;
   onClose: () => void;
 };
 
 export function LeaderboardModal({
+  dailyDateKey,
   isOpen,
   onClose,
 }: Readonly<LeaderboardModalProps>) {
@@ -148,6 +156,9 @@ export function LeaderboardModal({
         selectedDifficulties[activeCategory.id],
       )
     : "endless";
+  const leaderboardQuery = activeCategory.id === "daily"
+    ? `/api/leaderboard?category=daily&dateKey=${encodeURIComponent(dailyDateKey)}`
+    : `/api/leaderboard?category=${activeCategory.id}&difficulty=${activeMode}`;
 
   useEffect(() => {
     if (!isOpen) {
@@ -161,12 +172,9 @@ export function LeaderboardModal({
       setLoadError(null);
 
       try {
-        const response = await fetch(
-          `/api/leaderboard?category=${activeCategory.id}&difficulty=${activeMode}`,
-          {
-            cache: "no-store",
-          },
-        );
+        const response = await fetch(leaderboardQuery, {
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           throw new Error("Unable to load leaderboard.");
@@ -200,7 +208,7 @@ export function LeaderboardModal({
       isCancelled = true;
       window.removeEventListener(LEADERBOARD_REFRESH_EVENT, refreshLeaderboard);
     };
-  }, [activeCategory.id, activeMode, isOpen, retryRequestId]);
+  }, [isOpen, leaderboardQuery, retryRequestId]);
 
   if (!isOpen || typeof document === "undefined") {
     return null;
@@ -217,7 +225,7 @@ export function LeaderboardModal({
       <div className="relative z-10 flex max-h-full w-full max-w-[48rem] flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         <motion.nav
           aria-label="Leaderboard categories"
-          className="theme-modal order-2 grid w-full shrink-0 grid-cols-3 gap-2 rounded-[1.35rem] border p-2 sm:order-1 sm:w-[11.5rem] sm:grid-cols-1 sm:p-3"
+          className="theme-modal order-2 grid w-full shrink-0 grid-cols-2 gap-2 rounded-[1.35rem] border p-2 sm:order-1 sm:w-[11.5rem] sm:grid-cols-1 sm:p-3"
           initial={{ opacity: 0, x: -14, scale: 0.96 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
