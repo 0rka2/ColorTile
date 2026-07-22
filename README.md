@@ -1,4 +1,4 @@
-# ColorTile
+# ColorTile (colortile.vercel.app)
 
 ColorTile is a fast-paced puzzle game where players swap colored tiles to restore a smooth gradient across the board before time runs out.
 
