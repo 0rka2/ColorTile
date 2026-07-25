@@ -55,7 +55,7 @@ function CheckMark() {
   );
 }
 
-function withVisualModeFilter(baseFilter: string, visualMode: "color" | "grayscale") {
+function withTileFilter(baseFilter: string) {
   return baseFilter;
 }
 
@@ -105,7 +105,6 @@ type BoardProps = {
   showCorrectTilePulse?: boolean;
   winWaveActive: boolean;
   winState: boolean;
-  loseState: boolean;
   isTileCorrect: (tile: Tile, index: number) => boolean;
   isTileLocked: (tile: Tile, index: number) => boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, index: number) => void;
@@ -127,7 +126,6 @@ type TileButtonProps = {
   winWaveActive: boolean;
   winWaveDelay: number;
   winState: boolean;
-  loseState: boolean;
   tileRef: (element: HTMLButtonElement | null) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>, index: number) => void;
 };
@@ -147,7 +145,6 @@ const TileButton = memo(function TileButton({
   winWaveActive,
   winWaveDelay,
   winState,
-  loseState,
   tileRef,
   onPointerDown,
 }: Readonly<TileButtonProps>) {
@@ -196,7 +193,7 @@ const TileButton = memo(function TileButton({
 
         onPointerDown(event, index);
       }}
-      disabled={winState || loseState || interactionDisabled}
+      disabled={winState || interactionDisabled}
       onPointerMove={handlePointerMove}
       onPointerLeave={resetTilt}
       onBlur={resetTilt}
@@ -215,16 +212,16 @@ const TileButton = memo(function TileButton({
             : TILE_REST_SHADOW,
         filter: winWaveActive
           ? [
-              withVisualModeFilter("none", visualMode),
-              withVisualModeFilter("saturate(1.18) brightness(1.08)", visualMode),
-              withVisualModeFilter("saturate(1.08) brightness(1.03)", visualMode),
-              withVisualModeFilter("none", visualMode),
+              withTileFilter("none"),
+              withTileFilter("saturate(1.18) brightness(1.08)"),
+              withTileFilter("saturate(1.08) brightness(1.03)"),
+              withTileFilter("none"),
             ]
           : isPressed
-            ? withVisualModeFilter("saturate(1.12) brightness(1.04)", visualMode)
+            ? withTileFilter("saturate(1.12) brightness(1.04)")
           : isHovering && !isDragging
-            ? withVisualModeFilter("saturate(1.04) brightness(1.02)", visualMode)
-            : withVisualModeFilter("none", visualMode),
+            ? withTileFilter("saturate(1.04) brightness(1.02)")
+            : withTileFilter("none"),
       }}
       transition={
         winWaveActive
@@ -289,8 +286,7 @@ const TileButton = memo(function TileButton({
     previousProps.showCorrectTilePulse === nextProps.showCorrectTilePulse &&
     previousProps.winWaveActive === nextProps.winWaveActive &&
     previousProps.winWaveDelay === nextProps.winWaveDelay &&
-    previousProps.winState === nextProps.winState &&
-    previousProps.loseState === nextProps.loseState
+    previousProps.winState === nextProps.winState
   );
 });
 
@@ -311,7 +307,6 @@ export const GameBoard = memo(function GameBoard({
   showCorrectTilePulse = true,
   winWaveActive,
   winState,
-  loseState,
   isTileCorrect,
   isTileLocked,
   onPointerDown,
@@ -423,10 +418,10 @@ export const GameBoard = memo(function GameBoard({
               const isCorrect = isTileCorrect(tile, index);
               const isDragging = draggedIndex === index;
               const isLocked = isTileLocked(tile, index);
-              const canDrag = !interactionDisabled && !isLocked && !winState && !loseState;
+              const canDrag = !interactionDisabled && !isLocked && !winState;
               const canHover =
                 !interactionDisabled &&
-                (allowHoverWhenLocked || (!winState && !loseState && (canDrag || isCorrect)));
+                (allowHoverWhenLocked || (!winState && (canDrag || isCorrect)));
               const columnIndex = index % size;
               const tileVisualMode = visualMode === "grayscale" && isCorrect ? "color" : visualMode;
 
@@ -447,7 +442,6 @@ export const GameBoard = memo(function GameBoard({
                   winWaveActive={winWaveActive}
                   winWaveDelay={columnIndex * 0.045}
                   winState={winState}
-                  loseState={loseState}
                   tileRef={getTileRef(tile.id)}
                   onPointerDown={onPointerDown}
                 />

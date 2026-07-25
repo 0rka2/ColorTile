@@ -26,7 +26,7 @@ import {
   THEME_MODE_COOKIE_NAME,
 } from "../../lib/cookies";
 import { getSoundEnabled, setSoundEnabled } from "../../lib/sounds";
-import { resolveThemeMode, THEME_MODE_STORAGE_KEY } from "../settings-options";
+import { resolveThemeMode } from "../settings-options";
 import type { ThemeMode } from "../settings-options";
 
 type HeaderProps = {
@@ -52,8 +52,9 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
 
   useLayoutEffect(() => {
     try {
-      const storedThemeMode =
-        getCookie(THEME_MODE_COOKIE_NAME) ?? window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+      const storedThemeMode = getCookieConsent() === "accepted"
+        ? getCookie(THEME_MODE_COOKIE_NAME)
+        : null;
 
       setThemeMode(resolveThemeMode(storedThemeMode));
       setSoundIsEnabled(getSoundEnabled());

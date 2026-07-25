@@ -33,6 +33,8 @@ test("daily leaderboard category and date keys are validated", () => {
   assert.equal(isLeaderboardCategory("daily"), true);
   assert.equal(isDailyLeaderboardDateKey("2026-07-13"), true);
   assert.equal(isDailyLeaderboardDateKey("2026-7-13"), false);
+  assert.equal(isDailyLeaderboardDateKey("2026-02-30"), false);
+  assert.equal(isDailyLeaderboardDateKey("2026-13-01"), false);
   assert.equal(isDailyLeaderboardDateKey(null), false);
 });
 

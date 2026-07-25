@@ -16,8 +16,12 @@
     "../app/game/game-types.ts",
     "../app/game/confetti-logic.ts",
     "../app/game/gradient-quality.ts",
+    "../app/game/game-timer.ts",
     "../app/game/personal-best.ts",
     "../app/game/player-progress.ts",
+    "../app/game/verified-attempt.ts",
+    "../app/game/verified-leaderboard-client.ts",
+    "../app/game/verified-session.ts",
     "../app/game/win-sequence.ts",
     "../app/lib/cookies.ts",
     "./**/*.ts"

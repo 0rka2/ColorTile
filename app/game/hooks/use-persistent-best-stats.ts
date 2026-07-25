@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 
 import type { BestStats } from "../game-types";
-import { BEST_STATS_STORAGE_KEY } from "../player-progress";
+import {
+  BEST_STATS_STORAGE_KEY,
+  normalizePlayerProgress,
+} from "../player-progress";
 
 export function usePersistentBestStats() {
   const [bestStats, setBestStats] = useState<BestStats>({});
@@ -20,7 +23,9 @@ export function usePersistentBestStats() {
         return;
       }
 
-      setBestStats(JSON.parse(stored) as BestStats);
+      setBestStats(
+        normalizePlayerProgress({ bestStats: JSON.parse(stored) }).bestStats,
+      );
     } catch {
       // Ignore malformed local storage and start fresh.
     } finally {
@@ -29,12 +34,12 @@ export function usePersistentBestStats() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !isLoaded) {
       return;
     }
 
     window.localStorage.setItem(BEST_STATS_STORAGE_KEY, JSON.stringify(bestStats));
-  }, [bestStats]);
+  }, [bestStats, isLoaded]);
 
   return { bestStats, isLoaded, setBestStats };
 }

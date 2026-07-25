@@ -26,6 +26,9 @@ export type LeaderboardModeFamily = (typeof LEADERBOARD_MODE_FAMILIES)[number];
 
 export const LEADERBOARD_PRESET_DIFFICULTIES = PRESET_MODE_DIFFICULTIES;
 export const LEADERBOARD_REFRESH_EVENT = "colortile-leaderboard-refresh";
+export const MAX_LEADERBOARD_MOVES = 500;
+export const MAX_LEADERBOARD_SOLVE_TIME_SECONDS = 24 * 60 * 60;
+export const MAX_LEADERBOARD_STREAK = 10_000;
 
 export function getLeaderboardDifficultyForFamily(
   family: LeaderboardModeFamily,
@@ -43,7 +46,12 @@ export function isLeaderboardDifficulty(value: string | null): value is Leaderbo
 }
 
 export function isDailyLeaderboardDateKey(value: string | null): value is string {
-  return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (value === null || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 export function canUseLeaderboardCategory(

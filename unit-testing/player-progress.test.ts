@@ -2,10 +2,33 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  clearStoredPlayerData,
   EMPTY_PLAYER_PROGRESS,
   mergePlayerProgress,
   normalizePlayerProgress,
+  PLAYER_DATA_STORAGE_KEYS,
+  shouldClearStoredPlayerData,
 } from "../app/game/player-progress";
+
+test("clearStoredPlayerData removes every account-owned browser value", () => {
+  const removedKeys: string[] = [];
+
+  clearStoredPlayerData({
+    removeItem(key) {
+      removedKeys.push(key);
+    },
+  });
+
+  assert.deepEqual(removedKeys, PLAYER_DATA_STORAGE_KEYS);
+});
+
+test("stored player data is cleared only when leaving an account identity", () => {
+  assert.equal(shouldClearStoredPlayerData(undefined, null), false);
+  assert.equal(shouldClearStoredPlayerData(null, "user-a"), false);
+  assert.equal(shouldClearStoredPlayerData("user-a", "user-a"), false);
+  assert.equal(shouldClearStoredPlayerData("user-a", null), true);
+  assert.equal(shouldClearStoredPlayerData("user-a", "user-b"), true);
+});
 
 test("normalizePlayerProgress rejects malformed account data", () => {
   assert.deepEqual(normalizePlayerProgress(null), EMPTY_PLAYER_PROGRESS);

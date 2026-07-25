@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -391,7 +390,7 @@ export function AccountAuthModal({
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-between gap-5 pt-1 sm:pt-2">
+              <div className="flex items-center gap-5 pt-1 sm:pt-2">
                 <label className="theme-text-secondary font-fredoka-strong inline-flex cursor-pointer items-center gap-2.5 text-base">
                   <input
                     type="checkbox"
@@ -401,13 +400,6 @@ export function AccountAuthModal({
                   />
                   Keep me signed in
                 </label>
-                <Link
-                  href="/forgot-password"
-                  onClick={closeModal}
-                  className="font-fredoka-strong text-base text-emerald-300 transition hover:text-emerald-200"
-                >
-                  Forgot password?
-                </Link>
               </div>
             )}
 

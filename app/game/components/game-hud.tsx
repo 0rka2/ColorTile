@@ -35,9 +35,11 @@ export function GameHud({
   const [animatedQuality, setAnimatedQuality] = useState(gradientQuality);
   const [dailyResetSeconds, setDailyResetSeconds] = useState(getDailyResetSeconds);
   const animationFrameRef = useRef<number | null>(null);
+  const animatedQualityRef = useRef(animatedQuality);
+  const dailyDateKey = dailyInfo?.dateKey;
 
   useEffect(() => {
-    if (!dailyInfo) {
+    if (!dailyDateKey) {
       return;
     }
 
@@ -47,14 +49,15 @@ export function GameHud({
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [dailyInfo?.dateKey]);
+  }, [dailyDateKey]);
 
   useEffect(() => {
-    const startValue = animatedQuality;
+    const startValue = animatedQualityRef.current;
     const targetValue = gradientQuality;
 
     if (startValue === targetValue || typeof window === "undefined") {
       setAnimatedQuality(targetValue);
+      animatedQualityRef.current = targetValue;
       return;
     }
 
@@ -68,6 +71,7 @@ export function GameHud({
       const nextValue = Math.round(startValue + (targetValue - startValue) * easedProgress);
 
       setAnimatedQuality(nextValue);
+      animatedQualityRef.current = nextValue;
 
       if (progress < 1) {
         animationFrameRef.current = window.requestAnimationFrame(tick);

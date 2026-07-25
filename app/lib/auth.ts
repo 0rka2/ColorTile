@@ -5,7 +5,9 @@ import { APIError } from "better-auth/api";
 import { Pool } from "pg";
 
 import { sanitizePlayerName } from "../game/player-progress";
-import { sendAuthEmail } from "./auth-email";
+import { assertServerEnvironment } from "./server-env";
+
+assertServerEnvironment();
 
 const globalForAuth = globalThis as typeof globalThis & {
   colorTileAuthPool?: Pool;
@@ -79,28 +81,8 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
     requireEmailVerification: false,
-    revokeSessionsOnPasswordReset: true,
-    sendResetPassword: async ({ user, url }) => {
-      await sendAuthEmail({
-        to: user.email,
-        subject: "Reset your ColorTile password",
-        text: `Reset your ColorTile password using this link:\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
-      });
-    },
-  },
-  emailVerification: {
-    sendVerificationEmail: async ({ user, url }) => {
-      await sendAuthEmail({
-        to: user.email,
-        subject: "Verify your ColorTile account",
-        text: `Verify your ColorTile account using this link:\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
-      });
-    },
   },
   user: {
-    changeEmail: {
-      enabled: true,
-    },
     deleteUser: {
       enabled: true,
     },

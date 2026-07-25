@@ -6,6 +6,7 @@ import type { EndlessStats } from "../game-types";
 import {
   EMPTY_ENDLESS_STATS,
   ENDLESS_STATS_STORAGE_KEY,
+  normalizePlayerProgress,
 } from "../player-progress";
 
 export { EMPTY_ENDLESS_STATS } from "../player-progress";
@@ -25,10 +26,10 @@ export function usePersistentEndlessStats() {
         return;
       }
 
-      setEndlessStats({
-        ...EMPTY_ENDLESS_STATS,
-        ...(JSON.parse(stored) as Partial<EndlessStats>),
-      });
+      setEndlessStats(
+        normalizePlayerProgress({ endlessStats: JSON.parse(stored) })
+          .endlessStats,
+      );
     } catch {
       // Ignore malformed local storage and start fresh.
     } finally {
@@ -37,12 +38,12 @@ export function usePersistentEndlessStats() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !isLoaded) {
       return;
     }
 
     window.localStorage.setItem(ENDLESS_STATS_STORAGE_KEY, JSON.stringify(endlessStats));
-  }, [endlessStats]);
+  }, [endlessStats, isLoaded]);
 
   return { endlessStats, isLoaded, setEndlessStats };
 }

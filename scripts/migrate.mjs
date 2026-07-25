@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import process from "node:process";
 
@@ -12,18 +12,48 @@ const client = new Client({
   connectionString: process.env.DATABASE_URL,
 });
 
-const migrationPath = resolve("migrations/001-player-accounts.sql");
-const migration = await readFile(migrationPath, "utf8");
+const migrationDirectory = resolve("migrations");
+const migrationFiles = (await readdir(migrationDirectory))
+  .filter((fileName) => fileName.endsWith(".sql"))
+  .sort((first, second) => first.localeCompare(second));
 
 await client.connect();
 
 try {
-  await client.query("begin");
-  await client.query(migration);
-  await client.query("commit");
-  console.log("Player account migration completed.");
+  await client.query(`
+    create table if not exists schema_migration (
+      file_name text primary key,
+      applied_at timestamptz not null default now()
+    )
+  `);
+
+  for (const fileName of migrationFiles) {
+    const appliedMigration = await client.query(
+      "select 1 from schema_migration where file_name = $1",
+      [fileName],
+    );
+
+    if (appliedMigration.rowCount) {
+      continue;
+    }
+
+    const migration = await readFile(resolve(migrationDirectory, fileName), "utf8");
+    await client.query("begin");
+
+    try {
+      await client.query(migration);
+      await client.query(
+        "insert into schema_migration (file_name) values ($1)",
+        [fileName],
+      );
+      await client.query("commit");
+      console.log(`Applied ${fileName}.`);
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    }
+  }
 } catch (error) {
-  await client.query("rollback");
   throw error;
 } finally {
   await client.end();

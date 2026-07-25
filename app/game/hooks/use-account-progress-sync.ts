@@ -10,7 +10,11 @@ import type {
   EndlessStats,
 } from "../game-types";
 import {
+  clearStoredPlayerData,
+  EMPTY_ENDLESS_STATS,
   normalizePlayerProgress,
+  PLAYER_DATA_OWNER_STORAGE_KEY,
+  shouldClearStoredPlayerData,
   type PlayerProgress,
 } from "../player-progress";
 
@@ -49,12 +53,48 @@ export function useAccountProgressSync({
   setDailyRecord,
   setEndlessStats,
 }: AccountProgressSyncOptions) {
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending: sessionIsPending } = authClient.useSession();
+  const activeUserRef = useRef<string | null | undefined>(undefined);
   const startedForUserRef = useRef<string | null>(null);
   const readyForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (sessionIsPending) {
+      return;
+    }
+
     const userId = session?.user.id;
+    const nextActiveUser = userId ?? null;
+    const previousActiveUser = activeUserRef.current;
+    const storedOwnerId = window.localStorage.getItem(
+      PLAYER_DATA_OWNER_STORAGE_KEY,
+    );
+
+    if (previousActiveUser === undefined) {
+      activeUserRef.current = nextActiveUser;
+    } else if (previousActiveUser !== nextActiveUser) {
+      activeUserRef.current = nextActiveUser;
+      startedForUserRef.current = null;
+      readyForUserRef.current = null;
+    }
+
+    if (
+      shouldClearStoredPlayerData(previousActiveUser, nextActiveUser) ||
+      (storedOwnerId !== null && storedOwnerId !== nextActiveUser)
+    ) {
+      clearStoredPlayerData(window.localStorage);
+      if (userId) {
+        window.localStorage.setItem(PLAYER_DATA_OWNER_STORAGE_KEY, userId);
+      }
+      setBestStats({});
+      setDailyRecord(null);
+      setEndlessStats(EMPTY_ENDLESS_STATS);
+      return;
+    }
+
+    if (userId && storedOwnerId !== userId) {
+      window.localStorage.setItem(PLAYER_DATA_OWNER_STORAGE_KEY, userId);
+    }
 
     if (!userId) {
       startedForUserRef.current = null;
@@ -70,13 +110,19 @@ export function useAccountProgressSync({
 
     void saveProgress({ bestStats, dailyRecord, endlessStats })
       .then((merged) => {
+        if (activeUserRef.current !== userId) {
+          return;
+        }
+
         setBestStats(merged.bestStats);
         setDailyRecord(merged.dailyRecord);
         setEndlessStats(merged.endlessStats);
         readyForUserRef.current = userId;
       })
       .catch((error: unknown) => {
-        startedForUserRef.current = null;
+        if (activeUserRef.current === userId) {
+          startedForUserRef.current = null;
+        }
         console.error(error);
       });
   }, [
@@ -85,6 +131,7 @@ export function useAccountProgressSync({
     endlessStats,
     isLoaded,
     session?.user.id,
+    sessionIsPending,
     setBestStats,
     setDailyRecord,
     setEndlessStats,

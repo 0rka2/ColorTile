@@ -3,28 +3,38 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 
 import { formatDailyResetTime, formatTime, getDailyResetSeconds } from "../../game-logic";
-import type { DailyPuzzleRecord, ModeStyle } from "../../game-types";
+import type {
+  DailyFailureReason,
+  DailyPuzzleDefinition,
+  DailyPuzzleRecord,
+} from "../../game-types";
 
 type DailyPuzzleModalProps = {
+  challengeLabel: string;
   dateKey: string;
-  isFailed: boolean;
+  difficulty: DailyPuzzleDefinition["difficulty"];
+  failureReason: DailyFailureReason | null;
   isOpen: boolean;
   onClose: () => void;
   onStart: () => void;
   record: DailyPuzzleRecord | null;
-  style: ModeStyle;
-  swapBudget: number;
+  size: number;
+  swapBudget: number | null;
+  timeLimitSeconds: number | null;
 };
 
 export function DailyPuzzleModal({
+  challengeLabel,
   dateKey,
-  isFailed,
+  difficulty,
+  failureReason,
   isOpen,
   onClose,
   onStart,
   record,
-  style,
+  size,
   swapBudget,
+  timeLimitSeconds,
 }: Readonly<DailyPuzzleModalProps>) {
   const [resetSeconds, setResetSeconds] = useState(getDailyResetSeconds);
 
@@ -61,8 +71,8 @@ export function DailyPuzzleModal({
   }
 
   const todaysRecord = record?.dateKey === dateKey ? record : null;
-  const styleLabel = style === "black-and-white" ? "B&W" : "Classic";
-  const actionLabel = isFailed
+  const difficultyLabel = difficulty === "normal" ? "Normal" : "Hard";
+  const actionLabel = failureReason
     ? "Try Again"
     : todaysRecord?.completed
       ? "Replay Today"
@@ -108,23 +118,29 @@ export function DailyPuzzleModal({
 
         <div className="mt-7 grid grid-cols-3 gap-3 text-center sm:mt-8 sm:gap-4">
           <div className="theme-card rounded-[1rem] border px-3 py-4 sm:rounded-[1.25rem] sm:px-4 sm:py-5">
-            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">5x5</p>
-            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">size</p>
+            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">{difficultyLabel}</p>
+            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">{size}x{size}</p>
           </div>
           <div className="theme-card rounded-[1rem] border px-3 py-4 sm:rounded-[1.25rem] sm:px-4 sm:py-5">
-            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">{styleLabel}</p>
-            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">mode</p>
+            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">{challengeLabel}</p>
+            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">challenge</p>
           </div>
           <div className="theme-card rounded-[1rem] border px-3 py-4 sm:rounded-[1.25rem] sm:px-4 sm:py-5">
-            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">{swapBudget}</p>
-            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">swaps</p>
+            <p className="theme-text-primary font-fredoka-display text-2xl leading-none sm:text-[1.75rem]">
+              {timeLimitSeconds === null ? swapBudget ?? "None" : formatTime(timeLimitSeconds)}
+            </p>
+            <p className="theme-text-muted font-fredoka-regular mt-2 text-xs sm:text-sm">
+              {timeLimitSeconds === null ? "swap limit" : "time limit"}
+            </p>
           </div>
         </div>
 
         <div className="theme-panel-muted mt-5 rounded-[1.15rem] p-5 sm:mt-6 sm:rounded-[1.35rem] sm:p-6">
-          {isFailed ? (
+          {failureReason ? (
             <>
-              <p className="theme-text-primary font-fredoka-strong text-lg">Swap limit reached</p>
+              <p className="theme-text-primary font-fredoka-strong text-lg">
+                {failureReason === "time-limit" ? "Time limit reached" : "Swap limit reached"}
+              </p>
               <p className="theme-text-muted font-fredoka-regular mt-3 text-base leading-7">
                 Today&apos;s puzzle is ready to replay with the same board.
               </p>
@@ -151,7 +167,11 @@ export function DailyPuzzleModal({
             <>
               <p className="theme-text-primary font-fredoka-strong text-lg">Today&apos;s challenge</p>
               <p className="theme-text-muted font-fredoka-regular mt-3 text-base leading-7">
-                One puzzle for the day. Solve it before the swap limit and come back tomorrow for a new one.
+                {timeLimitSeconds !== null
+                  ? `One puzzle for the day. Solve it before the ${formatTime(timeLimitSeconds)} timer reaches zero.`
+                  : swapBudget === null
+                  ? "One puzzle for the day. Complete it at your own pace and come back tomorrow for a new challenge."
+                  : `One puzzle for the day. Solve it in ${swapBudget} swaps or fewer and come back tomorrow for a new challenge.`}
               </p>
             </>
           )}

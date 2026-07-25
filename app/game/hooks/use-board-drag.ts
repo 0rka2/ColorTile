@@ -32,7 +32,7 @@ type BoardStateUpdater = Tile[] | ((currentBoard: Tile[]) => Tile[]);
 
 type BoardDragOptions = {
   board: Tile[];
-  loseState: boolean;
+  onSwap?: (sourceIndex: number, targetIndex: number) => void;
   setBoard: Dispatch<SetStateAction<Tile[]>>;
   setMoves: Dispatch<SetStateAction<number>>;
   winState: boolean;
@@ -40,7 +40,7 @@ type BoardDragOptions = {
 
 export function useBoardDrag({
   board,
-  loseState,
+  onSwap,
   setBoard,
   setMoves,
   winState,
@@ -303,7 +303,6 @@ export function useBoardDrag({
         draggedTile &&
         targetTile &&
         !winState &&
-        !loseState &&
         !isTileLocked(draggedTile, sourceIndex) &&
         !isTileLocked(targetTile, targetIndex)
       ) {
@@ -321,6 +320,7 @@ export function useBoardDrag({
 
         updateBoard((currentBoard) => swapTiles(currentBoard, sourceIndex, targetIndex));
         setMoves((currentMoves) => currentMoves + 1);
+        onSwap?.(sourceIndex, targetIndex);
       } else {
         pendingSwapAnimationRef.current = null;
       }
@@ -337,7 +337,7 @@ export function useBoardDrag({
       window.removeEventListener("pointerup", handlePointerEnd);
       window.removeEventListener("pointercancel", handlePointerEnd);
     };
-  }, [board, clearDragSession, dragSession, loseState, resolveDropTargetIndex, scheduleDragOverlayPositionUpdate, setMoves, updateBoard, updateHoveredDropTarget, winState]);
+  }, [board, clearDragSession, dragSession, onSwap, resolveDropTargetIndex, scheduleDragOverlayPositionUpdate, setMoves, updateBoard, updateHoveredDropTarget, winState]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -410,7 +410,7 @@ export function useBoardDrag({
   }, [cancelDragAnimationFrame]);
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>, index: number) => {
-    if (winState || loseState) {
+    if (winState) {
       return;
     }
 
@@ -445,7 +445,7 @@ export function useBoardDrag({
       width: tileRect.width,
     };
     setPressedTileIndex(index);
-  }, [board, loseState, winState]);
+  }, [board, winState]);
 
   return {
     clearDragSession,
