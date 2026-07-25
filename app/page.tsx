@@ -6,8 +6,13 @@ import { FaShoppingCart } from "react-icons/fa";
 import { IoMdTrophy } from "react-icons/io";
 import { TbTargetArrow } from "react-icons/tb";
 import { VscStarFull } from "react-icons/vsc";
+import { Analytics } from "@vercel/analytics/next"
 
 import { GradientText } from "../components/ui/gradient-text";
+import {
+  AccountAuthModal,
+  type AccountAuthMode,
+} from "./account/components/account-auth-modal";
 import { GameBoard } from "./game/components/game-board";
 import { CompactLeaderboardPanel } from "./game/components/compact-leaderboard-panel";
 import { GameControls } from "./game/components/game-controls";
@@ -17,6 +22,7 @@ import { GameModal } from "./game/components/modals/game-modal";
 import { GameModeModal } from "./game/components/modals/game-mode-modal";
 import { LeaderboardModal } from "./game/components/modals/leaderboard-modal";
 import { ShopComingSoonModal } from "./game/components/modals/shop-coming-soon-modal";
+import { VerificationRetryModal } from "./game/components/modals/verification-retry-modal";
 import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
@@ -26,36 +32,51 @@ import { usePersistentDailyPuzzle } from "./game/hooks/use-persistent-daily-puzz
 import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
 import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
 import { useWinSequence } from "./game/hooks/use-win-sequence";
-import { LEADERBOARD_REFRESH_EVENT, type LeaderboardDifficulty } from "./game/leaderboard";
+import { LEADERBOARD_REFRESH_EVENT } from "./game/leaderboard";
 import {
   checkCompletion,
   createSeededRandom,
   formatTime,
+  GAME_START_PREVIEW_SECONDS,
   generateCornerColors,
   generateSolvedBoard,
   getBoardDensityClass,
-  getDailyPuzzleConfig,
+  getDailyPuzzleDefinition,
   getDailyPuzzleDateKey,
-  getDailyPuzzleStyle,
-  getEndlessCountdownDuration,
-  getEndlessConfig,
-  getEndlessPuzzleSwapBudget,
-  getEndlessPuzzleType,
-  getEndlessPuzzleTypeLabel,
-  getEndlessSwapBudget,
-  getEndlessThreeStarMoveLimit,
-  getEndlessTypeStyle,
+  getEndlessPuzzleDefinition,
   getGameModeConfig,
+  getReservedPresetTimeLimit,
   getTileRadiusClass,
-  endlessTypeUsesCountdown,
-  endlessTypeUsesSwapLimit,
+  isEndlessPuzzleType,
   isBlackAndWhiteMode,
   isTileCorrect,
   isTileLocked,
   scrambleBoard,
 } from "./game/game-logic";
-import type { BestStats, DifficultyConfig, DifficultyKey, EndlessPuzzleType, ModeStyle, Tile } from "./game/game-types";
+import type { BestStats, DailyFailureReason, DifficultyConfig, DifficultyKey, EndlessPuzzleDefinition, Tile } from "./game/game-types";
+import {
+  completeVerifiedAttempt,
+  createVerifiedAttempt,
+  isRetryableVerifiedLeaderboardError,
+  startVerifiedAttempt,
+  type VerifiedAttempt,
+  type VerifiedAttemptResult,
+} from "./game/verified-leaderboard-client";
+import type { VerifiedSwap } from "./game/verified-attempt";
+import { isVerifiedGameContextCurrent } from "./game/verified-session";
 import { getGradientQuality } from "./game/gradient-quality";
+import {
+  getCountdownDeadline,
+  getGameTimerSeconds,
+  getMonotonicStartedAt,
+} from "./game/game-timer";
+import {
+  clearStoredPlayerData,
+  PLAYER_NAME_MAX_LENGTH,
+  PLAYER_NAME_STORAGE_KEY,
+  sanitizePlayerName,
+} from "./game/player-progress";
+import { authClient } from "./lib/auth-client";
 import { countdownSound, timeUpSound } from "./lib/sounds";
 import { EMPTY_PERSONAL_BEST_STATUS, getPersonalBestStatus } from "./game/personal-best";
 import type { PersonalBestStatus } from "./game/personal-best";
@@ -75,108 +96,30 @@ const HUD_FEEDBACK_ANIMATION = {
 };
 
 const INTRO_COMPLETED_STORAGE_KEY = "colortile-intro-completed";
-const LEADERBOARD_PLAYER_NAME_STORAGE_KEY = "colortile-leaderboard-player-name";
-const PLAYER_NAME_MAX_LENGTH = 24;
 const INTRO_WELCOME_DURATION_MS = 1400;
-const BLACK_AND_WHITE_PREVIEW_DURATION_MS = 3000;
+const GAME_START_PREVIEW_DURATION_MS = GAME_START_PREVIEW_SECONDS * 1000;
+const INTRO_ACCOUNT_ACTION_CLASS_NAME =
+  "theme-button-secondary font-fredoka-strong inline-flex h-12 items-center justify-center rounded-full border border-[var(--border-soft)] px-6 text-base transition disabled:cursor-not-allowed disabled:opacity-50 sm:px-7 sm:text-lg";
 
 type IntroStep = "welcome" | "name";
+
+type VerificationOutcome =
+  | { result: VerifiedAttemptResult; status: "verified" }
+  | { status: "rejected" | "unavailable" | "unranked" };
+
+type PendingVerifiedCompletion = {
+  attempt: VerifiedAttempt;
+  gameSessionId: number;
+  swaps: VerifiedSwap[];
+  userId: string;
+};
 
 function generateGuestPlayerName() {
   return `guest${Math.floor(100 + Math.random() * 900)}`;
 }
 
-function sanitizePlayerName(value: string) {
-  return value.replace(/\s+/g, " ").trim().slice(0, PLAYER_NAME_MAX_LENGTH);
-}
-
-function getLeaderboardPlayerName() {
-  if (typeof window === "undefined") {
-    return "guest000";
-  }
-
-  const storedName = window.localStorage.getItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY);
-  const sanitizedStoredName = storedName ? sanitizePlayerName(storedName) : "";
-
-  if (sanitizedStoredName) {
-    return sanitizedStoredName;
-  }
-
-  const fallbackName = generateGuestPlayerName();
-  window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, fallbackName);
-  return fallbackName;
-}
-
 function notifyLeaderboardRefresh() {
   window.dispatchEvent(new Event(LEADERBOARD_REFRESH_EVENT));
-}
-
-async function submitLeaderboardScore(entry: {
-  difficulty: LeaderboardDifficulty;
-  moves: number;
-  solveTime: number;
-}) {
-  const response = await fetch("/api/leaderboard", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      ...entry,
-      playerName: getLeaderboardPlayerName(),
-    }),
-  });
-
-  if (response.ok) {
-    notifyLeaderboardRefresh();
-  }
-}
-
-async function submitDailyLeaderboardScore(entry: {
-  dateKey: string;
-  moves: number;
-  solveTime: number;
-  style: ModeStyle;
-}) {
-  const response = await fetch("/api/leaderboard", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      category: "daily",
-      dateKey: entry.dateKey,
-      moves: entry.moves,
-      playerName: getLeaderboardPlayerName(),
-      solveTime: entry.solveTime,
-      style: entry.style,
-    }),
-  });
-
-  if (response.ok) {
-    notifyLeaderboardRefresh();
-  }
-}
-
-async function submitEndlessStreak(entry: {
-  streakCount: number;
-}) {
-  const response = await fetch("/api/leaderboard", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      category: "streaks",
-      difficulty: "endless",
-      playerName: getLeaderboardPlayerName(),
-      streakCount: entry.streakCount,
-    }),
-  });
-
-  if (response.ok) {
-    notifyLeaderboardRefresh();
-  }
 }
 
 function getAccuracyScore(size: number, moves: number) {
@@ -199,30 +142,40 @@ function getBestSolveTime(record: BestStats[DifficultyKey], totalTime: number) {
 }
 
 type IntroOnboardingProps = {
+  accountName: string;
   introStep: IntroStep;
+  isSigningOut: boolean;
+  isSignedIn: boolean;
   nameError: string | null;
+  onAccountAction: (mode: AccountAuthMode) => void;
   onNameChange: (value: string) => void;
   onPlay: () => void;
+  onSignOut: () => void;
   playerNameInput: string;
 };
 
 function IntroOnboarding({
+  accountName,
   introStep,
+  isSigningOut,
+  isSignedIn,
   nameError,
+  onAccountAction,
   onNameChange,
   onPlay,
+  onSignOut,
   playerNameInput,
 }: Readonly<IntroOnboardingProps>) {
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (introStep !== "name") {
+    if (introStep !== "name" || isSignedIn) {
       return;
     }
 
     nameInputRef.current?.focus();
     nameInputRef.current?.select();
-  }, [introStep]);
+  }, [introStep, isSignedIn]);
 
   return (
     <div className="theme-page-bg fixed inset-0 z-[80] flex items-center justify-center px-6 py-10">
@@ -273,8 +226,9 @@ function IntroOnboarding({
                   id="player-name"
                   ref={nameInputRef}
                   type="text"
-                  value={playerNameInput}
+                  value={isSignedIn ? accountName : playerNameInput}
                   onChange={(event) => onNameChange(event.target.value)}
+                  readOnly={isSignedIn}
                   maxLength={PLAYER_NAME_MAX_LENGTH}
                   className="theme-input theme-text-primary h-14 w-full rounded-full border px-5 text-center font-fredoka-strong text-lg uppercase outline-none focus:border-slate-400"
                   autoComplete="nickname"
@@ -292,6 +246,37 @@ function IntroOnboarding({
               >
                 Play
               </button>
+
+              {isSignedIn ? (
+                <button
+                  type="button"
+                  disabled={isSigningOut}
+                  onClick={onSignOut}
+                  className={`mt-6 ${INTRO_ACCOUNT_ACTION_CLASS_NAME}`}
+                >
+                  {isSigningOut ? "Signing out..." : "Sign out"}
+                </button>
+              ) : (
+                <div className="mt-6 flex items-center justify-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onAccountAction("sign-in")}
+                    className={INTRO_ACCOUNT_ACTION_CLASS_NAME}
+                  >
+                    Sign in
+                  </button>
+                  <span aria-hidden="true" className="theme-text-muted text-sm">
+                    or
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onAccountAction("sign-up")}
+                    className={INTRO_ACCOUNT_ACTION_CLASS_NAME}
+                  >
+                    Create account
+                  </button>
+                </div>
+              )}
             </form>
           </motion.div>
         )}
@@ -310,17 +295,19 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [completion, setCompletion] = useState(0);
   const [winState, setWinState] = useState(false);
-  const [loseState, setLoseState] = useState(false);
   const [isDailyMode, setIsDailyMode] = useState(true);
   const [dailyModalOpen, setDailyModalOpen] = useState(false);
-  const [dailyAttemptFailed, setDailyAttemptFailed] = useState(false);
+  const [dailyFailureReason, setDailyFailureReason] = useState<DailyFailureReason | null>(null);
   const [dailyDateKey, setDailyDateKey] = useState(() => getDailyPuzzleDateKey());
   const [endlessPuzzleNumber, setEndlessPuzzleNumber] = useState(1);
-  const [endlessPuzzleStyle, setEndlessPuzzleStyle] = useState<ModeStyle>("color");
-  const [endlessPuzzleType, setEndlessPuzzleType] = useState<EndlessPuzzleType>("classic");
+  const [endlessPuzzle, setEndlessPuzzle] = useState(() =>
+    getEndlessPuzzleDefinition(1),
+  );
   const [endlessStreak, setEndlessStreak] = useState(0);
   const [endlessLastClear, setEndlessLastClear] = useState<{
+    challengeLabel: string;
     isThreeStar: boolean;
+    levelName: string;
     puzzleNumber: number;
     swapBudget: number | null;
     threeStarMoveLimit: number;
@@ -347,15 +334,42 @@ export default function Home() {
   }, []);
   const [hudFeedbackKey, setHudFeedbackKey] = useState(0);
   const [introStep, setIntroStep] = useState<IntroStep>("welcome");
-  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isIntroVisible, setIsIntroVisible] = useState(true);
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
   const [playerNameInput, setPlayerNameInput] = useState("");
   const [playerNameError, setPlayerNameError] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<AccountAuthMode>("sign-in");
+  const { data: session, isPending: sessionIsPending } = authClient.useSession();
+  const accountPlayerName = sanitizePlayerName(session?.user.name ?? "");
   const hudFeedbackControls = useAnimationControls();
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
-  const blackAndWhitePreviewTimeoutRef = useRef<number | null>(null);
-  const blackAndWhitePreviewIntervalRef = useRef<number | null>(null);
+  const gameStartPreviewTimeoutRef = useRef<number | null>(null);
+  const gameStartPreviewIntervalRef = useRef<number | null>(null);
+  const activeVerifiedAttemptRef = useRef<VerifiedAttempt | null>(null);
+  const verifiedSwapsRef = useRef<VerifiedSwap[]>([]);
+  const verifiedCompletionRef = useRef<Promise<VerificationOutcome> | null>(null);
+  const pendingVerifiedCompletionRef = useRef<PendingVerifiedCompletion | null>(null);
+  const verificationOutcomeHandlerRef = useRef<
+    ((outcome: VerificationOutcome) => void) | null
+  >(null);
+  const activeVerifiedGameSessionIdRef = useRef<number | null>(null);
+  const activeVerifiedUserIdRef = useRef<string | null>(null);
+  const verificationPendingGameSessionIdRef = useRef<number | null>(null);
+  const [verificationRetryStatus, setVerificationRetryStatus] = useState<
+    "hidden" | "ready" | "retrying"
+  >("hidden");
+  const endlessRunIdRef = useRef<string | null>(null);
+  const gameRequestIdRef = useRef(0);
+  const gameSessionIdRef = useRef(0);
+  const timerStartedAtRef = useRef<number | null>(null);
+  const countdownDeadlineRef = useRef<number | null>(null);
+  const observedSessionUserIdRef = useRef<string | null | undefined>(undefined);
+  const sessionUserIdRef = useRef<string | null>(session?.user.id ?? null);
+  sessionUserIdRef.current = session?.user.id ?? null;
 
   const {
     bestStats,
@@ -386,16 +400,18 @@ export default function Home() {
     setEndlessStats,
   });
 
-  const dailyConfig = getDailyPuzzleConfig();
-  const dailyPuzzleStyle = getDailyPuzzleStyle(createSeededRandom(`${dailyDateKey}:style`)());
-  const dailyPuzzleStyleLabel = dailyPuzzleStyle === "black-and-white" ? "B&W" : "Classic";
-  const dailySwapBudget = getEndlessSwapBudget(dailyConfig.size, 0);
+  const dailyPuzzle = getDailyPuzzleDefinition(dailyDateKey);
+  const dailyConfig: DifficultyConfig = dailyPuzzle;
+  const dailyPuzzleStyle = dailyPuzzle.style;
+  const dailyPuzzleStyleLabel = dailyPuzzle.challengeLabel;
+  const dailySwapBudget = dailyPuzzle.swapBudget;
+  const dailyUsesCountdown = isDailyMode && dailyPuzzle.timeLimitSeconds !== null;
   const dailyRecordForToday = dailyRecord?.dateKey === dailyDateKey ? dailyRecord : null;
   const activeConfig =
     isDailyMode
       ? dailyConfig
       : difficulty === "endless"
-      ? getEndlessConfig(endlessPuzzleNumber)
+      ? endlessPuzzle
       : getGameModeConfig(difficulty);
 
   const tileRadiusClass = getTileRadiusClass(activeConfig.size);
@@ -405,16 +421,20 @@ export default function Home() {
   const isBlackAndWhiteRun = isDailyMode
     ? dailyPuzzleStyle === "black-and-white"
     : isBlackAndWhiteMode(difficulty) ||
-      (isEndlessMode && endlessPuzzleStyle === "black-and-white");
-  const endlessPuzzleStyleLabel = getEndlessPuzzleTypeLabel(endlessPuzzleType);
-  const endlessUsesCountdown = isEndlessMode && endlessTypeUsesCountdown(endlessPuzzleType);
-  const endlessUsesSwapLimit = isEndlessMode && endlessTypeUsesSwapLimit(endlessPuzzleType);
-  const endlessCountdownDuration = getEndlessCountdownDuration(activeConfig.size);
-  const endlessSwapBudget = getEndlessPuzzleSwapBudget(activeConfig.size, endlessStreak, endlessPuzzleType);
-  const endlessThreeStarMoveLimit = getEndlessThreeStarMoveLimit(endlessSwapBudget);
-  const bestSolveTime = getBestSolveTime(currentBest, activeConfig.time);
+      (isEndlessMode && endlessPuzzle.style === "black-and-white");
+  const endlessPuzzleStyleLabel = endlessPuzzle.challengeLabel;
+  const endlessUsesCountdown = isEndlessMode && endlessPuzzle.usesCountdown;
+  const activeUsesCountdown = dailyUsesCountdown || endlessUsesCountdown;
+  const endlessUsesSwapLimit = isEndlessMode && endlessPuzzle.usesSwapLimit;
+  const activeCountdownDuration = dailyUsesCountdown
+    ? dailyPuzzle.timeLimitSeconds ?? 0
+    : endlessPuzzle.timeLimitSeconds ?? 0;
+  const endlessSwapBudget = endlessPuzzle.swapBudget;
+  const endlessThreeStarMoveLimit = endlessPuzzle.threeStarMoveLimit;
+  const reservedPresetTimeLimit = getReservedPresetTimeLimit(difficulty);
+  const bestSolveTime = getBestSolveTime(currentBest, reservedPresetTimeLimit);
   const bestTimeDisplay = bestSolveTime === undefined ? "-" : formatTime(bestSolveTime);
-  const solveTime = endlessUsesCountdown ? endlessCountdownDuration - timeLeft : timeLeft;
+  const solveTime = activeUsesCountdown ? activeCountdownDuration - timeLeft : timeLeft;
   const accuracy = getAccuracyScore(activeConfig.size, moves);
   const gradientQuality = getGradientQuality(completion);
   const allowHoverWhenLocked = false;
@@ -431,6 +451,118 @@ export default function Home() {
     setPersonalBestStatus,
   });
 
+  const handleVerifiedSwap = useCallback((sourceIndex: number, targetIndex: number) => {
+    if (activeVerifiedAttemptRef.current) {
+      verifiedSwapsRef.current.push([sourceIndex, targetIndex]);
+    }
+  }, []);
+
+  const submitVerifiedCompletion = useCallback((
+    pendingCompletion: PendingVerifiedCompletion,
+  ) => {
+    const completion = completeVerifiedAttempt(
+      pendingCompletion.attempt.attemptId,
+      pendingCompletion.swaps,
+    )
+      .then((result) => {
+        if (pendingVerifiedCompletionRef.current === pendingCompletion) {
+          pendingVerifiedCompletionRef.current = null;
+        }
+        if (sessionUserIdRef.current === pendingCompletion.userId) {
+          notifyLeaderboardRefresh();
+        }
+        return { result, status: "verified" } as const;
+      })
+      .catch((error: unknown) => {
+        if (!isRetryableVerifiedLeaderboardError(error)) {
+          if (pendingVerifiedCompletionRef.current === pendingCompletion) {
+            pendingVerifiedCompletionRef.current = null;
+          }
+          if (
+            pendingCompletion.attempt.puzzle.kind === "endless" &&
+            isVerifiedGameContextCurrent(
+              {
+                gameSessionId: pendingCompletion.gameSessionId,
+                userId: pendingCompletion.userId,
+              },
+              {
+                gameSessionId: gameSessionIdRef.current,
+                userId: sessionUserIdRef.current ?? "",
+              },
+            )
+          ) {
+            endlessRunIdRef.current = null;
+          }
+          return { status: "rejected" } as const;
+        }
+
+        return { status: "unavailable" } as const;
+      });
+
+    verifiedCompletionRef.current = completion;
+    return completion;
+  }, []);
+
+  const completeCurrentVerifiedAttempt = useCallback(() => {
+    const attempt = activeVerifiedAttemptRef.current;
+    const attemptGameSessionId = activeVerifiedGameSessionIdRef.current;
+    const attemptUserId = activeVerifiedUserIdRef.current;
+    if (!attempt || attemptGameSessionId === null || !attemptUserId) {
+      verifiedCompletionRef.current = null;
+      return null;
+    }
+
+    const pendingCompletion: PendingVerifiedCompletion = {
+      attempt,
+      gameSessionId: attemptGameSessionId,
+      swaps: [...verifiedSwapsRef.current],
+      userId: attemptUserId,
+    };
+    activeVerifiedAttemptRef.current = null;
+    activeVerifiedGameSessionIdRef.current = null;
+    activeVerifiedUserIdRef.current = null;
+    verifiedSwapsRef.current = [];
+    pendingVerifiedCompletionRef.current = pendingCompletion;
+
+    return submitVerifiedCompletion(pendingCompletion);
+  }, [submitVerifiedCompletion]);
+
+  const retryPendingVerifiedCompletion = useCallback(() => {
+    const pendingCompletion = pendingVerifiedCompletionRef.current;
+    return pendingCompletion
+      ? submitVerifiedCompletion(pendingCompletion)
+      : null;
+  }, [submitVerifiedCompletion]);
+
+  const handleVerificationRetry = useCallback(() => {
+    const completion = retryPendingVerifiedCompletion();
+    if (!completion) {
+      setVerificationRetryStatus("hidden");
+      return;
+    }
+
+    setVerificationRetryStatus("retrying");
+    void completion.then((outcome) => {
+      verificationOutcomeHandlerRef.current?.(outcome);
+    });
+  }, [retryPendingVerifiedCompletion]);
+
+  const handleContinueUnranked = useCallback(() => {
+    const pendingCompletion = pendingVerifiedCompletionRef.current;
+    const handleOutcome = verificationOutcomeHandlerRef.current;
+    if (!pendingCompletion || !handleOutcome) {
+      setVerificationRetryStatus("hidden");
+      return;
+    }
+
+    if (pendingCompletion.attempt.puzzle.kind === "endless") {
+      endlessRunIdRef.current = null;
+    }
+    pendingVerifiedCompletionRef.current = null;
+    verifiedCompletionRef.current = null;
+    handleOutcome({ status: "unranked" });
+  }, []);
+
   const {
     clearDragSession,
     clearPendingSwapAnimation,
@@ -444,7 +576,7 @@ export default function Home() {
     updateBoard,
   } = useBoardDrag({
     board,
-    loseState,
+    onSwap: handleVerifiedSwap,
     setBoard,
     setMoves,
     winState,
@@ -460,16 +592,10 @@ export default function Home() {
     restartRef,
   } = useBoardSize({
     activeConfigSize: activeConfig.size,
-    activeConfigTime: activeConfig.time,
     activeView,
     boardLength: board.length,
     boardResetKey,
-    completion,
     difficulty,
-    loseState,
-    moves,
-    timeLeft,
-    winState,
   });
 
   useEffect(() => {
@@ -484,17 +610,17 @@ export default function Home() {
 
     const storedIntroCompleted =
       window.localStorage.getItem(INTRO_COMPLETED_STORAGE_KEY) === "true";
-    const storedPlayerName = window.localStorage.getItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY);
+    const storedPlayerName = window.localStorage.getItem(PLAYER_NAME_STORAGE_KEY);
     const nextPlayerName = sanitizePlayerName(storedPlayerName ?? "") || generateGuestPlayerName();
 
     setPlayerNameInput(nextPlayerName);
-    setIsOnboardingComplete(storedIntroCompleted);
+    setHasCompletedOnboarding(storedIntroCompleted);
     setIntroStep(storedIntroCompleted ? "name" : "welcome");
     setIsOnboardingReady(true);
   }, []);
 
   useEffect(() => {
-    if (!isOnboardingReady || isOnboardingComplete) {
+    if (!isOnboardingReady || hasCompletedOnboarding) {
       return;
     }
 
@@ -505,15 +631,15 @@ export default function Home() {
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [isOnboardingComplete, isOnboardingReady]);
+  }, [hasCompletedOnboarding, isOnboardingReady]);
 
   useEffect(() => {
-    if (!isOnboardingReady || isOnboardingComplete) {
+    if (!isOnboardingReady || !isIntroVisible) {
       return;
     }
 
     setTimerStarted(false);
-  }, [isOnboardingComplete, isOnboardingReady]);
+  }, [isIntroVisible, isOnboardingReady]);
 
   useEffect(() => {
     if (activeView !== "game" || hudFeedbackKey === 0) {
@@ -531,26 +657,62 @@ export default function Home() {
     countdownSound.play();
   }, [previewCountdown]);
 
-  const clearBlackAndWhitePreview = useCallback(() => {
-    if (blackAndWhitePreviewTimeoutRef.current !== null) {
-      window.clearTimeout(blackAndWhitePreviewTimeoutRef.current);
-      blackAndWhitePreviewTimeoutRef.current = null;
+  const clearGameStartPreview = useCallback(() => {
+    if (gameStartPreviewTimeoutRef.current !== null) {
+      window.clearTimeout(gameStartPreviewTimeoutRef.current);
+      gameStartPreviewTimeoutRef.current = null;
     }
 
-    if (blackAndWhitePreviewIntervalRef.current !== null) {
-      window.clearInterval(blackAndWhitePreviewIntervalRef.current);
-      blackAndWhitePreviewIntervalRef.current = null;
+    if (gameStartPreviewIntervalRef.current !== null) {
+      window.clearInterval(gameStartPreviewIntervalRef.current);
+      gameStartPreviewIntervalRef.current = null;
     }
 
     setPreviewCountdown(null);
   }, []);
 
-  const startGame = useCallback((config: DifficultyConfig, useBlackAndWhitePreview: boolean, random = Math.random, initialTime = 0) => {
+  const startGame = useCallback((
+    config: DifficultyConfig,
+    useBlackAndWhitePreview: boolean,
+    random = Math.random,
+    initialTime = 0,
+    verifiedAttempt: VerifiedAttempt | null = null,
+    verifiedUserId: string | null = null,
+  ) => {
     const corners = generateCornerColors(config.size, random);
     const nextSolvedBoard = generateSolvedBoard(config.size, corners);
     const nextBoard = scrambleBoard(nextSolvedBoard, random);
+    const gameSessionId = gameSessionIdRef.current + 1;
+    gameSessionIdRef.current = gameSessionId;
+    activeVerifiedAttemptRef.current = verifiedAttempt;
+    activeVerifiedGameSessionIdRef.current = verifiedAttempt ? gameSessionId : null;
+    activeVerifiedUserIdRef.current = verifiedAttempt ? verifiedUserId : null;
+    verifiedSwapsRef.current = [];
+    verifiedCompletionRef.current = null;
+    pendingVerifiedCompletionRef.current = null;
+    verificationOutcomeHandlerRef.current = null;
+    verificationPendingGameSessionIdRef.current = null;
+    setVerificationRetryStatus("hidden");
 
-    clearBlackAndWhitePreview();
+    const authoritativeStartedAt = verifiedAttempt
+      ? Date.parse(verifiedAttempt.startedAt)
+      : Number.NaN;
+    const startedAt = getMonotonicStartedAt({
+      authoritativeStartedAt: Number.isFinite(authoritativeStartedAt)
+        ? authoritativeStartedAt
+        : Date.now(),
+      monotonicNow: performance.now(),
+      wallClockNow: Date.now(),
+    });
+    timerStartedAtRef.current = startedAt;
+    const showStartPreview = useBlackAndWhitePreview || initialTime > 0;
+    countdownDeadlineRef.current = getCountdownDeadline({
+      durationSeconds: initialTime,
+      previewSeconds: showStartPreview ? GAME_START_PREVIEW_SECONDS : 0,
+      startedAt,
+    });
+
+    clearGameStartPreview();
     clearDragSession();
     resetWinSequence();
     setBoardResetKey((currentKey) => currentKey + 1);
@@ -560,212 +722,431 @@ export default function Home() {
     setTimeLeft(initialTime);
     setCompletion(checkCompletion(nextBoard));
     setWinState(false);
-    setLoseState(false);
     setEndlessLastClear(null);
     setBoardVisualMode("color");
+    setTimerStarted(false);
 
-    if (useBlackAndWhitePreview) {
+    if (showStartPreview) {
       setPreviewActive(true);
-      setPreviewCountdown(3);
+      setPreviewCountdown(GAME_START_PREVIEW_SECONDS);
       setTimerStarted(false);
-      blackAndWhitePreviewIntervalRef.current = window.setInterval(() => {
+      gameStartPreviewIntervalRef.current = window.setInterval(() => {
         setPreviewCountdown((currentCountdown) =>
           currentCountdown === null ? null : Math.max(1, currentCountdown - 1),
         );
       }, 1000);
-      blackAndWhitePreviewTimeoutRef.current = window.setTimeout(() => {
-        if (blackAndWhitePreviewIntervalRef.current !== null) {
-          window.clearInterval(blackAndWhitePreviewIntervalRef.current);
-          blackAndWhitePreviewIntervalRef.current = null;
+      gameStartPreviewTimeoutRef.current = window.setTimeout(() => {
+        if (gameStartPreviewIntervalRef.current !== null) {
+          window.clearInterval(gameStartPreviewIntervalRef.current);
+          gameStartPreviewIntervalRef.current = null;
         }
 
         setBoardVisualMode("grayscale");
         setPreviewActive(false);
         setPreviewCountdown(null);
         setTimerStarted(true);
-        blackAndWhitePreviewTimeoutRef.current = null;
-      }, BLACK_AND_WHITE_PREVIEW_DURATION_MS);
+        gameStartPreviewTimeoutRef.current = null;
+      }, GAME_START_PREVIEW_DURATION_MS);
       return;
     }
 
     setPreviewActive(false);
     setTimerStarted(true);
-  }, [clearBlackAndWhitePreview, clearDragSession, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
+  }, [clearDragSession, clearGameStartPreview, clearPendingSwapAnimation, resetWinSequence, updateBoard]);
 
-  useEffect(() => {
-    if (isDailyMode || difficulty === "endless") {
+  const startPresetGame = useCallback(async (nextDifficulty: Exclude<DifficultyKey, "endless">) => {
+    const requestId = gameRequestIdRef.current + 1;
+    gameRequestIdRef.current = requestId;
+    const requestUserId = sessionUserIdRef.current;
+    let verifiedAttempt: VerifiedAttempt | null = null;
+
+    if (requestUserId) {
+      try {
+        const preparedAttempt = await createVerifiedAttempt({
+          difficulty: nextDifficulty,
+          kind: "preset",
+        });
+
+        if (
+          gameRequestIdRef.current !== requestId ||
+          sessionUserIdRef.current !== requestUserId
+        ) {
+          return;
+        }
+
+        verifiedAttempt = await startVerifiedAttempt(preparedAttempt.attemptId);
+      } catch {
+        verifiedAttempt = null;
+      }
+    }
+
+    if (
+      gameRequestIdRef.current !== requestId ||
+      sessionUserIdRef.current !== requestUserId
+    ) {
       return;
     }
 
-    startGame(getGameModeConfig(difficulty), isBlackAndWhiteMode(difficulty));
-  }, [difficulty, isDailyMode, startGame]);
-
-  const startEndlessPuzzle = useCallback((puzzleNumber: number) => {
-    const nextConfig = getEndlessConfig(puzzleNumber);
-    const nextType = getEndlessPuzzleType(nextConfig.size);
-    const nextStyle = getEndlessTypeStyle(nextType);
-    const initialTime = endlessTypeUsesCountdown(nextType)
-      ? getEndlessCountdownDuration(nextConfig.size)
-      : 0;
-
-    setEndlessPuzzleNumber(puzzleNumber);
-    setEndlessPuzzleType(nextType);
-    setEndlessPuzzleStyle(nextStyle);
-    startGame(nextConfig, nextStyle === "black-and-white", Math.random, initialTime);
+    startGame(
+      getGameModeConfig(nextDifficulty),
+      isBlackAndWhiteMode(nextDifficulty),
+      verifiedAttempt
+        ? createSeededRandom(verifiedAttempt.puzzle.seed)
+        : Math.random,
+      0,
+      verifiedAttempt,
+      verifiedAttempt ? requestUserId : null,
+    );
   }, [startGame]);
 
   useEffect(() => {
-    if (!board.length || winState || loseState) {
+    if (isIntroVisible || isDailyMode || difficulty === "endless") {
+      return;
+    }
+
+    void startPresetGame(difficulty);
+  }, [difficulty, isDailyMode, isIntroVisible, startPresetGame]);
+
+  const startEndlessPuzzle = useCallback(async (
+    requestedPuzzleNumber: number,
+    startNewVerifiedRun = false,
+  ) => {
+    const requestId = gameRequestIdRef.current + 1;
+    gameRequestIdRef.current = requestId;
+    const requestUserId = sessionUserIdRef.current;
+    let verifiedAttempt: VerifiedAttempt | null = null;
+
+    if (startNewVerifiedRun) {
+      endlessRunIdRef.current = null;
+    }
+
+    if (
+      requestUserId &&
+      (startNewVerifiedRun || endlessRunIdRef.current)
+    ) {
+      try {
+        const preparedAttempt = await createVerifiedAttempt({
+          endlessRunId: startNewVerifiedRun ? null : endlessRunIdRef.current,
+          kind: "endless",
+        });
+
+        if (
+          gameRequestIdRef.current !== requestId ||
+          sessionUserIdRef.current !== requestUserId
+        ) {
+          return;
+        }
+
+        verifiedAttempt = await startVerifiedAttempt(preparedAttempt.attemptId);
+      } catch {
+        verifiedAttempt = null;
+        if (gameRequestIdRef.current === requestId) {
+          endlessRunIdRef.current = null;
+        }
+      }
+    }
+
+    if (
+      gameRequestIdRef.current !== requestId ||
+      sessionUserIdRef.current !== requestUserId
+    ) {
+      return;
+    }
+
+    const puzzleNumber = verifiedAttempt?.puzzle.puzzleNumber ?? requestedPuzzleNumber;
+    const verifiedPuzzleType = isEndlessPuzzleType(
+      verifiedAttempt?.puzzle.puzzleType,
+    )
+      ? verifiedAttempt.puzzle.puzzleType
+      : null;
+    const scheduledPuzzle = getEndlessPuzzleDefinition(
+      puzzleNumber,
+      verifiedPuzzleType,
+    );
+    const nextPuzzle: EndlessPuzzleDefinition = verifiedAttempt
+      ? {
+          ...scheduledPuzzle,
+          size: verifiedAttempt.puzzle.size,
+          style: verifiedAttempt.puzzle.style,
+          swapBudget: verifiedAttempt.puzzle.swapBudget,
+          timeLimitSeconds: verifiedAttempt.puzzle.timeLimitSeconds,
+          usesCountdown: verifiedAttempt.puzzle.timeLimitSeconds !== null,
+          usesSwapLimit: verifiedAttempt.puzzle.swapBudget !== null,
+        }
+      : scheduledPuzzle;
+
+    endlessRunIdRef.current = verifiedAttempt?.puzzle.endlessRunId ?? null;
+
+    setEndlessPuzzleNumber(puzzleNumber);
+    setEndlessPuzzle(nextPuzzle);
+    startGame(
+      nextPuzzle,
+      nextPuzzle.style === "black-and-white",
+      verifiedAttempt
+        ? createSeededRandom(verifiedAttempt.puzzle.seed)
+        : Math.random,
+      nextPuzzle.timeLimitSeconds ?? 0,
+      verifiedAttempt,
+      verifiedAttempt ? requestUserId : null,
+    );
+  }, [startGame]);
+
+  useEffect(() => {
+    const currentGameSessionId = gameSessionIdRef.current;
+    if (
+      !board.length ||
+      winState ||
+      verificationPendingGameSessionIdRef.current === currentGameSessionId
+    ) {
       return;
     }
 
     const nextCompletion = checkCompletion(board);
     setCompletion(nextCompletion);
 
-    if (nextCompletion === 100) {
-      const finalSolveTime = solveTime;
+    if (nextCompletion !== 100) {
+      return;
+    }
 
-      if (isDailyMode) {
-        setDailyRecord((currentRecord) => {
-          const isSameDay = currentRecord?.dateKey === dailyDateKey;
-          return {
-            bestSolveTime:
-              isSameDay && currentRecord.bestSolveTime !== undefined
-                ? Math.min(currentRecord.bestSolveTime, finalSolveTime)
-                : finalSolveTime,
-            completed: true,
-            dateKey: dailyDateKey,
-            fewestMoves:
-              isSameDay && currentRecord.fewestMoves !== undefined
-                ? Math.min(currentRecord.fewestMoves, moves)
-                : moves,
-            style: dailyPuzzleStyle,
-          };
-        });
-        setWinState(true);
-        setWinPhase("boardWave");
-        clearDragSession();
-
-        void submitDailyLeaderboardScore({
-          dateKey: dailyDateKey,
-          moves,
-          solveTime: finalSolveTime,
-          style: dailyPuzzleStyle,
-        }).catch(() => {
-          // Ignore leaderboard submission failures so local progress still works.
-        });
-
-        return;
-      }
-
-      if (isEndlessMode) {
-        const completedPuzzleNumber = endlessPuzzleNumber;
-        const completedSwapBudget = endlessUsesSwapLimit ? endlessSwapBudget : null;
-        const completedThreeStarMoveLimit = endlessThreeStarMoveLimit;
-        const isThreeStar = moves <= completedThreeStarMoveLimit;
-        const nextStreak = endlessStreak + 1;
-        const shouldSubmitEndlessStreak = nextStreak > endlessStats.bestStreak;
-
-        setEndlessLastClear({
-          isThreeStar,
-          puzzleNumber: completedPuzzleNumber,
-          swapBudget: completedSwapBudget,
-          threeStarMoveLimit: completedThreeStarMoveLimit,
-          usesSwapLimit: endlessUsesSwapLimit,
-        });
-        setEndlessStreak(nextStreak);
-        setEndlessStats((currentStats) => ({
-          clears: currentStats.clears + 1,
-          threeStarClears: currentStats.threeStarClears + (isThreeStar ? 1 : 0),
-          bestStreak: Math.max(currentStats.bestStreak, nextStreak),
-        }));
-        setWinState(true);
-        setWinPhase("boardWave");
-        clearDragSession();
-
-        if (shouldSubmitEndlessStreak) {
-          void submitEndlessStreak({
-            streakCount: nextStreak,
-          }).catch(() => {
-            // Ignore leaderboard submission failures so local progress still works.
-          });
-        }
-
-        return;
-      }
-
-      const currentBestWithSolveTime = {
-        ...currentBest,
-        bestSolveTime: getBestSolveTime(currentBest, activeConfig.time),
-      };
-
-      setPersonalBestStatus(
-        getPersonalBestStatus(currentBestWithSolveTime, {
-          moves,
-          solveTime: finalSolveTime,
-        }),
+    const exceededSwapLimit =
+      (isDailyMode && dailySwapBudget !== null && moves > dailySwapBudget) ||
+      (
+        isEndlessMode &&
+        endlessUsesSwapLimit &&
+        endlessSwapBudget !== null &&
+        moves > endlessSwapBudget
       );
+    const missedCountdownDeadline =
+      activeUsesCountdown &&
+      countdownDeadlineRef.current !== null &&
+      performance.now() > countdownDeadlineRef.current;
+
+    if (exceededSwapLimit || missedCountdownDeadline) {
+      return;
+    }
+
+    const finalSolveTime = solveTime;
+
+    const awardDailyClear = (outcome?: VerificationOutcome) => {
+      const verifiedResult = outcome?.status === "verified" ? outcome.result : null;
+      const awardedMoves = verifiedResult?.moves ?? moves;
+      const awardedSolveTime = verifiedResult?.solveTime ?? finalSolveTime;
+
+      setDailyRecord((currentRecord) => {
+        const isSameDay = currentRecord?.dateKey === dailyDateKey;
+        return {
+          bestSolveTime:
+            isSameDay && currentRecord.bestSolveTime !== undefined
+              ? Math.min(currentRecord.bestSolveTime, awardedSolveTime)
+              : awardedSolveTime,
+          completed: true,
+          dateKey: dailyDateKey,
+          fewestMoves:
+            isSameDay && currentRecord.fewestMoves !== undefined
+              ? Math.min(currentRecord.fewestMoves, awardedMoves)
+              : awardedMoves,
+          style: dailyPuzzleStyle,
+        };
+      });
       setWinState(true);
       setWinPhase("boardWave");
       clearDragSession();
+    };
 
-      void submitLeaderboardScore({
-        difficulty,
+    const awardEndlessClear = (outcome?: VerificationOutcome) => {
+      const completedSwapBudget = endlessUsesSwapLimit ? endlessSwapBudget : null;
+      const isThreeStar = moves <= endlessThreeStarMoveLimit;
+      const verifiedStreak = outcome?.status === "verified"
+        ? outcome.result.streakCount
+        : undefined;
+      const nextStreak = verifiedStreak ?? endlessStreak + 1;
+
+      setEndlessLastClear({
+        challengeLabel: endlessPuzzle.challengeLabel,
+        isThreeStar,
+        levelName: endlessPuzzle.name,
+        puzzleNumber: endlessPuzzleNumber,
+        swapBudget: completedSwapBudget,
+        threeStarMoveLimit: endlessThreeStarMoveLimit,
+        usesSwapLimit: endlessUsesSwapLimit,
+      });
+      setEndlessStreak(nextStreak);
+      setEndlessStats((currentStats) => ({
+        clears: currentStats.clears + 1,
+        threeStarClears: currentStats.threeStarClears + (isThreeStar ? 1 : 0),
+        bestStreak: Math.max(currentStats.bestStreak, nextStreak),
+      }));
+      setWinState(true);
+      setWinPhase("boardWave");
+      clearDragSession();
+    };
+
+    if (isDailyMode || isEndlessMode) {
+      const verificationUserId = activeVerifiedUserIdRef.current;
+      const verifiedCompletion = completeCurrentVerifiedAttempt();
+      if (!verifiedCompletion) {
+        if (isDailyMode) {
+          awardDailyClear();
+        } else {
+          awardEndlessClear();
+        }
+        return;
+      }
+
+      verificationPendingGameSessionIdRef.current = currentGameSessionId;
+      setTimerStarted(false);
+      clearDragSession();
+
+      const handleVerificationOutcome = (outcome: VerificationOutcome) => {
+        if (
+          !verificationUserId ||
+          !isVerifiedGameContextCurrent(
+            {
+              gameSessionId: currentGameSessionId,
+              userId: verificationUserId,
+            },
+            {
+              gameSessionId: gameSessionIdRef.current,
+              userId: sessionUserIdRef.current ?? "",
+            },
+          )
+        ) {
+          return;
+        }
+
+        if (outcome.status === "unavailable") {
+          verificationOutcomeHandlerRef.current = handleVerificationOutcome;
+          setVerificationRetryStatus("ready");
+          return;
+        }
+
+        verificationOutcomeHandlerRef.current = null;
+        setVerificationRetryStatus("hidden");
+        verificationPendingGameSessionIdRef.current = null;
+
+        if (outcome.status === "rejected") {
+          if (isDailyMode) {
+            resetWinSequenceRef.current();
+            setDailyModalOpen(true);
+            setDailyFailureReason(dailyUsesCountdown ? "time-limit" : "swap-limit");
+            timeUpSound.play();
+          } else {
+            setEndlessStreak(0);
+            resetWinSequenceRef.current();
+            timeUpSound.play();
+            void startEndlessPuzzle(1, true);
+          }
+          return;
+        }
+
+        if (isDailyMode) {
+          awardDailyClear(outcome);
+        } else {
+          awardEndlessClear(outcome);
+        }
+      };
+
+      void verifiedCompletion.then(handleVerificationOutcome);
+      return;
+    }
+
+    const currentBestWithSolveTime = {
+      ...currentBest,
+      bestSolveTime: getBestSolveTime(currentBest, reservedPresetTimeLimit),
+    };
+
+    setPersonalBestStatus(
+      getPersonalBestStatus(currentBestWithSolveTime, {
         moves,
         solveTime: finalSolveTime,
-      }).catch(() => {
-        // Ignore leaderboard submission failures so local progress still works.
-      });
+      }),
+    );
+    setWinState(true);
+    setWinPhase("boardWave");
+    clearDragSession();
 
-      setBestStats((current) => {
-        const currentRecord = current[difficulty] ?? {};
-        const currentBestSolveTime = getBestSolveTime(currentRecord, activeConfig.time);
-        const nextRecord = {
-          bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
-          bestSolveTime:
-            currentBestSolveTime === undefined
-              ? finalSolveTime
-              : Math.min(currentBestSolveTime, finalSolveTime),
-          fewestMoves:
-            currentRecord.fewestMoves === undefined
-              ? moves
-              : Math.min(currentRecord.fewestMoves, moves),
-        };
+    void completeCurrentVerifiedAttempt();
 
-        return {
-          ...current,
-          [difficulty]: nextRecord,
-        };
-      });
-    }
-  }, [activeConfig.time, board, clearDragSession, currentBest, dailyDateKey, dailyPuzzleStyle, difficulty, endlessPuzzleNumber, endlessStats.bestStreak, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, loseState, moves, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, winState]);
+    setBestStats((current) => {
+      const currentRecord = current[difficulty] ?? {};
+      const currentBestSolveTime = getBestSolveTime(
+        currentRecord,
+        reservedPresetTimeLimit,
+      );
+      const nextRecord = {
+        bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
+        bestSolveTime:
+          currentBestSolveTime === undefined
+            ? finalSolveTime
+            : Math.min(currentBestSolveTime, finalSolveTime),
+        fewestMoves:
+          currentRecord.fewestMoves === undefined
+            ? moves
+            : Math.min(currentRecord.fewestMoves, moves),
+      };
+
+      return {
+        ...current,
+        [difficulty]: nextRecord,
+      };
+    });
+  }, [activeUsesCountdown, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
 
   useEffect(() => {
-    if (!isEndlessMode || !endlessUsesSwapLimit || !board.length || winState || loseState || moves <= endlessSwapBudget || checkCompletion(board) === 100) {
+    if (
+      !isEndlessMode ||
+      !endlessUsesSwapLimit ||
+      endlessSwapBudget === null ||
+      !board.length ||
+      winState ||
+      moves <= endlessSwapBudget
+    ) {
       return;
     }
 
     setEndlessStreak(0);
     resetWinSequenceRef.current();
-    setLoseState(false);
     timeUpSound.play();
     clearDragSessionRef.current();
-    startEndlessPuzzle(1);
-  }, [board, endlessSwapBudget, endlessUsesSwapLimit, isEndlessMode, loseState, moves, startEndlessPuzzle, winState]);
+    void startEndlessPuzzle(1, true);
+  }, [board, endlessSwapBudget, endlessUsesSwapLimit, isEndlessMode, moves, startEndlessPuzzle, winState]);
 
   useEffect(() => {
-    if (!isDailyMode || !board.length || winState || loseState || moves <= dailySwapBudget || checkCompletion(board) === 100) {
+    if (
+      !isDailyMode ||
+      dailySwapBudget === null ||
+      !board.length ||
+      winState ||
+      moves <= dailySwapBudget
+    ) {
       return;
     }
 
     resetWinSequenceRef.current();
-    setLoseState(false);
     setDailyModalOpen(true);
-    setDailyAttemptFailed(true);
+    setDailyFailureReason("swap-limit");
     setTimerStarted(false);
     timeUpSound.play();
     clearDragSessionRef.current();
-  }, [board, dailySwapBudget, isDailyMode, loseState, moves, winState]);
+  }, [board, dailySwapBudget, isDailyMode, moves, winState]);
+
+  useEffect(() => {
+    if (
+      !dailyUsesCountdown ||
+      !board.length ||
+      winState ||
+      timeLeft > 0
+    ) {
+      return;
+    }
+
+    resetWinSequenceRef.current();
+    setDailyModalOpen(true);
+    setDailyFailureReason("time-limit");
+    setTimerStarted(false);
+    timeUpSound.play();
+    clearDragSessionRef.current();
+  }, [board, dailyUsesCountdown, timeLeft, winState]);
 
   useEffect(() => {
     if (
@@ -773,41 +1154,54 @@ export default function Home() {
       !endlessUsesCountdown ||
       !board.length ||
       winState ||
-      loseState ||
       timeLeft > 0 ||
-      (endlessUsesSwapLimit && moves > endlessSwapBudget) ||
-      checkCompletion(board) === 100
+      (
+        endlessUsesSwapLimit &&
+        endlessSwapBudget !== null &&
+        moves > endlessSwapBudget
+      )
     ) {
       return;
     }
 
     setEndlessStreak(0);
     resetWinSequenceRef.current();
-    setLoseState(false);
     timeUpSound.play();
     clearDragSessionRef.current();
-    startEndlessPuzzle(1);
-  }, [board, endlessSwapBudget, endlessUsesCountdown, endlessUsesSwapLimit, isEndlessMode, loseState, moves, startEndlessPuzzle, timeLeft, winState]);
+    void startEndlessPuzzle(1, true);
+  }, [board, endlessSwapBudget, endlessUsesCountdown, endlessUsesSwapLimit, isEndlessMode, moves, startEndlessPuzzle, timeLeft, winState]);
 
   useEffect(() => {
-    if (activeView !== "game" || !board.length || winState || loseState || !timerStarted) {
+    if (
+      activeView !== "game" ||
+      isIntroVisible ||
+      !board.length ||
+      winState ||
+      !timerStarted
+    ) {
       return;
     }
 
     const interval = window.setInterval(() => {
-      setTimeLeft((current) => {
-        if (endlessUsesCountdown) {
-          return Math.max(0, Math.round((current - 0.1) * 10) / 10);
-        }
+      const now = performance.now();
+      const startedAt = timerStartedAtRef.current;
+      if (startedAt === null) {
+        return;
+      }
 
-        return Math.round((current + 0.1) * 10) / 10;
-      });
+      setTimeLeft(getGameTimerSeconds({
+        countdownDeadline: activeUsesCountdown
+          ? countdownDeadlineRef.current
+          : null,
+        now,
+        startedAt,
+      }));
     }, 100);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeView, board.length, endlessUsesCountdown, loseState, timerStarted, winState]);
+  }, [activeUsesCountdown, activeView, board.length, isIntroVisible, timerStarted, winState]);
 
   useEffect(() => {
     if (!modeModalOpen) {
@@ -826,17 +1220,16 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
-      clearBlackAndWhitePreview();
+      clearGameStartPreview();
       clearWinSequenceTimeouts();
     };
-  }, [clearBlackAndWhitePreview, clearWinSequenceTimeouts]);
+  }, [clearGameStartPreview, clearWinSequenceTimeouts]);
 
   const handleDifficultyChange = (nextDifficulty: DifficultyKey) => {
-    clearBlackAndWhitePreview();
+    clearGameStartPreview();
     setIsDailyMode(false);
     setDailyModalOpen(false);
-    setDailyAttemptFailed(false);
-    setDailyAttemptFailed(false);
+    setDailyFailureReason(null);
     setPreviewActive(false);
     setBoardVisualMode(isBlackAndWhiteMode(nextDifficulty) ? "grayscale" : "color");
 
@@ -848,7 +1241,7 @@ export default function Home() {
     resetWinSequence();
 
     if (nextDifficulty === difficulty) {
-      startGame(getGameModeConfig(nextDifficulty), isBlackAndWhiteMode(nextDifficulty));
+      void startPresetGame(nextDifficulty);
       return;
     }
 
@@ -856,37 +1249,150 @@ export default function Home() {
   };
 
   const handleEndlessStart = () => {
-    clearBlackAndWhitePreview();
+    clearGameStartPreview();
     setIsDailyMode(false);
     setDailyModalOpen(false);
-    setDailyAttemptFailed(false);
+    setDailyFailureReason(null);
     setPreviewActive(false);
     setBoardVisualMode("color");
     setDifficulty("endless");
     setEndlessStreak(0);
-    startEndlessPuzzle(1);
+    void startEndlessPuzzle(1, true);
   };
 
-  const startDailyPuzzle = useCallback((dateKey: string) => {
-    const nextStyle = getDailyPuzzleStyle(createSeededRandom(`${dateKey}:style`)());
-    const boardRandom = createSeededRandom(`${dateKey}:board`);
+  const startDailyPuzzle = useCallback(async (dateKey: string) => {
+    const requestId = gameRequestIdRef.current + 1;
+    gameRequestIdRef.current = requestId;
+    const requestUserId = sessionUserIdRef.current;
+    let verifiedAttempt: VerifiedAttempt | null = null;
 
-    clearBlackAndWhitePreview();
-    setDailyDateKey(dateKey);
-    setDailyModalOpen(false);
-    setIsDailyMode(true);
-    setPreviewActive(false);
-    setBoardVisualMode("color");
-    startGame(getDailyPuzzleConfig(), nextStyle === "black-and-white", boardRandom);
-  }, [clearBlackAndWhitePreview, startGame]);
+    if (requestUserId) {
+      try {
+        const preparedAttempt = await createVerifiedAttempt({ dateKey, kind: "daily" });
 
-  useEffect(() => {
-    if (!isOnboardingComplete || activeView !== "game" || !isDailyMode || board.length > 0) {
+        if (
+          gameRequestIdRef.current !== requestId ||
+          sessionUserIdRef.current !== requestUserId
+        ) {
+          return;
+        }
+
+        verifiedAttempt = await startVerifiedAttempt(preparedAttempt.attemptId);
+      } catch {
+        verifiedAttempt = null;
+      }
+    }
+
+    if (
+      gameRequestIdRef.current !== requestId ||
+      sessionUserIdRef.current !== requestUserId
+    ) {
       return;
     }
 
-    startDailyPuzzle(dailyDateKey);
-  }, [activeView, board.length, dailyDateKey, isDailyMode, isOnboardingComplete, startDailyPuzzle]);
+    const definition = getDailyPuzzleDefinition(dateKey);
+    const nextStyle = verifiedAttempt?.puzzle.style ?? definition.style;
+    const nextConfig: DifficultyConfig = {
+      label: definition.label,
+      size: verifiedAttempt?.puzzle.size ?? definition.size,
+    };
+    const boardRandom = createSeededRandom(
+      verifiedAttempt?.puzzle.seed ?? `${dateKey}:board`,
+    );
+
+    clearGameStartPreview();
+    setDailyDateKey(dateKey);
+    setDailyModalOpen(false);
+    setDailyFailureReason(null);
+    setIsDailyMode(true);
+    setPreviewActive(false);
+    setBoardVisualMode("color");
+    startGame(
+      nextConfig,
+      nextStyle === "black-and-white",
+      boardRandom,
+      verifiedAttempt?.puzzle.timeLimitSeconds ?? definition.timeLimitSeconds ?? 0,
+      verifiedAttempt,
+      verifiedAttempt ? requestUserId : null,
+    );
+  }, [clearGameStartPreview, startGame]);
+
+  useEffect(() => {
+    if (sessionIsPending) {
+      return;
+    }
+
+    const nextUserId = session?.user.id ?? null;
+    const previousUserId = observedSessionUserIdRef.current;
+    observedSessionUserIdRef.current = nextUserId;
+
+    if (previousUserId === undefined || previousUserId === nextUserId) {
+      return;
+    }
+
+    gameRequestIdRef.current += 1;
+    gameSessionIdRef.current += 1;
+    activeVerifiedAttemptRef.current = null;
+    activeVerifiedGameSessionIdRef.current = null;
+    activeVerifiedUserIdRef.current = null;
+    verifiedSwapsRef.current = [];
+    verifiedCompletionRef.current = null;
+    pendingVerifiedCompletionRef.current = null;
+    verificationOutcomeHandlerRef.current = null;
+    verificationPendingGameSessionIdRef.current = null;
+    setVerificationRetryStatus("hidden");
+    endlessRunIdRef.current = null;
+
+    if (
+      !hasCompletedOnboarding ||
+      isIntroVisible ||
+      activeView !== "game" ||
+      board.length === 0
+    ) {
+      return;
+    }
+
+    if (isDailyMode) {
+      void startDailyPuzzle(dailyDateKey);
+      return;
+    }
+
+    if (isEndlessMode) {
+      setEndlessStreak(0);
+      void startEndlessPuzzle(1, true);
+      return;
+    }
+
+    void startPresetGame(difficulty as Exclude<DifficultyKey, "endless">);
+  }, [
+    activeView,
+    board.length,
+    dailyDateKey,
+    difficulty,
+    hasCompletedOnboarding,
+    isDailyMode,
+    isEndlessMode,
+    isIntroVisible,
+    session?.user.id,
+    sessionIsPending,
+    startDailyPuzzle,
+    startEndlessPuzzle,
+    startPresetGame,
+  ]);
+
+  useEffect(() => {
+    if (
+      !hasCompletedOnboarding ||
+      isIntroVisible ||
+      activeView !== "game" ||
+      !isDailyMode ||
+      board.length > 0
+    ) {
+      return;
+    }
+
+    void startDailyPuzzle(dailyDateKey);
+  }, [activeView, board.length, dailyDateKey, hasCompletedOnboarding, isDailyMode, isIntroVisible, startDailyPuzzle]);
 
   const handleDailyOpen = () => {
     setDailyDateKey(getDailyPuzzleDateKey());
@@ -897,11 +1403,11 @@ export default function Home() {
   };
 
   const handleDailyStart = () => {
-    startDailyPuzzle(dailyDateKey);
+    void startDailyPuzzle(dailyDateKey);
   };
 
   const handleDailyReplay = () => {
-    startDailyPuzzle(dailyDateKey);
+    void startDailyPuzzle(dailyDateKey);
   };
 
   const handleDailyModes = () => {
@@ -916,26 +1422,24 @@ export default function Home() {
       return;
     }
 
-    startGame(
-      activeConfig,
-      isBlackAndWhiteRun,
-      Math.random,
-      endlessUsesCountdown ? getEndlessCountdownDuration(activeConfig.size) : 0,
-    );
+    if (isEndlessMode) {
+      setEndlessStreak(0);
+      void startEndlessPuzzle(1, true);
+      return;
+    }
+
+    void startPresetGame(difficulty as Exclude<DifficultyKey, "endless">);
   };
 
   const handleEndlessReplay = () => {
-    startGame(
-      activeConfig,
-      endlessPuzzleStyle === "black-and-white",
-      Math.random,
-      endlessUsesCountdown ? getEndlessCountdownDuration(activeConfig.size) : 0,
-    );
+    setEndlessStreak(0);
+    void startEndlessPuzzle(1, true);
   };
 
-  const handleEndlessNextPuzzle = () => {
+  const handleEndlessNextPuzzle = async () => {
+    await verifiedCompletionRef.current;
     const nextPuzzleNumber = endlessPuzzleNumber + 1;
-    startEndlessPuzzle(nextPuzzleNumber);
+    await startEndlessPuzzle(nextPuzzleNumber);
   };
 
   const handleEndlessBack = () => {
@@ -957,7 +1461,7 @@ export default function Home() {
 
   const handleNavigateView = useCallback((nextView: AppView) => {
     if (nextView !== "game") {
-      clearBlackAndWhitePreview();
+      clearGameStartPreview();
       setPreviewActive(false);
       clearDragSession();
       setModeModalOpen(false);
@@ -968,7 +1472,7 @@ export default function Home() {
     }
 
     setActiveView(nextView);
-  }, [clearBlackAndWhitePreview, clearDragSession, previewActive]);
+  }, [clearDragSession, clearGameStartPreview]);
 
   const handleLogoClick = useCallback(() => {
     setHudFeedbackKey((currentKey) => currentKey + 1);
@@ -980,24 +1484,58 @@ export default function Home() {
     setPlayerNameError(null);
   }, []);
 
-  const handleIntroPlay = useCallback(() => {
-    const sanitizedPlayerName = sanitizePlayerName(playerNameInput);
+  const handleIntroAccountAction = useCallback((mode: AccountAuthMode) => {
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+  }, []);
 
-    window.localStorage.setItem(LEADERBOARD_PLAYER_NAME_STORAGE_KEY, sanitizedPlayerName);
+  const handleIntroSignOut = useCallback(async () => {
+    setIsSigningOut(true);
+    setPlayerNameError(null);
+
+    try {
+      const result = await authClient.signOut();
+
+      if (result.error) {
+        setPlayerNameError(result.error.message ?? "Your account could not be signed out.");
+        return;
+      }
+
+      const guestPlayerName = generateGuestPlayerName();
+      clearStoredPlayerData(window.localStorage);
+      window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, guestPlayerName);
+      setPlayerNameInput(guestPlayerName);
+    } catch {
+      setPlayerNameError("Your account could not be signed out.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  }, []);
+
+  const handleIntroPlay = useCallback(() => {
+    const sanitizedPlayerName = session ? accountPlayerName : sanitizePlayerName(playerNameInput);
+
+    if (!sanitizedPlayerName) {
+      setPlayerNameError("Enter a player name.");
+      return;
+    }
+
+    window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, sanitizedPlayerName);
     window.localStorage.setItem(INTRO_COMPLETED_STORAGE_KEY, "true");
     setPlayerNameInput(sanitizedPlayerName);
     setPlayerNameError(null);
-    setIsOnboardingComplete(true);
-    setActiveView("tutorial");
+    setHasCompletedOnboarding(true);
+    setIsIntroVisible(false);
+    setActiveView(hasCompletedOnboarding ? "game" : "tutorial");
     setTimerStarted(true);
-  }, [playerNameInput]);
+  }, [accountPlayerName, hasCompletedOnboarding, playerNameInput, session]);
 
   const hudFeedbackMotion = {
     animate: hudFeedbackControls,
     initial: false,
   };
 
-  if (!isOnboardingReady) {
+  if (!isOnboardingReady || sessionIsPending) {
     return <main className="theme-page-bg min-h-dvh" />;
   }
 
@@ -1005,7 +1543,7 @@ export default function Home() {
     <main className={`theme-page-bg min-h-dvh overflow-x-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
       <div ref={pageShellRef} className="game-page-shell mx-auto flex h-[100dvh] min-h-0 w-full max-w-[72rem] flex-col gap-[clamp(0.35rem,0.9vw,0.7rem)]">
         <Header ref={headerRef} onLogoClick={handleLogoClick} onNavigateView={handleNavigateView} />
-
+        <Analytics />
         {activeView === "game" ? (
         <section ref={contentRef} className="game-play-section relative flex flex-1 min-h-0 flex-col items-center justify-center gap-[clamp(0.25rem,0.65vw,0.5rem)] pb-[clamp(0.1rem,0.35vh,0.25rem)]">
           <motion.div
@@ -1027,24 +1565,24 @@ export default function Home() {
               endlessInfo={
                 isDailyMode
                   ? {
-                      label: `Daily ${dailyPuzzleStyleLabel}`,
+                      label: `Daily ${dailyPuzzle.difficulty === "normal" ? "Normal" : "Hard"} · ${dailyPuzzleStyleLabel}`,
                       puzzleNumber: 1,
                       styleLabel: dailyPuzzleStyleLabel,
                       swapBudget: dailySwapBudget,
                     }
                   : isEndlessMode
                     ? {
-                        label: `Puzzle ${endlessPuzzleNumber} · ${endlessPuzzleStyleLabel}`,
+                        label: `Puzzle ${endlessPuzzleNumber} · ${endlessPuzzle.name} · ${endlessPuzzleStyleLabel}`,
                         puzzleNumber: endlessPuzzleNumber,
                         styleLabel: endlessPuzzleStyleLabel,
-                        swapBudget: endlessUsesSwapLimit ? endlessSwapBudget : null,
+                        swapBudget: endlessSwapBudget,
                       }
                     : undefined
               }
               gradientQuality={gradientQuality}
               moves={moves}
               timeDisplay={formatTime(timeLeft)}
-              timeWarning={endlessUsesCountdown && timeLeft <= 10}
+              timeWarning={activeUsesCountdown && timeLeft <= 10}
             />
           </motion.div>
 
@@ -1068,7 +1606,7 @@ export default function Home() {
               draggedIndex={draggedIndex}
               dropTargetRect={dropTargetRect}
               getTileRef={getTileRef}
-              interactionDisabled={previewActive || dailyAttemptFailed}
+              interactionDisabled={previewActive || dailyFailureReason !== null || !timerStarted}
               previewCountdown={previewActive ? previewCountdown : null}
               setDragOverlayRef={setDragOverlayRef}
               tileRadiusClass={tileRadiusClass}
@@ -1076,7 +1614,6 @@ export default function Home() {
               confettiActive={confettiActive}
               winWaveActive={winWaveActive}
               winState={winState}
-              loseState={loseState}
               isTileCorrect={isTileCorrect}
               isTileLocked={isTileLocked}
               onPointerDown={handlePointerDown}
@@ -1189,12 +1726,17 @@ export default function Home() {
                   }
                 : undefined
             }
-            loseState={loseState}
             moves={moves}
             onRestart={handleRestartGame}
             personalBestStatus={personalBestStatus}
             timeDisplay={formatTime(solveTime)}
             winState={winModalVisible}
+          />
+          <VerificationRetryModal
+            isOpen={verificationRetryStatus !== "hidden"}
+            isRetrying={verificationRetryStatus === "retrying"}
+            onContinueUnranked={handleContinueUnranked}
+            onRetry={handleVerificationRetry}
           />
           <WinConfetti active={confettiActive} />
           <GameModeModal
@@ -1212,30 +1754,44 @@ export default function Home() {
           />
           <DailyPuzzleModal
             dateKey={dailyDateKey}
-            isFailed={dailyAttemptFailed}
+            failureReason={dailyFailureReason}
             isOpen={dailyModalOpen}
             onClose={() => setDailyModalOpen(false)}
             onStart={handleDailyStart}
             record={dailyRecordForToday}
-            style={dailyPuzzleStyle}
+            challengeLabel={dailyPuzzle.challengeLabel}
+            difficulty={dailyPuzzle.difficulty}
+            size={dailyPuzzle.size}
             swapBudget={dailySwapBudget}
+            timeLimitSeconds={dailyPuzzle.timeLimitSeconds}
           />
           <LeaderboardModal
+            dailyDateKey={dailyDateKey}
             isOpen={leaderboardModalOpen}
             onClose={() => setLeaderboardModalOpen(false)}
           />
         </>
       )}
 
-      {activeView === "game" && !isOnboardingComplete && (
+      {activeView === "game" && isIntroVisible && (
         <IntroOnboarding
+          accountName={accountPlayerName}
           introStep={introStep}
+          isSigningOut={isSigningOut}
+          isSignedIn={Boolean(session)}
           nameError={playerNameError}
+          onAccountAction={handleIntroAccountAction}
           onNameChange={handlePlayerNameChange}
           onPlay={handleIntroPlay}
+          onSignOut={handleIntroSignOut}
           playerNameInput={playerNameInput}
         />
       )}
+      <AccountAuthModal
+        initialMode={authModalMode}
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      />
     </main>
   );
 }

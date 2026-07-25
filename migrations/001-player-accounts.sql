@@ -95,6 +95,12 @@ create index if not exists endless_streak_user_id_idx
   on endless_streak_leaderboard (user_id);
 create index if not exists daily_leaderboard_user_id_idx
   on daily_leaderboard (user_id);
+create index if not exists leaderboard_created_at_idx
+  on leaderboard (created_at);
+create index if not exists endless_streak_created_at_idx
+  on endless_streak_leaderboard (created_at);
+create index if not exists daily_leaderboard_created_at_idx
+  on daily_leaderboard (created_at);
 
 do $$
 begin

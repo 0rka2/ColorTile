@@ -7,22 +7,23 @@ import {
   DIFFICULTY_LABELS,
   GAME_MODE_DEFINITIONS,
   PRESET_DIFFICULTIES,
+  RESERVED_PRESET_TIME_LIMIT_SECONDS,
   checkCompletion,
   clamp,
   createSeededRandom,
   formatTime,
   generateCornerColors,
   generateSolvedBoard,
-  getDailyPuzzleConfig,
+  getCountdownDuration,
+  getDailyPuzzleDefinition,
   getDailyPuzzleDateKey,
-  getDailyPuzzleStyle,
+  getDailyPuzzleTypeLabel,
   getGameModeConfig,
   getBoardDensityClass,
-  getEndlessCountdownDuration,
+  getEndlessPuzzleDefinition,
   getEndlessPuzzleSwapBudget,
-  getEndlessPuzzleStyle,
   getEndlessPuzzleSize,
-  getEndlessPuzzleType,
+  getEndlessPuzzleTypeLabel,
   getEndlessSwapBudget,
   getModeStyle,
   getPresetModeKey,
@@ -31,6 +32,7 @@ import {
   hexToRgb,
   hslToHex,
   interpolateHue,
+  isEndlessPuzzleType,
   isBlackAndWhiteMode,
   isSolved,
   isTileLocked,
@@ -44,9 +46,10 @@ function buildSolvedBoard(size = 4) {
 }
 
 function buildSeededBoard(dateKey: string) {
+  const definition = getDailyPuzzleDefinition(dateKey);
   const random = createSeededRandom(`${dateKey}:board`);
-  const corners = generateCornerColors(getDailyPuzzleConfig().size, random);
-  return scrambleBoard(generateSolvedBoard(getDailyPuzzleConfig().size, corners), random);
+  const corners = generateCornerColors(definition.size, random);
+  return scrambleBoard(generateSolvedBoard(definition.size, corners), random);
 }
 
 function withMockedRandom(values: number[], callback: () => void) {
@@ -183,46 +186,191 @@ test("endless puzzle sizes increase at the planned puzzle thresholds", () => {
   assert.equal(getEndlessPuzzleSize(16), 7);
 });
 
-test("endless puzzle style is only black and white for hard-sized puzzles below the chance threshold", () => {
-  assert.equal(getEndlessPuzzleStyle(4, 0), "color");
-  assert.equal(getEndlessPuzzleStyle(5, 0.29), "black-and-white");
-  assert.equal(getEndlessPuzzleStyle(5, 0.3), "color");
-  assert.equal(getEndlessPuzzleStyle(6, 0), "color");
-  assert.equal(getEndlessPuzzleStyle(7, 0.1), "color");
+test("endless puzzles follow the authored twenty-level ladder", () => {
+  const expectedLevels = [
+    ["First Steps", "classic"],
+    ["Clean Moves", "limited-swaps"],
+    ["Quick Start", "countdown"],
+    ["Faded Colors", "black-and-white"],
+    ["Double Trouble", "countdown-swaps"],
+    ["Bigger Canvas", "classic"],
+    ["Memory Fade", "black-and-white"],
+    ["Precision Grid", "limited-swaps"],
+    ["Against the Clock", "countdown"],
+    ["Pressure Check", "black-and-white-countdown"],
+    ["Wide Open", "classic"],
+    ["Gray Area", "black-and-white"],
+    ["Careful Hands", "limited-swaps"],
+    ["Rush Hour", "countdown-swaps"],
+    ["Blind Sprint", "black-and-white-countdown"],
+    ["Final Size", "classic"],
+    ["Monochrome Maze", "black-and-white"],
+    ["Master Precision", "limited-swaps"],
+    ["Lasting Clock", "black-and-white-countdown"],
+    ["ColorTile Gauntlet", "black-and-white-countdown-swaps"],
+  ];
+
+  assert.deepEqual(
+    expectedLevels.map((_, index) => {
+      const definition = getEndlessPuzzleDefinition(index + 1);
+      return [definition.name, definition.type];
+    }),
+    expectedLevels,
+  );
 });
 
-test("endless countdown puzzle types only appear on normal and hard sized boards", () => {
-  assert.equal(getEndlessPuzzleType(4, 0.1), "countdown");
-  assert.equal(getEndlessPuzzleType(4, 0.5), "countdown-swaps");
-  assert.equal(getEndlessPuzzleType(4, 0.8), "classic");
-  assert.equal(getEndlessPuzzleType(5, 0.2), "black-and-white");
-  assert.equal(getEndlessPuzzleType(5, 0.4), "countdown");
-  assert.equal(getEndlessPuzzleType(5, 0.7), "countdown-swaps");
-  assert.equal(getEndlessPuzzleType(6, 0), "classic");
-  assert.equal(getEndlessPuzzleType(7, 0.5), "classic");
+test("late endless cycles are deterministic, balanced, and avoid adjacent repeats", () => {
+  const expectedTypes = [
+    "black-and-white",
+    "black-and-white-countdown-swaps",
+    "classic",
+    "countdown",
+    "limited-swaps",
+  ];
+  const firstPass = Array.from({ length: 20 }, (_, index) =>
+    getEndlessPuzzleDefinition(index + 21),
+  );
+  const repeatedPass = Array.from({ length: 20 }, (_, index) =>
+    getEndlessPuzzleDefinition(index + 21),
+  );
+
+  assert.deepEqual(repeatedPass, firstPass);
+  assert.notEqual(
+    getEndlessPuzzleDefinition(20).type,
+    getEndlessPuzzleDefinition(21).type,
+  );
+
+  for (let cycleStart = 0; cycleStart < firstPass.length; cycleStart += 5) {
+    assert.deepEqual(
+      firstPass
+        .slice(cycleStart, cycleStart + 5)
+        .map((definition) => definition.type)
+        .sort(),
+      expectedTypes,
+    );
+  }
+
+  for (let index = 1; index < firstPass.length; index += 1) {
+    assert.notEqual(firstPass[index].type, firstPass[index - 1].type);
+  }
 });
 
-test("endless countdown durations match normal and hard sized boards", () => {
-  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.normal.size), 150);
-  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.hard.size), 210);
-  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.expert.size), 0);
-  assert.equal(getEndlessCountdownDuration(PRESET_DIFFICULTIES.extreme.size), 0);
+test("countdown durations scale by size and combined challenge modifiers", () => {
+  assert.equal(getCountdownDuration(PRESET_DIFFICULTIES.normal.size), 180);
+  assert.equal(getCountdownDuration(PRESET_DIFFICULTIES.hard.size), 300);
+  assert.equal(getCountdownDuration(PRESET_DIFFICULTIES.expert.size), 420);
+  assert.equal(getCountdownDuration(PRESET_DIFFICULTIES.extreme.size), 540);
+  assert.equal(
+    getCountdownDuration(PRESET_DIFFICULTIES.normal.size, { includesSwapLimit: true }),
+    240,
+  );
+  assert.equal(
+    getCountdownDuration(PRESET_DIFFICULTIES.hard.size, { includesSwapLimit: true }),
+    360,
+  );
+  assert.equal(
+    getCountdownDuration(PRESET_DIFFICULTIES.extreme.size, {
+      includesSwapLimit: true,
+      isBlackAndWhite: true,
+    }),
+    660,
+  );
 });
 
-test("endless countdown swap puzzles get a generous swap budget", () => {
-  const baseBudget = getEndlessSwapBudget(5, 6);
+test("endless constrained puzzles use safe budgets for every board size", () => {
+  const sizes = [4, 5, 6, 7];
+  const limitedBudgets = [17, 26, 37, 50];
+  const combinedBudgets = [20, 29, 40, 53];
+  const worstCaseMinimums = [11, 20, 31, 44];
 
-  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "countdown-swaps"), baseBudget + 3);
-  assert.equal(getEndlessPuzzleSwapBudget(5, 6, "classic"), baseBudget);
+  sizes.forEach((size, index) => {
+    assert.equal(
+      getEndlessPuzzleSwapBudget(size, "limited-swaps"),
+      limitedBudgets[index],
+    );
+    assert.equal(
+      getEndlessPuzzleSwapBudget(size, "countdown-swaps"),
+      combinedBudgets[index],
+    );
+    assert.ok(limitedBudgets[index] > worstCaseMinimums[index]);
+    assert.ok(combinedBudgets[index] > worstCaseMinimums[index]);
+  });
+
+  assert.equal(getEndlessPuzzleSwapBudget(7, "classic"), null);
+  assert.equal(getEndlessPuzzleSwapBudget(7, "black-and-white"), null);
+});
+
+test("combined endless rules expose matching labels, styles, and limits", () => {
+  const definition = getEndlessPuzzleDefinition(20);
+
+  assert.equal(definition.challengeLabel, "B&W + Time Limit + Swaps");
+  assert.equal(definition.style, "black-and-white");
+  assert.equal(definition.swapBudget, 53);
+  assert.equal(definition.threeStarMoveLimit, 44);
+  assert.equal(definition.timeLimitSeconds, 660);
+  assert.equal(definition.usesCountdown, true);
+  assert.equal(definition.usesSwapLimit, true);
+  assert.equal(getEndlessPuzzleTypeLabel(definition.type), definition.challengeLabel);
+  assert.equal(isEndlessPuzzleType(definition.type), true);
+  assert.equal(isEndlessPuzzleType("time-limit"), false);
 });
 
 test("daily puzzle date key uses UTC dates", () => {
   assert.equal(getDailyPuzzleDateKey(new Date("2026-07-13T23:59:59.000Z")), "2026-07-13");
 });
 
-test("daily puzzle style uses the hard-sized black and white threshold", () => {
-  assert.equal(getDailyPuzzleStyle(0.29), "black-and-white");
-  assert.equal(getDailyPuzzleStyle(0.3), "color");
+test("daily puzzle roster is stable for a date", () => {
+  assert.deepEqual(
+    getDailyPuzzleDefinition("2026-07-25"),
+    getDailyPuzzleDefinition("2026-07-25"),
+  );
+});
+
+test("daily puzzle roster includes both difficulties and all challenge types", () => {
+  const difficulties = new Set<string>();
+  const types = new Set<string>();
+
+  for (let day = 1; day <= 120; day += 1) {
+    const dateKey = new Date(Date.UTC(2026, 0, day)).toISOString().slice(0, 10);
+    const definition = getDailyPuzzleDefinition(dateKey);
+
+    difficulties.add(definition.difficulty);
+    types.add(definition.type);
+  }
+
+  assert.deepEqual([...difficulties].sort(), ["hard", "normal"]);
+  assert.deepEqual(
+    [...types].sort(),
+    ["black-and-white", "classic", "limited-swaps", "time-limit"],
+  );
+});
+
+test("daily puzzle definitions apply the selected difficulty and challenge rules", () => {
+  for (let day = 1; day <= 120; day += 1) {
+    const dateKey = new Date(Date.UTC(2026, 0, day)).toISOString().slice(0, 10);
+    const definition = getDailyPuzzleDefinition(dateKey);
+    const expectedSize = PRESET_DIFFICULTIES[definition.difficulty].size;
+
+    assert.equal(definition.size, expectedSize);
+    assert.equal(definition.challengeLabel, getDailyPuzzleTypeLabel(definition.type));
+
+    if (definition.type === "limited-swaps") {
+      assert.equal(definition.style, "color");
+      assert.equal(definition.swapBudget, getEndlessSwapBudget(expectedSize));
+      assert.equal(definition.timeLimitSeconds, null);
+    } else if (definition.type === "time-limit") {
+      assert.equal(definition.style, "color");
+      assert.equal(definition.swapBudget, null);
+      assert.equal(definition.timeLimitSeconds, getCountdownDuration(expectedSize));
+    } else {
+      assert.equal(
+        definition.style,
+        definition.type === "black-and-white" ? "black-and-white" : "color",
+      );
+      assert.equal(definition.swapBudget, null);
+      assert.equal(definition.timeLimitSeconds, null);
+    }
+  }
 });
 
 test("seeded daily board generation is stable for a date and changes across dates", () => {
@@ -257,16 +405,18 @@ test("board random helpers still use Math.random by default", () => {
   assert.deepEqual(defaultCorners, injectedCorners);
 });
 
-test("endless swap budget tightens with streak but keeps a minimum", () => {
-  assert.equal(getEndlessSwapBudget(4, 0), 15);
-  assert.equal(getEndlessSwapBudget(4, 3), 14);
-  assert.equal(getEndlessSwapBudget(4, 99), 8);
-  assert.equal(getEndlessSwapBudget(7, 0), 48);
+test("endless swap budget stays between 30 and 32 based on board difficulty", () => {
+  assert.equal(getEndlessSwapBudget(4), 30);
+  assert.equal(getEndlessSwapBudget(5), 31);
+  assert.equal(getEndlessSwapBudget(6), 32);
+  assert.equal(getEndlessSwapBudget(7), 32);
 });
 
-test("endless three-star limit is seventy percent rounded up", () => {
-  assert.equal(getEndlessThreeStarMoveLimit(15), 11);
-  assert.equal(getEndlessThreeStarMoveLimit(14), 10);
+test("endless three-star limits match efficient solutions by board size", () => {
+  assert.equal(getEndlessThreeStarMoveLimit(4), 11);
+  assert.equal(getEndlessThreeStarMoveLimit(5), 20);
+  assert.equal(getEndlessThreeStarMoveLimit(6), 31);
+  assert.equal(getEndlessThreeStarMoveLimit(7), 44);
 });
 
 test("tile radius and board density classes change at the expected thresholds", () => {
@@ -280,7 +430,7 @@ test("tile radius and board density classes change at the expected thresholds", 
   assert.equal(getBoardDensityClass(18), "board-grid--dense");
 });
 
-test("black and white modes mirror preset board sizes and times", () => {
+test("black and white modes mirror preset board sizes and reserved limits", () => {
   assert.deepEqual(COLOR_PRESET_MODE_KEYS, ["normal", "hard", "expert", "extreme"]);
   assert.deepEqual(BLACK_AND_WHITE_PRESET_MODE_KEYS, [
     "black-and-white-normal",
@@ -292,13 +442,13 @@ test("black and white modes mirror preset board sizes and times", () => {
   assert.deepEqual(getGameModeConfig("black-and-white-normal"), {
     label: "B&W Normal",
     size: PRESET_DIFFICULTIES.normal.size,
-    time: PRESET_DIFFICULTIES.normal.time,
   });
   assert.deepEqual(getGameModeConfig("black-and-white-extreme"), {
     label: "B&W Extreme",
     size: PRESET_DIFFICULTIES.extreme.size,
-    time: PRESET_DIFFICULTIES.extreme.time,
   });
+  assert.equal(RESERVED_PRESET_TIME_LIMIT_SECONDS.normal, 120);
+  assert.equal(RESERVED_PRESET_TIME_LIMIT_SECONDS.extreme, 420);
 });
 
 test("mode helpers resolve style and keys for black and white runs", () => {

@@ -12,7 +12,7 @@ import {
   formatTime,
   isTileCorrect,
   isTileLocked,
-  PRESET_DIFFICULTIES,
+  RESERVED_PRESET_TIME_LIMIT_SECONDS,
   swapTiles,
 } from "../game/game-logic";
 import { findNearestTileIndex } from "../game/drop-target";
@@ -30,7 +30,7 @@ const MODAL_GAP_MAX_PX = 18;
 const MODAL_WIDTH_PX = 480;
 const MODAL_ESTIMATED_HEIGHT_PX = 216;
 const VIEWPORT_MARGIN_PX = 16;
-const TUTORIAL_TIME_SECONDS = PRESET_DIFFICULTIES.normal.time;
+const TUTORIAL_TIME_SECONDS = RESERVED_PRESET_TIME_LIMIT_SECONDS.normal;
 const tutorialCorners: [string, string, string, string] = [
   "#38bdf8",
   "#7c3aed",
@@ -303,12 +303,12 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     stepCompletionTimeoutRef.current = null;
   }, []);
 
-  const resetTileRefs = () => {
+  const resetTileRefs = useCallback(() => {
     tileElementsRef.current = {};
     pendingSwapAnimationRef.current = null;
-  };
+  }, []);
 
-  const goToStage = (nextStageIndex: number) => {
+  const goToStage = useCallback((nextStageIndex: number) => {
     clearStepCompletionTimeout();
     resetTileRefs();
     setStepCompletionPending(false);
@@ -321,7 +321,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
     }
 
     setBoard(getSolvedTutorialBoard(`stage-${nextStageIndex}`));
-  };
+  }, [clearStepCompletionTimeout, resetTileRefs]);
 
   useLayoutEffect(() => {
     updateSpotlight();
@@ -544,7 +544,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
       stepCompletionTimeoutRef.current = null;
       goToStage(2);
     }, STEP_COMPLETION_DELAY_MS);
-  }, [board, clearDragSession, stageIndex, stepCompletionPending]);
+  }, [board, clearDragSession, goToStage, stageIndex, stepCompletionPending]);
 
   useEffect(() => {
     if (!dragSession) {
@@ -846,7 +846,6 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           interactionDisabled={!canInteractWithBoard}
           isTileCorrect={isTileCorrect}
           isTileLocked={isTileLocked}
-          loseState={false}
           onPointerDown={handlePointerDown}
           pressedTileIndex={pressedTileIndex}
           setDragOverlayRef={setDragOverlayRef}

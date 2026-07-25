@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 
 import type { DailyPuzzleRecord } from "../game-types";
-import { DAILY_PUZZLE_STORAGE_KEY } from "../player-progress";
+import {
+  DAILY_PUZZLE_STORAGE_KEY,
+  normalizePlayerProgress,
+} from "../player-progress";
 
 export function usePersistentDailyPuzzle() {
   const [dailyRecord, setDailyRecord] = useState<DailyPuzzleRecord | null>(null);
@@ -20,7 +23,9 @@ export function usePersistentDailyPuzzle() {
         return;
       }
 
-      setDailyRecord(JSON.parse(stored) as DailyPuzzleRecord);
+      setDailyRecord(
+        normalizePlayerProgress({ dailyRecord: JSON.parse(stored) }).dailyRecord,
+      );
     } catch {
       // Ignore malformed local storage and start fresh.
     } finally {
@@ -29,7 +34,7 @@ export function usePersistentDailyPuzzle() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (typeof window === "undefined" || !isLoaded) {
       return;
     }
 
@@ -38,7 +43,7 @@ export function usePersistentDailyPuzzle() {
     }
 
     window.localStorage.setItem(DAILY_PUZZLE_STORAGE_KEY, JSON.stringify(dailyRecord));
-  }, [dailyRecord]);
+  }, [dailyRecord, isLoaded]);
 
   return { dailyRecord, isLoaded, setDailyRecord };
 }

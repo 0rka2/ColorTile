@@ -1,69 +1,11 @@
-import { getSql } from "@/app/lib/db";
-import { auth } from "@/app/lib/auth";
+import { getDailyPuzzleDateKey } from "@/app/game/game-logic";
 import {
   canUseLeaderboardCategory,
   isDailyLeaderboardDateKey,
   isLeaderboardCategory,
   isLeaderboardDifficulty,
-  type LeaderboardDifficulty,
 } from "@/app/game/leaderboard";
-import type { ModeStyle } from "@/app/game/game-types";
-
-let leaderboardTablePromise: Promise<void> | null = null;
-
-async function createLeaderboardTables() {
-  const sql = getSql();
-
-  await sql`
-    create table if not exists leaderboard (
-      id bigint generated always as identity primary key,
-      player_name text not null,
-      difficulty text not null,
-      moves integer not null check (moves > 0),
-      solve_time double precision not null check (solve_time > 0),
-      created_at timestamptz not null default now()
-    )
-  `;
-
-  await sql`alter table leaderboard add column if not exists user_id text`;
-
-  await sql`
-    create table if not exists endless_streak_leaderboard (
-      id bigint generated always as identity primary key,
-      player_name text not null,
-      difficulty text not null,
-      streak_count integer not null check (streak_count > 0),
-      created_at timestamptz not null default now()
-    )
-  `;
-
-  await sql`alter table endless_streak_leaderboard add column if not exists user_id text`;
-
-  await sql`
-    create table if not exists daily_leaderboard (
-      id bigint generated always as identity primary key,
-      player_name text not null,
-      date_key text not null,
-      style text not null,
-      moves integer not null check (moves > 0),
-      solve_time double precision not null check (solve_time > 0),
-      created_at timestamptz not null default now()
-    )
-  `;
-
-  await sql`alter table daily_leaderboard add column if not exists user_id text`;
-}
-
-function ensureLeaderboardTable() {
-  if (!leaderboardTablePromise) {
-    leaderboardTablePromise = createLeaderboardTables().catch((error: unknown) => {
-      leaderboardTablePromise = null;
-      throw error;
-    });
-  }
-
-  return leaderboardTablePromise;
-}
+import { getSql } from "@/app/lib/db";
 
 function leaderboardUnavailable(error: unknown) {
   console.error("Leaderboard database request failed.", error);
@@ -75,22 +17,21 @@ function leaderboardUnavailable(error: unknown) {
 
 async function getLeaderboard(request: Request) {
   const { searchParams } = new URL(request.url);
-  const categoryParam = searchParams.get("category");
-  const difficultyParam = searchParams.get("difficulty");
-  const dateKeyParam = searchParams.get("dateKey");
+  const category = searchParams.get("category");
+  const difficulty = searchParams.get("difficulty");
+  const dateKey = searchParams.get("dateKey");
 
-  if (!isLeaderboardCategory(categoryParam)) {
-    return Response.json(
-      { error: "Invalid leaderboard query." },
-      { status: 400 },
-    );
+  if (!isLeaderboardCategory(category)) {
+    return Response.json({ error: "Invalid leaderboard query." }, { status: 400 });
   }
 
-  await ensureLeaderboardTable();
   const sql = getSql();
 
-  if (categoryParam === "daily") {
-    if (!isDailyLeaderboardDateKey(dateKeyParam)) {
+  if (category === "daily") {
+    if (
+      !isDailyLeaderboardDateKey(dateKey) ||
+      dateKey !== getDailyPuzzleDateKey()
+    ) {
       return Response.json(
         { error: "Invalid daily leaderboard date." },
         { status: 400 },
@@ -98,9 +39,26 @@ async function getLeaderboard(request: Request) {
     }
 
     const rows = await sql`
+      with personal_scores as (
+        select
+          score.id,
+          account.name as player_name,
+          score.date_key,
+          score.style,
+          score.moves,
+          score.solve_time,
+          score.created_at,
+          row_number() over (
+            partition by score.user_id
+            order by score.solve_time asc, score.moves asc, score.created_at asc
+          ) as personal_rank
+        from daily_leaderboard as score
+        join "user" as account on account.id = score.user_id
+        where score.date_key = ${dateKey}
+      )
       select id, player_name, date_key, style, moves, solve_time, created_at
-      from daily_leaderboard
-      where date_key = ${dateKeyParam}
+      from personal_scores
+      where personal_rank = 1
       order by solve_time asc, moves asc, created_at asc
       limit 10
     `;
@@ -108,25 +66,33 @@ async function getLeaderboard(request: Request) {
     return Response.json(rows);
   }
 
-  if (!isLeaderboardDifficulty(difficultyParam)) {
-    return Response.json(
-      { error: "Invalid leaderboard query." },
-      { status: 400 },
-    );
+  if (
+    !isLeaderboardDifficulty(difficulty) ||
+    !canUseLeaderboardCategory(category, difficulty)
+  ) {
+    return Response.json({ error: "Invalid leaderboard query." }, { status: 400 });
   }
 
-  if (!canUseLeaderboardCategory(categoryParam, difficultyParam)) {
-    return Response.json(
-      { error: "This leaderboard query is not available for that mode." },
-      { status: 400 },
-    );
-  }
-
-  if (categoryParam === "streaks") {
+  if (category === "streaks") {
     const rows = await sql`
+      with personal_scores as (
+        select
+          score.id,
+          account.name as player_name,
+          score.difficulty,
+          score.streak_count,
+          score.created_at,
+          row_number() over (
+            partition by score.user_id
+            order by score.streak_count desc, score.created_at asc
+          ) as personal_rank
+        from endless_streak_leaderboard as score
+        join "user" as account on account.id = score.user_id
+        where score.difficulty = ${difficulty}
+      )
       select id, player_name, difficulty, streak_count, created_at
-      from endless_streak_leaderboard
-      where difficulty = ${difficultyParam}
+      from personal_scores
+      where personal_rank = 1
       order by streak_count desc, created_at asc
       limit 10
     `;
@@ -135,125 +101,55 @@ async function getLeaderboard(request: Request) {
   }
 
   const rows =
-    categoryParam === "moves"
+    category === "moves"
       ? await sql`
+          with personal_scores as (
+            select
+              score.id,
+              account.name as player_name,
+              score.difficulty,
+              score.moves,
+              score.solve_time,
+              score.created_at,
+              row_number() over (
+                partition by score.user_id
+                order by score.moves asc, score.solve_time asc, score.created_at asc
+              ) as personal_rank
+            from leaderboard as score
+            join "user" as account on account.id = score.user_id
+            where score.difficulty = ${difficulty}
+          )
           select id, player_name, difficulty, moves, solve_time, created_at
-          from leaderboard
-          where difficulty = ${difficultyParam}
+          from personal_scores
+          where personal_rank = 1
           order by moves asc, solve_time asc, created_at asc
           limit 10
         `
       : await sql`
+          with personal_scores as (
+            select
+              score.id,
+              account.name as player_name,
+              score.difficulty,
+              score.moves,
+              score.solve_time,
+              score.created_at,
+              row_number() over (
+                partition by score.user_id
+                order by score.solve_time asc, score.moves asc, score.created_at asc
+              ) as personal_rank
+            from leaderboard as score
+            join "user" as account on account.id = score.user_id
+            where score.difficulty = ${difficulty}
+          )
           select id, player_name, difficulty, moves, solve_time, created_at
-          from leaderboard
-          where difficulty = ${difficultyParam}
+          from personal_scores
+          where personal_rank = 1
           order by solve_time asc, moves asc, created_at asc
           limit 10
         `;
 
   return Response.json(rows);
-}
-
-async function submitLeaderboardScore(request: Request) {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
-  const body = (await request.json()) as Partial<{
-    category: string;
-    dateKey: string;
-    difficulty: string;
-    moves: number;
-    playerName: string;
-    solveTime: number;
-    streakCount: number;
-    style: ModeStyle;
-  }>;
-
-  const playerName = (
-    session?.user.name.trim() || body.playerName?.trim() || ""
-  ).slice(0, 24);
-  const userId = session?.user.id ?? null;
-  const moves = body.moves;
-  const solveTime = body.solveTime;
-
-  if (!playerName || playerName.length > 24) {
-    return Response.json({ error: "Player name is required." }, { status: 400 });
-  }
-
-  if (body.category === "daily") {
-    if (!isDailyLeaderboardDateKey(body.dateKey ?? null)) {
-      return Response.json({ error: "Invalid daily leaderboard date." }, { status: 400 });
-    }
-
-    if (body.style !== "color" && body.style !== "black-and-white") {
-      return Response.json({ error: "Invalid daily puzzle style." }, { status: 400 });
-    }
-
-    if (typeof moves !== "number" || !Number.isInteger(moves) || moves <= 0) {
-      return Response.json({ error: "Moves must be a positive integer." }, { status: 400 });
-    }
-
-    if (typeof solveTime !== "number" || !Number.isFinite(solveTime) || solveTime <= 0) {
-      return Response.json({ error: "Solve time must be a positive number." }, { status: 400 });
-    }
-
-    await ensureLeaderboardTable();
-    const sql = getSql();
-    await sql`
-      insert into daily_leaderboard (user_id, player_name, date_key, style, moves, solve_time)
-      values (${userId}, ${playerName}, ${body.dateKey}, ${body.style}, ${moves}, ${solveTime})
-    `;
-
-    return Response.json({ ok: true }, { status: 201 });
-  }
-
-  if (!isLeaderboardDifficulty(body.difficulty ?? null)) {
-    return Response.json({ error: "Invalid difficulty." }, { status: 400 });
-  }
-
-  const difficulty = body.difficulty as LeaderboardDifficulty;
-
-  if (body.category === "streaks") {
-    const streakCount = body.streakCount;
-
-    if (!canUseLeaderboardCategory("streaks", difficulty)) {
-      return Response.json({ error: "Best streaks must use endless difficulty." }, { status: 400 });
-    }
-
-    if (typeof streakCount !== "number" || !Number.isInteger(streakCount) || streakCount <= 0) {
-      return Response.json({ error: "Streak count must be a positive integer." }, { status: 400 });
-    }
-
-    await ensureLeaderboardTable();
-    const sql = getSql();
-    await sql`
-      insert into endless_streak_leaderboard (user_id, player_name, difficulty, streak_count)
-      values (${userId}, ${playerName}, ${difficulty}, ${streakCount})
-    `;
-
-    return Response.json({ ok: true }, { status: 201 });
-  }
-
-  if (typeof moves !== "number" || !Number.isInteger(moves) || moves <= 0) {
-    return Response.json({ error: "Moves must be a positive integer." }, { status: 400 });
-  }
-
-  if (typeof solveTime !== "number" || !Number.isFinite(solveTime) || solveTime <= 0) {
-    return Response.json({ error: "Solve time must be a positive number." }, { status: 400 });
-  }
-
-  if (!canUseLeaderboardCategory("fastest", difficulty)) {
-    return Response.json({ error: "This difficulty cannot submit solve scores." }, { status: 400 });
-  }
-
-  await ensureLeaderboardTable();
-  const sql = getSql();
-  await sql`
-    insert into leaderboard (user_id, player_name, difficulty, moves, solve_time)
-    values (${userId}, ${playerName}, ${difficulty}, ${moves}, ${solveTime})
-  `;
-
-  return Response.json({ ok: true }, { status: 201 });
 }
 
 export async function GET(request: Request) {
@@ -264,10 +160,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
-  try {
-    return await submitLeaderboardScore(request);
-  } catch (error) {
-    return leaderboardUnavailable(error);
-  }
+export function POST() {
+  return Response.json(
+    { error: "Direct score submissions are no longer accepted." },
+    { status: 405, headers: { Allow: "GET" } },
+  );
 }

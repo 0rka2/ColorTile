@@ -1,7 +1,10 @@
 import {
   BlackAndWhiteModeKey,
+  DailyPuzzleDefinition,
+  DailyPuzzleType,
   DifficultyConfig,
   DifficultyKey,
+  EndlessPuzzleDefinition,
   EndlessPuzzleType,
   ModeStyle,
   PresetDifficultyKey,
@@ -12,10 +15,17 @@ import {
 type RandomSource = () => number;
 
 export const PRESET_DIFFICULTIES: Record<PresetDifficultyKey, DifficultyConfig> = {
-  normal: { label: "Normal", size: 4, time: 120 },
-  hard: { label: "Hard", size: 5, time: 240 },
-  expert: { label: "Expert", size: 6, time: 360 },
-  extreme: { label: "Extreme", size: 7, time: 420 },
+  normal: { label: "Normal", size: 4 },
+  hard: { label: "Hard", size: 5 },
+  expert: { label: "Expert", size: 6 },
+  extreme: { label: "Extreme", size: 7 },
+};
+
+export const RESERVED_PRESET_TIME_LIMIT_SECONDS: Record<PresetDifficultyKey, number> = {
+  normal: 120,
+  hard: 240,
+  expert: 360,
+  extreme: 420,
 };
 
 export const PRESET_MODE_DIFFICULTIES: PresetDifficultyKey[] = [
@@ -124,13 +134,16 @@ export const GAME_MODE_DEFINITIONS: Record<DifficultyKey, GameModeDefinition> = 
     leaderboardDifficulty: "endless",
     size: 0,
     style: "endless",
-    time: 0,
   },
 };
 
 export const DIFFICULTY_LABELS: Record<DifficultyKey, string> = Object.fromEntries(
   Object.entries(GAME_MODE_DEFINITIONS).map(([key, mode]) => [key, mode.label]),
 ) as Record<DifficultyKey, string>;
+
+const MIN_CONSTRAINED_SWAP_BUDGET = 30;
+const MAX_CONSTRAINED_SWAP_BUDGET = 32;
+export const GAME_START_PREVIEW_SECONDS = 3;
 
 export const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -151,97 +164,231 @@ export function getEndlessPuzzleSize(puzzleNumber: number) {
   return 7;
 }
 
-export function getEndlessSwapBudget(size: number, streak: number) {
-  return Math.max(size + 4, size * size - 1 - Math.floor(streak / 3));
+export function getEndlessSwapBudget(size: number) {
+  const normalBoardSize = PRESET_DIFFICULTIES.normal.size;
+
+  return clamp(
+    MIN_CONSTRAINED_SWAP_BUDGET + (size - normalBoardSize),
+    MIN_CONSTRAINED_SWAP_BUDGET,
+    MAX_CONSTRAINED_SWAP_BUDGET,
+  );
 }
 
-export function getEndlessThreeStarMoveLimit(swapBudget: number) {
-  return Math.ceil(swapBudget * 0.7);
+export function getEndlessThreeStarMoveLimit(size: number) {
+  return Math.max(0, size * size - 5);
 }
 
-export function getEndlessCountdownDuration(size: number) {
+export function getCountdownDuration(
+  size: number,
+  options?: {
+    includesSwapLimit?: boolean;
+    isBlackAndWhite?: boolean;
+  },
+) {
+  let duration = 0;
+
   if (size === PRESET_DIFFICULTIES.normal.size) {
-    return 150;
+    duration = 180;
+  } else if (size === PRESET_DIFFICULTIES.hard.size) {
+    duration = 300;
+  } else if (size === PRESET_DIFFICULTIES.expert.size) {
+    duration = 420;
+  } else if (size === PRESET_DIFFICULTIES.extreme.size) {
+    duration = 540;
   }
 
-  if (size === PRESET_DIFFICULTIES.hard.size) {
-    return 210;
+  if (duration === 0) {
+    return 0;
   }
 
-  return 0;
-}
+  const modifierCount =
+    Number(options?.includesSwapLimit === true) +
+    Number(options?.isBlackAndWhite === true);
 
-export function getEndlessPuzzleType(size: number, randomValue = Math.random()): EndlessPuzzleType {
-  if (size === PRESET_DIFFICULTIES.normal.size) {
-    if (randomValue < 0.35) {
-      return "countdown";
-    }
-
-    if (randomValue < 0.65) {
-      return "countdown-swaps";
-    }
-
-    return "classic";
-  }
-
-  if (size === PRESET_DIFFICULTIES.hard.size) {
-    if (randomValue < 0.3) {
-      return "black-and-white";
-    }
-
-    if (randomValue < 0.55) {
-      return "countdown";
-    }
-
-    if (randomValue < 0.8) {
-      return "countdown-swaps";
-    }
-  }
-
-  return "classic";
-}
-
-export function getEndlessPuzzleStyle(size: number, randomValue = Math.random()): ModeStyle {
-  if (size !== PRESET_DIFFICULTIES.hard.size) {
-    return "color";
-  }
-
-  return randomValue < 0.3 ? "black-and-white" : "color";
+  return duration + modifierCount * 60;
 }
 
 export function getEndlessTypeStyle(type: EndlessPuzzleType): ModeStyle {
-  return type === "black-and-white" ? "black-and-white" : "color";
+  return type === "black-and-white" ||
+    type === "black-and-white-countdown" ||
+    type === "black-and-white-countdown-swaps"
+    ? "black-and-white"
+    : "color";
 }
 
 export function getEndlessPuzzleTypeLabel(type: EndlessPuzzleType) {
   switch (type) {
+    case "limited-swaps":
+      return "Limited Swaps";
     case "black-and-white":
       return "B&W";
+    case "black-and-white-countdown":
+      return "B&W + Time Limit";
+    case "black-and-white-countdown-swaps":
+      return "B&W + Time Limit + Swaps";
     case "countdown":
-      return "Countdown";
+      return "Time Limit";
     case "countdown-swaps":
-      return "Countdown + Swaps";
+      return "Time Limit + Swaps";
     default:
       return "Classic";
   }
 }
 
 export function endlessTypeUsesCountdown(type: EndlessPuzzleType) {
-  return type === "countdown" || type === "countdown-swaps";
+  return type === "countdown" ||
+    type === "countdown-swaps" ||
+    type === "black-and-white-countdown" ||
+    type === "black-and-white-countdown-swaps";
 }
 
 export function endlessTypeUsesSwapLimit(type: EndlessPuzzleType) {
-  return type === "classic" || type === "black-and-white" || type === "countdown-swaps";
+  return type === "limited-swaps" ||
+    type === "countdown-swaps" ||
+    type === "black-and-white-countdown-swaps";
 }
 
-export function getEndlessPuzzleSwapBudget(size: number, streak: number, type: EndlessPuzzleType) {
-  const baseBudget = getEndlessSwapBudget(size, streak);
-
-  if (type === "countdown-swaps") {
-    return baseBudget + 3;
+export function getEndlessPuzzleSwapBudget(size: number, type: EndlessPuzzleType) {
+  if (!endlessTypeUsesSwapLimit(type)) {
+    return null;
   }
 
-  return baseBudget;
+  const extraMoves = endlessTypeUsesCountdown(type) ? 9 : 6;
+  return getEndlessThreeStarMoveLimit(size) + extraMoves;
+}
+
+const ENDLESS_PUZZLE_TYPES: EndlessPuzzleType[] = [
+  "classic",
+  "limited-swaps",
+  "black-and-white",
+  "countdown",
+  "countdown-swaps",
+  "black-and-white-countdown",
+  "black-and-white-countdown-swaps",
+];
+
+const AUTHORED_ENDLESS_LEVELS: Array<{
+  name: string;
+  type: EndlessPuzzleType;
+}> = [
+  { name: "First Steps", type: "classic" },
+  { name: "Clean Moves", type: "limited-swaps" },
+  { name: "Quick Start", type: "countdown" },
+  { name: "Faded Colors", type: "black-and-white" },
+  { name: "Double Trouble", type: "countdown-swaps" },
+  { name: "Bigger Canvas", type: "classic" },
+  { name: "Memory Fade", type: "black-and-white" },
+  { name: "Precision Grid", type: "limited-swaps" },
+  { name: "Against the Clock", type: "countdown" },
+  { name: "Pressure Check", type: "black-and-white-countdown" },
+  { name: "Wide Open", type: "classic" },
+  { name: "Gray Area", type: "black-and-white" },
+  { name: "Careful Hands", type: "limited-swaps" },
+  { name: "Rush Hour", type: "countdown-swaps" },
+  { name: "Blind Sprint", type: "black-and-white-countdown" },
+  { name: "Final Size", type: "classic" },
+  { name: "Monochrome Maze", type: "black-and-white" },
+  { name: "Master Precision", type: "limited-swaps" },
+  { name: "Lasting Clock", type: "black-and-white-countdown" },
+  { name: "ColorTile Gauntlet", type: "black-and-white-countdown-swaps" },
+];
+
+const LATE_ENDLESS_LEVELS: Array<{
+  name: string;
+  type: EndlessPuzzleType;
+}> = [
+  { name: "Breather", type: "classic" },
+  { name: "Afterimage", type: "black-and-white" },
+  { name: "Precision Run", type: "limited-swaps" },
+  { name: "Clock Chase", type: "countdown" },
+  { name: "Master Gauntlet", type: "black-and-white-countdown-swaps" },
+];
+
+function shuffleEndlessLevels(
+  levels: typeof LATE_ENDLESS_LEVELS,
+  seed: string,
+) {
+  const shuffled = levels.map((level) => ({ ...level }));
+  const random = createSeededRandom(seed);
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function getLateEndlessCycle(cycleIndex: number) {
+  const levels = shuffleEndlessLevels(
+    LATE_ENDLESS_LEVELS,
+    `endless-late-cycle:${cycleIndex}`,
+  );
+  const previousType = cycleIndex === 0
+    ? AUTHORED_ENDLESS_LEVELS[AUTHORED_ENDLESS_LEVELS.length - 1].type
+    : shuffleEndlessLevels(
+        LATE_ENDLESS_LEVELS,
+        `endless-late-cycle:${cycleIndex - 1}`,
+      ).at(-1)?.type;
+
+  if (levels[0].type === previousType) {
+    [levels[0], levels[1]] = [levels[1], levels[0]];
+  }
+
+  return levels;
+}
+
+function getScheduledEndlessLevel(puzzleNumber: number) {
+  if (puzzleNumber <= AUTHORED_ENDLESS_LEVELS.length) {
+    return AUTHORED_ENDLESS_LEVELS[Math.max(1, puzzleNumber) - 1];
+  }
+
+  const latePuzzleIndex = puzzleNumber - AUTHORED_ENDLESS_LEVELS.length - 1;
+  const cycleIndex = Math.floor(latePuzzleIndex / LATE_ENDLESS_LEVELS.length);
+  const cyclePosition = latePuzzleIndex % LATE_ENDLESS_LEVELS.length;
+  return getLateEndlessCycle(cycleIndex)[cyclePosition];
+}
+
+function getFallbackEndlessLevelName(type: EndlessPuzzleType) {
+  return `${getEndlessPuzzleTypeLabel(type)} Challenge`;
+}
+
+export function isEndlessPuzzleType(value: unknown): value is EndlessPuzzleType {
+  return ENDLESS_PUZZLE_TYPES.includes(value as EndlessPuzzleType);
+}
+
+export function getEndlessPuzzleDefinition(
+  puzzleNumber: number,
+  typeOverride?: EndlessPuzzleType | null,
+): EndlessPuzzleDefinition {
+  const scheduledLevel = getScheduledEndlessLevel(puzzleNumber);
+  const type = typeOverride ?? scheduledLevel.type;
+  const size = getEndlessPuzzleSize(puzzleNumber);
+  const style = getEndlessTypeStyle(type);
+  const usesCountdown = endlessTypeUsesCountdown(type);
+  const usesSwapLimit = endlessTypeUsesSwapLimit(type);
+
+  return {
+    challengeLabel: getEndlessPuzzleTypeLabel(type),
+    label: "Endless",
+    name:
+      type === scheduledLevel.type
+        ? scheduledLevel.name
+        : getFallbackEndlessLevelName(type),
+    size,
+    style,
+    swapBudget: getEndlessPuzzleSwapBudget(size, type),
+    threeStarMoveLimit: getEndlessThreeStarMoveLimit(size),
+    timeLimitSeconds: usesCountdown
+      ? getCountdownDuration(size, {
+          includesSwapLimit: usesSwapLimit,
+          isBlackAndWhite: style === "black-and-white",
+        })
+      : null,
+    type,
+    usesCountdown,
+    usesSwapLimit,
+  };
 }
 
 export function getDailyPuzzleDateKey(date = new Date()) {
@@ -287,15 +434,40 @@ export function createSeededRandom(seed: string): RandomSource {
   };
 }
 
-export function getDailyPuzzleStyle(randomValue: number): ModeStyle {
-  return getEndlessPuzzleStyle(PRESET_DIFFICULTIES.hard.size, randomValue);
+export function getDailyPuzzleTypeLabel(type: DailyPuzzleType) {
+  switch (type) {
+    case "black-and-white":
+      return "B&W";
+    case "limited-swaps":
+      return "Limited Swaps";
+    case "time-limit":
+      return "Time Limit";
+    default:
+      return "Classic";
+  }
 }
 
-export function getDailyPuzzleConfig(): DifficultyConfig {
+export function getDailyPuzzleDefinition(dateKey: string): DailyPuzzleDefinition {
+  const random = createSeededRandom(`${dateKey}:daily-roster`);
+  const difficulty = random() < 0.5 ? "normal" : "hard";
+  const types: DailyPuzzleType[] = [
+    "classic",
+    "black-and-white",
+    "limited-swaps",
+    "time-limit",
+  ];
+  const type = types[Math.floor(random() * types.length)];
+  const size = PRESET_DIFFICULTIES[difficulty].size;
+
   return {
+    challengeLabel: getDailyPuzzleTypeLabel(type),
+    difficulty,
     label: "Daily Puzzle",
-    size: PRESET_DIFFICULTIES.hard.size,
-    time: 0,
+    size,
+    style: type === "black-and-white" ? "black-and-white" : "color",
+    swapBudget: type === "limited-swaps" ? getEndlessSwapBudget(size) : null,
+    timeLimitSeconds: type === "time-limit" ? getCountdownDuration(size) : null,
+    type,
   };
 }
 
@@ -305,7 +477,6 @@ export function getEndlessConfig(puzzleNumber: number): DifficultyConfig {
   return {
     label: "Endless",
     size,
-    time: 0,
   };
 }
 
@@ -346,8 +517,14 @@ export function getGameModeConfig(
   return {
     label: mode.label,
     size: mode.size,
-    time: mode.time,
   };
+}
+
+export function getReservedPresetTimeLimit(modeKey: DifficultyKey) {
+  const baseDifficulty = GAME_MODE_DEFINITIONS[modeKey].baseDifficulty;
+  return baseDifficulty === null
+    ? 0
+    : RESERVED_PRESET_TIME_LIMIT_SECONDS[baseDifficulty];
 }
 
 function getGradientContrastBoost(size: number) {

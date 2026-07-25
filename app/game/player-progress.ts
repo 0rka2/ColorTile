@@ -11,7 +11,15 @@ export const BEST_STATS_STORAGE_KEY = "colortile-best-stats";
 export const DAILY_PUZZLE_STORAGE_KEY = "colortile-daily-puzzle";
 export const ENDLESS_STATS_STORAGE_KEY = "colortile-endless-stats";
 export const PLAYER_NAME_STORAGE_KEY = "colortile-leaderboard-player-name";
+export const PLAYER_DATA_OWNER_STORAGE_KEY = "colortile-player-data-owner";
 export const PLAYER_NAME_MAX_LENGTH = 24;
+export const PLAYER_DATA_STORAGE_KEYS = [
+  PLAYER_NAME_STORAGE_KEY,
+  BEST_STATS_STORAGE_KEY,
+  DAILY_PUZZLE_STORAGE_KEY,
+  ENDLESS_STATS_STORAGE_KEY,
+  PLAYER_DATA_OWNER_STORAGE_KEY,
+] as const;
 
 export type PlayerProgress = {
   bestStats: BestStats;
@@ -33,6 +41,23 @@ export const EMPTY_PLAYER_PROGRESS: PlayerProgress = {
 
 export function sanitizePlayerName(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, PLAYER_NAME_MAX_LENGTH);
+}
+
+export function clearStoredPlayerData(
+  storage: Pick<Storage, "removeItem">,
+) {
+  PLAYER_DATA_STORAGE_KEYS.forEach((key) => storage.removeItem(key));
+}
+
+export function shouldClearStoredPlayerData(
+  previousUserId: string | null | undefined,
+  nextUserId: string | null,
+) {
+  return (
+    previousUserId !== undefined &&
+    previousUserId !== null &&
+    previousUserId !== nextUserId
+  );
 }
 
 const DIFFICULTIES: DifficultyKey[] = [

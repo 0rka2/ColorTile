@@ -1,28 +1,33 @@
 const privacyItems = [
   {
-    title: "No Account",
+    title: "Optional Accounts",
     copy:
-      "ColorTile does not require an account and does not ask for your name, email address, payment information, or other personal details inside the game.",
+      "You can play ColorTile without an account. If you create one, ColorTile stores your name, email address, sign-in credentials, and account settings so you can sign in and manage your profile.",
   },
   {
-    title: "Necessary Cookie",
+    title: "Game Progress",
     copy:
-      "ColorTile uses one necessary cookie to remember whether you accepted or declined optional cookies.",
+      "Guest progress is stored in your browser. When you sign in, best times, move records, daily progress, and endless statistics are also synchronized to ColorTile's PostgreSQL database.",
   },
   {
-    title: "Preference Cookie",
+    title: "Public Leaderboards",
     copy:
-      "If you accept cookies, ColorTile may use a small preference cookie to remember your selected theme.",
+      "Verified scores and endless streaks may appear publicly with your current account name. Leaderboard attempts temporarily store puzzle and timing data, and short-lived pseudonymous counters help limit abusive attempt creation.",
   },
   {
-    title: "Local Records",
+    title: "Retention and Deletion",
     copy:
-      "The game stores gameplay records, such as best times, fewest moves, and endless stats, in your browser's local storage.",
+      "Verification attempts expire after 24 hours and are removed by maintenance without deleting completed scores. Daily rankings keep the current day, and other rankings reset annually. Deleting your account also deletes its synchronized progress, attempts, runs, and leaderboard entries.",
   },
   {
-    title: "Your Device",
+    title: "Account Email",
     copy:
-      "This local data remains on your device unless you clear your browser storage or reset site data for ColorTile.",
+      "Your email address is used as your sign-in identifier. ColorTile does not currently send account email, so password recovery, email verification, and email-address changes are unavailable.",
+  },
+  {
+    title: "Cookies and Preferences",
+    copy:
+      "A necessary cookie remembers your cookie choice. If you accept optional preferences, a cookie also remembers your selected theme; otherwise theme changes last only for the current page session.",
   },
   {
     title: "External Links",
@@ -42,19 +47,24 @@ export function PrivacyView() {
         <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.28em] sm:text-sm">
           Privacy
         </p>
-
-        <h1 className="theme-text-primary font-fredoka-display mt-3 text-[2.25rem] leading-none tracking-[-0.04em] sm:text-[2.85rem]">
-          Privacy Policy
+        <h1 className="theme-text-primary font-fredoka-display mt-3 text-[2.4rem] leading-none sm:text-[3rem]">
+          Your data, clearly explained
         </h1>
+        <p className="theme-text-secondary mx-auto mt-4 max-w-[32rem] text-base leading-7 sm:text-lg sm:leading-8">
+          This page describes the information used by the current ColorTile app and how it supports accounts, progress, and verified rankings.
+        </p>
       </div>
 
-      <div className="grid gap-3 text-left">
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
         {privacyItems.map((item) => (
-          <article key={item.title} className="theme-card rounded-[1rem] border px-4 py-4 sm:rounded-[1.25rem] sm:px-5 sm:py-5">
-            <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.18em]">
+          <article
+            key={item.title}
+            className="theme-card rounded-[1.25rem] border px-5 py-5 sm:rounded-[1.5rem] sm:px-6 sm:py-6"
+          >
+            <h2 className="theme-text-primary font-fredoka-display text-xl">
               {item.title}
-            </p>
-            <p className="theme-text-secondary mt-2 font-fredoka-regular text-sm leading-6 sm:text-base sm:leading-7">
+            </h2>
+            <p className="theme-text-secondary mt-3 text-sm leading-6 sm:text-base sm:leading-7">
               {item.copy}
             </p>
           </article>

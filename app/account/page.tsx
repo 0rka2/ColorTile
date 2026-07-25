@@ -32,7 +32,6 @@ export default async function AccountPage() {
       <AccountDashboard
         createdAt={new Date(session.user.createdAt).toISOString()}
         email={session.user.email}
-        emailVerified={session.user.emailVerified}
         name={session.user.name}
         progress={progress}
       />

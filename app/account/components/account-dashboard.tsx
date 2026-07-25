@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 
 import type { PlayerProgress } from "@/app/game/player-progress";
 import {
-  BEST_STATS_STORAGE_KEY,
-  DAILY_PUZZLE_STORAGE_KEY,
-  ENDLESS_STATS_STORAGE_KEY,
+  clearStoredPlayerData,
   PLAYER_NAME_MAX_LENGTH,
   PLAYER_NAME_STORAGE_KEY,
   sanitizePlayerName,
@@ -17,7 +15,6 @@ import { authClient } from "@/app/lib/auth-client";
 type AccountDashboardProps = {
   createdAt: string;
   email: string;
-  emailVerified: boolean;
   name: string;
   progress: PlayerProgress;
 };
@@ -40,7 +37,6 @@ function formatTime(seconds: number | null) {
 export function AccountDashboard({
   createdAt,
   email,
-  emailVerified,
   name: initialName,
   progress,
 }: Readonly<AccountDashboardProps>) {
@@ -53,24 +49,10 @@ export function AccountDashboard({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
-  const [isChangingEmail, setIsChangingEmail] = useState(false);
-  const [isSavingEmail, setIsSavingEmail] = useState(false);
-  const [emailChangeMessage, setEmailChangeMessage] = useState<string | null>(
-    null,
-  );
-  const [emailChangeError, setEmailChangeError] = useState<string | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
-  const [isSendingVerification, setIsSendingVerification] = useState(false);
-  const [verificationMessage, setVerificationMessage] = useState<string | null>(
-    null,
-  );
-  const [verificationError, setVerificationError] = useState<string | null>(
-    null,
-  );
   const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -99,20 +81,26 @@ export function AccountDashboard({
     }
 
     setIsSavingProfile(true);
-    const result = await authClient.updateUser({ name: sanitizedName });
-    setIsSavingProfile(false);
 
-    if (result.error) {
-      setProfileError(result.error.message ?? "Your player name could not be saved.");
-      return;
+    try {
+      const result = await authClient.updateUser({ name: sanitizedName });
+
+      if (result.error) {
+        setProfileError(result.error.message ?? "Your player name could not be saved.");
+        return;
+      }
+
+      setName(sanitizedName);
+      setSavedName(sanitizedName);
+      window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, sanitizedName);
+      setProfileMessage("Player name saved.");
+      setIsEditingName(false);
+      router.refresh();
+    } catch {
+      setProfileError("Your player name could not be saved. Please try again.");
+    } finally {
+      setIsSavingProfile(false);
     }
-
-    setName(sanitizedName);
-    setSavedName(sanitizedName);
-    window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, sanitizedName);
-    setProfileMessage("Player name saved.");
-    setIsEditingName(false);
-    router.refresh();
   }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
@@ -126,97 +114,47 @@ export function AccountDashboard({
     }
 
     setIsSavingPassword(true);
-    const result = await authClient.changePassword({
-      currentPassword,
-      newPassword,
-      revokeOtherSessions: true,
-    });
-    setIsSavingPassword(false);
-
-    if (result.error) {
-      setSecurityError(result.error.message ?? "Your password could not be changed.");
-      return;
-    }
-
-    setCurrentPassword("");
-    setNewPassword("");
-    setIsChangingPassword(false);
-    setSecurityMessage("Password changed. Other devices have been signed out.");
-  }
-
-  async function changeEmail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setEmailChangeError(null);
-    setEmailChangeMessage(null);
-
-    const normalizedEmail = newEmail.trim().toLowerCase();
-
-    if (normalizedEmail === email.toLowerCase()) {
-      setEmailChangeError("Enter a different email address.");
-      return;
-    }
-
-    setIsSavingEmail(true);
 
     try {
-      const result = await authClient.changeEmail({
-        newEmail: normalizedEmail,
-        callbackURL: "/account",
+      const result = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+        revokeOtherSessions: true,
       });
 
       if (result.error) {
-        setEmailChangeError(
-          result.error.message ?? "Your email address could not be changed.",
-        );
+        setSecurityError(result.error.message ?? "Your password could not be changed.");
         return;
       }
 
-      setNewEmail("");
-      setIsChangingEmail(false);
-      setEmailChangeMessage(
-        `Check ${normalizedEmail} to confirm your new email address.`,
-      );
+      setCurrentPassword("");
+      setNewPassword("");
+      setIsChangingPassword(false);
+      setSecurityMessage("Password changed. Other devices have been signed out.");
     } catch {
-      setEmailChangeError(
-        "Your email address could not be changed. Please try again.",
-      );
+      setSecurityError("Your password could not be changed. Please try again.");
     } finally {
-      setIsSavingEmail(false);
-    }
-  }
-
-  async function sendVerificationEmail() {
-    setVerificationError(null);
-    setVerificationMessage(null);
-    setIsSendingVerification(true);
-
-    try {
-      const result = await authClient.sendVerificationEmail({
-        email,
-        callbackURL: "/account",
-      });
-
-      if (result.error) {
-        setVerificationError(
-          result.error.message ?? "The verification email could not be sent.",
-        );
-        return;
-      }
-
-      setVerificationMessage("Verification email sent. Check your inbox.");
-    } catch {
-      setVerificationError(
-        "The verification email could not be sent. Please try again.",
-      );
-    } finally {
-      setIsSendingVerification(false);
+      setIsSavingPassword(false);
     }
   }
 
   async function signOut() {
-    await authClient.signOut();
-    router.push("/");
-    router.refresh();
+    setSecurityError(null);
+
+    try {
+      const result = await authClient.signOut();
+
+      if (result.error) {
+        setSecurityError(result.error.message ?? "Your account could not be signed out.");
+        return;
+      }
+
+      clearStoredPlayerData(window.localStorage);
+      router.push("/");
+      router.refresh();
+    } catch {
+      setSecurityError("Your account could not be signed out. Please try again.");
+    }
   }
 
   async function deleteAccount(event: FormEvent<HTMLFormElement>) {
@@ -240,12 +178,7 @@ export function AccountDashboard({
         return;
       }
 
-      [
-        PLAYER_NAME_STORAGE_KEY,
-        BEST_STATS_STORAGE_KEY,
-        DAILY_PUZZLE_STORAGE_KEY,
-        ENDLESS_STATS_STORAGE_KEY,
-      ].forEach((key) => window.localStorage.removeItem(key));
+      clearStoredPlayerData(window.localStorage);
 
       router.replace("/");
       router.refresh();
@@ -430,104 +363,13 @@ export function AccountDashboard({
               <p className="theme-text-primary font-fredoka-strong text-base">
                 Email
               </p>
-              <div className="mt-2 flex items-center justify-between gap-4">
-                <p className="theme-text-muted min-w-0 break-all text-base">
-                  {email}
-                </p>
-                {!isChangingEmail && (
-                  <button
-                    type="button"
-                    aria-label="Change email address"
-                    onClick={() => {
-                      setEmailChangeError(null);
-                      setEmailChangeMessage(null);
-                      setIsChangingEmail(true);
-                    }}
-                    className="theme-button-secondary font-fredoka-strong shrink-0 rounded-full border border-[var(--border-soft)] px-4 py-2 text-base"
-                  >
-                    Change
-                  </button>
-                )}
-              </div>
-              <div className="theme-text-muted mt-3 flex flex-wrap items-center gap-2.5 text-sm">
-                <span
-                  className={`font-fredoka-strong ${
-                    emailVerified
-                      ? "text-emerald-600"
-                      : "text-amber-600"
-                  }`}
-                >
-                  {emailVerified ? "Verified" : "Unverified"}
-                </span>
-                {!emailVerified && (
-                  <button
-                    type="button"
-                    onClick={sendVerificationEmail}
-                    disabled={isSendingVerification}
-                    className="theme-button-secondary font-fredoka-strong rounded-full border border-[var(--border-soft)] px-3.5 py-2 text-sm disabled:opacity-60"
-                  >
-                    {isSendingVerification ? "Sending..." : "Verify email"}
-                  </button>
-                )}
-              </div>
-              {isChangingEmail && (
-                <form className="mt-4 space-y-3" onSubmit={changeEmail}>
-                  <label className="block">
-                    <span className="theme-text-primary font-fredoka-strong text-base">
-                      New email
-                    </span>
-                    <input
-                      required
-                      autoFocus
-                      type="email"
-                      autoComplete="email"
-                      value={newEmail}
-                      onChange={(event) => setNewEmail(event.target.value)}
-                      className="theme-input theme-text-primary mt-2 h-12 w-full rounded-xl border px-4 text-base outline-none focus:border-slate-400"
-                    />
-                  </label>
-                  {emailChangeError && (
-                    <p role="alert" className="theme-text-danger text-base">
-                      {emailChangeError}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="submit"
-                      disabled={isSavingEmail}
-                      className="theme-button-primary font-fredoka-strong rounded-full px-5 py-2.5 text-base disabled:opacity-60"
-                    >
-                      {isSavingEmail ? "Sending..." : "Confirm email"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewEmail("");
-                        setEmailChangeError(null);
-                        setIsChangingEmail(false);
-                      }}
-                      className="theme-button-secondary font-fredoka-strong rounded-full px-5 py-2.5 text-base"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-              {emailChangeMessage && (
-                <p role="status" className="mt-3 text-base text-emerald-600">
-                  {emailChangeMessage}
-                </p>
-              )}
-              {verificationError && (
-                <p role="alert" className="theme-text-danger mt-3 text-base">
-                  {verificationError}
-                </p>
-              )}
-              {verificationMessage && (
-                <p role="status" className="mt-3 text-base text-emerald-600">
-                  {verificationMessage}
-                </p>
-              )}
+              <p className="theme-text-muted mt-2 break-all text-base">
+                {email}
+              </p>
+              <p className="theme-text-muted mt-2 text-sm leading-5">
+                Used to sign in. Email changes and password recovery are
+                currently unavailable.
+              </p>
             </div>
             <div className="border-t border-[var(--border-soft)] pt-5">
               <div className="flex items-end justify-between gap-4">

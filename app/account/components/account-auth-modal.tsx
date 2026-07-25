@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -8,7 +7,6 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -93,7 +91,6 @@ export function AccountAuthModal({
   isOpen,
   onClose,
 }: Readonly<AccountAuthModalProps>) {
-  const router = useRouter();
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<AccountAuthMode>(initialMode);
   const [email, setEmail] = useState("");
@@ -188,7 +185,6 @@ export function AccountAuthModal({
         }
 
         closeModal();
-        router.refresh();
         return;
       }
 
@@ -206,7 +202,6 @@ export function AccountAuthModal({
 
       window.localStorage.setItem(PLAYER_NAME_STORAGE_KEY, sanitizedName);
       closeModal();
-      router.refresh();
     } catch {
       setError("ColorTile accounts are temporarily unavailable.");
     } finally {
@@ -395,7 +390,7 @@ export function AccountAuthModal({
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-between gap-5 pt-1 sm:pt-2">
+              <div className="flex items-center gap-5 pt-1 sm:pt-2">
                 <label className="theme-text-secondary font-fredoka-strong inline-flex cursor-pointer items-center gap-2.5 text-base">
                   <input
                     type="checkbox"
@@ -405,13 +400,6 @@ export function AccountAuthModal({
                   />
                   Keep me signed in
                 </label>
-                <Link
-                  href="/forgot-password"
-                  onClick={closeModal}
-                  className="font-fredoka-strong text-base text-emerald-300 transition hover:text-emerald-200"
-                >
-                  Forgot password?
-                </Link>
               </div>
             )}
 

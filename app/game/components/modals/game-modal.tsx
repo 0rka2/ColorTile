@@ -4,13 +4,6 @@ import { motion } from "motion/react";
 import type { DifficultyConfig } from "../../game-types";
 import type { PersonalBestStatus } from "../../personal-best";
 
-const TIME_UP_QUOTES = [
-  "Almost there!",
-  "That gradient was fighting back.",
-  "Only a few swaps from perfection.",
-  "The colors aren't blending yet.",
-  "So close. Try one more run.",
-];
 const COMPLETE_TITLE_RAINBOW = [
   "#ef4444",
   "#f97316",
@@ -20,23 +13,6 @@ const COMPLETE_TITLE_RAINBOW = [
   "#4f46e5",
   "#a855f7",
 ];
-
-//logic
-function getTimeUpStars(completion: number) {
-  if (completion >= 100) {
-    return 3;
-  }
-
-  if (completion >= 90) {
-    return 2;
-  }
-
-  if (completion >= 85) {
-    return 1;
-  }
-
-  return 0;
-}
 
 function renderStars(count: number) {
   return "⭐".repeat(count);
@@ -97,10 +73,12 @@ type ModalProps = {
   dailyResult?: {
     onModes: () => void;
     onReplay: () => void;
-    swapBudget: number;
+    swapBudget: number | null;
   };
   endlessResult?: {
+    challengeLabel: string;
     isThreeStar: boolean;
+    levelName: string;
     onBack: () => void;
     onNextPuzzle: () => void;
     onReplay: () => void;
@@ -109,7 +87,6 @@ type ModalProps = {
     threeStarMoveLimit: number;
     usesSwapLimit: boolean;
   };
-  loseState: boolean;
   moves: number;
   onRestart: () => void;
   personalBestStatus: PersonalBestStatus;
@@ -123,19 +100,16 @@ export function GameModal({
   completion,
   dailyResult,
   endlessResult,
-  loseState,
   moves,
   onRestart,
   personalBestStatus,
   timeDisplay,
   winState,
 }: Readonly<ModalProps>) {
-  if (!winState && !loseState) {
+  if (!winState) {
     return null;
   }
 
-  const timeUpQuote = TIME_UP_QUOTES[(moves + completion + activeConfig.size) % TIME_UP_QUOTES.length];
-  const timeUpStars = getTimeUpStars(completion);
   const personalBestLabel = personalBestStatus.hasNewPersonalBest ? "New Personal Best!" : null;
 
   if (typeof document === "undefined") {
@@ -151,8 +125,7 @@ export function GameModal({
         className="theme-modal relative w-full max-w-[40.5rem] max-h-[calc(100dvh-1.5rem)] overflow-y-auto overflow-x-hidden rounded-[clamp(1.25rem,3vw,2rem)] border p-[clamp(1rem,3vw,2rem)] text-center sm:max-h-[calc(100dvh-2rem)] sm:p-10"
       >
         <div className="relative z-10 flex flex-col">
-          {winState ? (
-            dailyResult ? (
+          {dailyResult ? (
               <div className="mx-auto max-w-lg">
                 <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Daily Puzzle</p>
                 <h2 className="font-fredoka-display mt-3 text-[2rem] leading-none tracking-[-0.05em] sm:text-[2.4rem]">
@@ -170,8 +143,12 @@ export function GameModal({
                     <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{timeDisplay}</p>
                   </div>
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
-                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Swaps</p>
-                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{moves}/{dailyResult.swapBudget}</p>
+                    <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">
+                      {dailyResult.swapBudget === null ? "Moves" : "Swaps"}
+                    </p>
+                    <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">
+                      {dailyResult.swapBudget === null ? moves : `${moves}/${dailyResult.swapBudget}`}
+                    </p>
                   </div>
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
                     <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Progress</p>
@@ -197,15 +174,17 @@ export function GameModal({
               </div>
             ) : endlessResult ? (
               <div className="mx-auto max-w-lg">
-                <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">Endless</p>
+                <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.3em] sm:text-sm">
+                  Puzzle {endlessResult.puzzleNumber} · {endlessResult.challengeLabel}
+                </p>
                 <h2 className="theme-text-primary font-fredoka-display mt-3 text-[2rem] leading-none sm:text-[2.4rem]">
-                  Cleared
+                  {endlessResult.levelName} Cleared
                 </h2>
                 <div className="font-fredoka-strong mt-4 text-base leading-none tracking-[0.18em] text-emerald-500 sm:mt-5 sm:text-lg">
                   {renderStars(endlessResult.isThreeStar ? 3 : 1)}
                 </div>
                 <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.95rem] leading-6 sm:text-[1.05rem] sm:leading-7">
-                  Puzzle {endlessResult.puzzleNumber} cleared in {moves} {endlessResult.usesSwapLimit ? "swaps" : "moves"}. Three-star clears need {endlessResult.threeStarMoveLimit} {endlessResult.usesSwapLimit ? "swaps" : "moves"} or fewer.
+                  Cleared in {moves} {endlessResult.usesSwapLimit ? "swaps" : "moves"}. Three-star clears need {endlessResult.threeStarMoveLimit} {endlessResult.usesSwapLimit ? "swaps" : "moves"} or fewer.
                 </p>
                 <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
@@ -284,32 +263,7 @@ export function GameModal({
                 </div>
               </div>
             </>
-            )
-          ) : (
-            <div className="mx-auto mt-3 max-w-lg">
-              <h2 className="theme-text-primary font-fredoka-display text-[2rem] leading-none tracking-[-0.05em] sm:text-[2.35rem]">
-                Time&apos;s up
-              </h2>
-              {timeUpStars > 0 && (
-                <p className="font-fredoka-strong mt-5 text-base leading-none tracking-[0.24em] text-amber-500 sm:mt-6 sm:text-lg">
-                  {renderStars(timeUpStars)}
-                </p>
-              )}
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-5">
-                <div className="theme-card rounded-[1.2rem] border px-3 py-3 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
-                  <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.22em] sm:text-[0.78rem]">Gradient Completion</p>
-                  <p className="theme-text-primary font-fredoka-strong mt-2.5 text-[1.5rem] leading-none sm:mt-4 sm:text-[1.9rem]">{completion}%</p>
-                </div>
-                <div className="theme-card rounded-[1.2rem] border px-3 py-3 sm:rounded-[1.4rem] sm:px-5 sm:py-5">
-                  <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.22em] sm:text-[0.78rem]">Moves</p>
-                  <p className="theme-text-primary font-fredoka-strong mt-2.5 text-[1.5rem] leading-none sm:mt-4 sm:text-[1.9rem]">{moves}</p>
-                </div>
-              </div>
-              <p className="theme-text-muted font-fredoka-regular mt-5 text-[0.98rem] leading-7 sm:mt-7 sm:text-[1.08rem] sm:leading-8">
-                {timeUpQuote}
-              </p>
-            </div>
-          )}
+            )}
 
           {!dailyResult && !endlessResult && (
             <button

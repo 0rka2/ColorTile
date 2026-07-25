@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   deleteCookie,
   getCookieConsent,
+  setCookie,
   setCookieConsent,
   THEME_MODE_COOKIE_NAME,
 } from "../lib/cookies";
@@ -18,12 +19,18 @@ export function CookieConsentBanner() {
 
   const handleAccept = () => {
     setCookieConsent("accepted");
+    setCookie(
+      THEME_MODE_COOKIE_NAME,
+      document.documentElement.dataset.theme === "dark" ? "dark" : "light",
+    );
+    window.localStorage.removeItem(THEME_MODE_COOKIE_NAME);
     setIsVisible(false);
   };
 
   const handleDecline = () => {
     setCookieConsent("declined");
     deleteCookie(THEME_MODE_COOKIE_NAME);
+    window.localStorage.removeItem(THEME_MODE_COOKIE_NAME);
     setIsVisible(false);
   };
 

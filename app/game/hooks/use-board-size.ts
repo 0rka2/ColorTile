@@ -10,30 +10,18 @@ const MOBILE_BOARD_BREAKPOINT_PX = 640;
 
 type BoardSizeOptions = {
   activeConfigSize: number;
-  activeConfigTime: number;
   activeView: AppView;
   boardLength: number;
   boardResetKey: number;
-  completion: number;
   difficulty: DifficultyKey;
-  loseState: boolean;
-  moves: number;
-  timeLeft: number;
-  winState: boolean;
 };
 
 export function useBoardSize({
   activeConfigSize,
-  activeConfigTime,
   activeView,
   boardLength,
   boardResetKey,
-  completion,
   difficulty,
-  loseState,
-  moves,
-  timeLeft,
-  winState,
 }: BoardSizeOptions) {
   const pageShellRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
@@ -112,7 +100,7 @@ export function useBoardSize({
       window.visualViewport?.removeEventListener("resize", measureBoardSize);
       window.visualViewport?.removeEventListener("scroll", measureBoardSize);
     };
-  }, [activeConfigTime, activeConfigSize, activeView, boardLength, boardResetKey, completion, difficulty, loseState, moves, timeLeft, winState]);
+  }, [activeConfigSize, activeView, boardLength, boardResetKey, difficulty]);
 
   return {
     boardAreaWidth: boardSize > 0 ? `${boardSize}px` : `min(100%, ${GAME_AREA_MAX_WIDTH_PX}px)`,

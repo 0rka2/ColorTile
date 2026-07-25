@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getThemeModeLabel, resolveThemeMode, THEME_MODE_STORAGE_KEY, THEME_MODES } from "../app/game/settings-options";
+import { getThemeModeLabel, resolveThemeMode, THEME_MODES } from "../app/game/settings-options";
 
 test("THEME_MODES exposes light and dark in a stable order", () => {
   assert.deepEqual(
@@ -20,8 +20,4 @@ test("resolveThemeMode falls back to light for unknown stored values", () => {
   assert.equal(resolveThemeMode("dark"), "dark");
   assert.equal(resolveThemeMode("system"), "light");
   assert.equal(resolveThemeMode(null), "light");
-});
-
-test("THEME_MODE_STORAGE_KEY stays stable for persistence", () => {
-  assert.equal(THEME_MODE_STORAGE_KEY, "colortile-theme-mode");
 });
