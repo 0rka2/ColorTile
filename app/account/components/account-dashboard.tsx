@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import type { PlayerProgress } from "@/app/game/player-progress";
+import type { AchievementSummary } from "@/app/game/achievements";
 import {
   clearStoredPlayerData,
   PLAYER_NAME_MAX_LENGTH,
@@ -11,12 +12,19 @@ import {
   sanitizePlayerName,
 } from "@/app/game/player-progress";
 import { authClient } from "@/app/lib/auth-client";
+import { clearPendingAchievementEvents } from "@/app/game/hooks/use-account-achievements";
+import {
+  AchievementCollection,
+  AchievementPreview,
+} from "./achievement-collection";
 
 type AccountDashboardProps = {
+  achievements: AchievementSummary;
   createdAt: string;
   email: string;
   name: string;
   progress: PlayerProgress;
+  userId: string;
 };
 
 function getLowestValue(values: Array<number | undefined>) {
@@ -35,10 +43,12 @@ function formatTime(seconds: number | null) {
 }
 
 export function AccountDashboard({
+  achievements,
   createdAt,
   email,
   name: initialName,
   progress,
+  userId,
 }: Readonly<AccountDashboardProps>) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -58,6 +68,9 @@ export function AccountDashboard({
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(
     null,
+  );
+  const [activeTab, setActiveTab] = useState<"overview" | "achievements">(
+    "overview",
   );
 
   const bestRecords = Object.values(progress.bestStats);
@@ -179,6 +192,7 @@ export function AccountDashboard({
       }
 
       clearStoredPlayerData(window.localStorage);
+      clearPendingAchievementEvents(window.localStorage, userId);
 
       router.replace("/");
       router.refresh();
@@ -271,6 +285,60 @@ export function AccountDashboard({
         </p>
       </div>
 
+      <div
+        role="tablist"
+        aria-label="Account sections"
+        className="theme-card mb-6 inline-flex rounded-full border p-1.5"
+      >
+        {([
+          ["overview", "Overview"],
+          ["achievements", "Achievements"],
+        ] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            tabIndex={activeTab === tab ? 0 : -1}
+            aria-selected={activeTab === tab}
+            aria-controls={`${tab}-panel`}
+            id={`${tab}-tab`}
+            onClick={() => setActiveTab(tab)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+                return;
+              }
+
+              event.preventDefault();
+              const nextTab =
+                event.key === "ArrowRight"
+                  ? tab === "overview"
+                    ? "achievements"
+                    : "overview"
+                  : tab === "achievements"
+                    ? "overview"
+                    : "achievements";
+              setActiveTab(nextTab);
+              window.requestAnimationFrame(() => {
+                document.getElementById(`${nextTab}-tab`)?.focus();
+              });
+            }}
+            className={`font-fredoka-strong rounded-full px-5 py-2.5 text-sm transition sm:text-base ${
+              activeTab === tab
+                ? "theme-button-primary"
+                : "theme-text-muted hover:theme-text-primary"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "overview" ? (
+        <div
+          id="overview-panel"
+          role="tabpanel"
+          aria-labelledby="overview-tab"
+        >
       <section aria-labelledby="stats-heading">
         <h2 id="stats-heading" className="sr-only">
           Player statistics
@@ -348,11 +416,10 @@ export function AccountDashboard({
       </section>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <section className="theme-modal rounded-[1.75rem] border p-6 sm:p-8">
-          <h2 className="theme-text-primary font-fredoka-display text-2xl">
-            Achievements
-          </h2>
-        </section>
+        <AchievementPreview
+          summary={achievements}
+          onViewAll={() => setActiveTab("achievements")}
+        />
 
         <section className="theme-modal rounded-[1.75rem] border p-6 sm:p-8">
           <h2 className="theme-text-primary font-fredoka-display text-2xl">
@@ -563,6 +630,16 @@ export function AccountDashboard({
           </form>
         )}
       </section>
+        </div>
+      ) : (
+        <div
+          id="achievements-panel"
+          role="tabpanel"
+          aria-labelledby="achievements-tab"
+        >
+          <AchievementCollection summary={achievements} />
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   AccountAuthModal,
   type AccountAuthMode,
 } from "./account/components/account-auth-modal";
+import { AchievementToast } from "./game/components/achievement-toast";
 import { GameBoard } from "./game/components/game-board";
 import { CompactLeaderboardPanel } from "./game/components/compact-leaderboard-panel";
 import { GameControls } from "./game/components/game-controls";
@@ -27,6 +28,7 @@ import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
 import { useBoardSize } from "./game/hooks/use-board-size";
+import { useAccountAchievements } from "./game/hooks/use-account-achievements";
 import { useAccountProgressSync } from "./game/hooks/use-account-progress-sync";
 import { usePersistentDailyPuzzle } from "./game/hooks/use-persistent-daily-puzzle";
 import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
@@ -344,6 +346,11 @@ export default function Home() {
   const [authModalMode, setAuthModalMode] = useState<AccountAuthMode>("sign-in");
   const { data: session, isPending: sessionIsPending } = authClient.useSession();
   const accountPlayerName = sanitizePlayerName(session?.user.name ?? "");
+  const {
+    currentAnnouncement,
+    dismissAnnouncement,
+    recordAchievementEvent,
+  } = useAccountAchievements(session?.user.id ?? null);
   const hudFeedbackControls = useAnimationControls();
   const clearDragSessionRef = useRef<() => void>(() => {});
   const resetWinSequenceRef = useRef<() => void>(() => {});
@@ -948,6 +955,10 @@ export default function Home() {
           style: dailyPuzzleStyle,
         };
       });
+      recordAchievementEvent({
+        dateKey: dailyDateKey,
+        kind: "daily",
+      });
       setWinState(true);
       setWinPhase("boardWave");
       clearDragSession();
@@ -976,6 +987,11 @@ export default function Home() {
         threeStarClears: currentStats.threeStarClears + (isThreeStar ? 1 : 0),
         bestStreak: Math.max(currentStats.bestStreak, nextStreak),
       }));
+      recordAchievementEvent({
+        isThreeStar,
+        kind: "endless",
+        streak: nextStreak,
+      });
       setWinState(true);
       setWinPhase("boardWave");
       clearDragSession();
@@ -1066,6 +1082,13 @@ export default function Home() {
     clearDragSession();
 
     void completeCurrentVerifiedAttempt();
+    if (difficulty !== "endless") {
+      recordAchievementEvent({
+        kind: "preset",
+        mode: difficulty,
+        solveTime: finalSolveTime,
+      });
+    }
 
     setBestStats((current) => {
       const currentRecord = current[difficulty] ?? {};
@@ -1090,7 +1113,7 @@ export default function Home() {
         [difficulty]: nextRecord,
       };
     });
-  }, [activeUsesCountdown, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
+  }, [activeUsesCountdown, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, recordAchievementEvent, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
 
   useEffect(() => {
     if (
@@ -1791,6 +1814,10 @@ export default function Home() {
         initialMode={authModalMode}
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
+      />
+      <AchievementToast
+        achievement={currentAnnouncement}
+        onDismiss={dismissAnnouncement}
       />
     </main>
   );

@@ -7,7 +7,7 @@ const privacyItems = [
   {
     title: "Game Progress",
     copy:
-      "Guest progress is stored in your browser. When you sign in, best times, move records, daily progress, and endless statistics are also synchronized to ColorTile's PostgreSQL database.",
+      "Guest progress is stored in your browser. When you sign in, best times, move records, daily progress, endless statistics, and account-only achievement events are also synchronized to ColorTile's PostgreSQL database.",
   },
   {
     title: "Public Leaderboards",

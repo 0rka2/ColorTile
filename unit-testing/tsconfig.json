@@ -12,6 +12,7 @@
   },
   "include": [
     "../app/game/game-logic.ts",
+    "../app/game/achievements.ts",
     "../app/game/leaderboard.ts",
     "../app/game/game-types.ts",
     "../app/game/confetti-logic.ts",
