@@ -6,7 +6,6 @@ import type { AppView } from "../../views/app-view";
 import type { DifficultyKey } from "../game-types";
 
 const GAME_AREA_MAX_WIDTH_PX = 600;
-const MOBILE_BOARD_BREAKPOINT_PX = 640;
 
 type BoardSizeOptions = {
   activeConfigSize: number;
@@ -28,7 +27,6 @@ export function useBoardSize({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const hudRef = useRef<HTMLDivElement | null>(null);
   const controlsRef = useRef<HTMLDivElement | null>(null);
-  const restartRef = useRef<HTMLDivElement | null>(null);
   const [boardSize, setBoardSize] = useState(0);
 
   useLayoutEffect(() => {
@@ -42,9 +40,8 @@ export function useBoardSize({
       const headerElement = headerRef.current;
       const hudElement = hudRef.current;
       const controlsElement = controlsRef.current;
-      const restartElement = restartRef.current;
 
-      if (!shellElement || !contentElement || !headerElement || !hudElement || !controlsElement || !restartElement) {
+      if (!shellElement || !contentElement || !headerElement || !hudElement || !controlsElement) {
         return;
       }
 
@@ -65,17 +62,13 @@ export function useBoardSize({
         headerElement.getBoundingClientRect().height +
         hudElement.getBoundingClientRect().height +
         controlsElement.getBoundingClientRect().height +
-        restartElement.getBoundingClientRect().height +
         shellGap +
-        contentGap * 3 +
+        contentGap * 2 +
         paddingTop +
         paddingBottom +
         contentPaddingBottom;
       const availableHeight = viewportHeight - reservedHeight;
-      const boardSizeLimit =
-        viewportWidth <= MOBILE_BOARD_BREAKPOINT_PX
-          ? availableWidth
-          : Math.min(availableWidth, availableHeight);
+      const boardSizeLimit = Math.min(availableWidth, availableHeight);
       const measuredBoardSize = Math.max(0, Math.floor(boardSizeLimit));
       const nextBoardSize = Math.min(availableWidth, GAME_AREA_MAX_WIDTH_PX, measuredBoardSize);
       setBoardSize(Math.max(0, nextBoardSize));
@@ -84,7 +77,7 @@ export function useBoardSize({
     measureBoardSize();
 
     const resizeObserver = new ResizeObserver(measureBoardSize);
-    [pageShellRef.current, headerRef.current, contentRef.current, hudRef.current, controlsRef.current, restartRef.current].forEach((element) => {
+    [pageShellRef.current, headerRef.current, contentRef.current, hudRef.current, controlsRef.current].forEach((element) => {
       if (element) {
         resizeObserver.observe(element);
       }
@@ -109,6 +102,5 @@ export function useBoardSize({
     headerRef,
     hudRef,
     pageShellRef,
-    restartRef,
   };
 }

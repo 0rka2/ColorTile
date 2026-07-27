@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { FaShoppingCart } from "react-icons/fa";
+import { FiMoreHorizontal } from "react-icons/fi";
 import { IoMdTrophy } from "react-icons/io";
 import { TbTargetArrow } from "react-icons/tb";
 import { VscStarFull } from "react-icons/vsc";
@@ -318,6 +319,7 @@ export default function Home() {
   const [modeModalOpen, setModeModalOpen] = useState(false);
   const [shopModalOpen, setShopModalOpen] = useState(false);
   const [leaderboardModalOpen, setLeaderboardModalOpen] = useState(false);
+  const [bottomActionMenu, setBottomActionMenu] = useState<"play" | "more" | null>(null);
   const [timerStarted, setTimerStarted] = useState(true);
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
   const [boardResetKey, setBoardResetKey] = useState(0);
@@ -598,7 +600,6 @@ export default function Home() {
     headerRef,
     hudRef,
     pageShellRef,
-    restartRef,
   } = useBoardSize({
     activeConfigSize: activeConfig.size,
     activeView,
@@ -1568,7 +1569,7 @@ export default function Home() {
   }
 
   return (
-    <main className={`theme-page-bg min-h-dvh overflow-x-hidden px-[clamp(0.5rem,2vw,1.25rem)] py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
+    <main className={`game-page theme-page-bg min-h-dvh overflow-x-hidden py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
       <div ref={pageShellRef} className="game-page-shell mx-auto flex h-[100dvh] min-h-0 w-full max-w-[72rem] flex-col gap-[clamp(0.35rem,0.9vw,0.7rem)]">
         <Header ref={headerRef} onLogoClick={handleLogoClick} onNavigateView={handleNavigateView} />
         <Analytics />
@@ -1658,30 +1659,12 @@ export default function Home() {
             <GameControls
               showDevControls={process.env.NODE_ENV !== "production"}
               onAutoSolve={handleAutoSolve}
+              onRestart={handleRestartGame}
             />
           </motion.div>
 
-          <motion.div
-            {...hudFeedbackMotion}
-            ref={restartRef}
-            className="restart-area relative z-10 flex w-full justify-center"
-            style={{ width: boardAreaWidth }}
-          >
-            <button
-              type="button"
-              onClick={handleRestartGame}
-              aria-label="Restart game"
-              className="theme-button-primary restart-button font-fredoka-strong flex h-14 w-full max-w-[20rem] items-center justify-center gap-2 rounded-full px-7 py-3 text-base shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
-            >
-              <span aria-hidden="true" className="text-[clamp(0.95rem,1.5vw,1.1rem)] leading-none">
-                {"\u21BB"}
-              </span>
-              <span>Restart</span>
-            </button>
-          </motion.div>
-
           <div className="side-actions-rail">
-            <motion.div {...hudFeedbackMotion} className="side-actions-list">
+            <motion.div {...hudFeedbackMotion} className="desktop-side-actions">
               <button
                 type="button"
                 onClick={handleDailyOpen}
@@ -1717,6 +1700,110 @@ export default function Home() {
               >
                 <IoMdTrophy className="theme-text-primary text-[clamp(1.5rem,2.5vw,1.9rem)] leading-none" />
               </button>
+            </motion.div>
+
+            <motion.div {...hudFeedbackMotion} className="mobile-action-groups">
+              <div className="relative">
+                <AnimatePresence>
+                  {bottomActionMenu === "play" && (
+                    <motion.div
+                      id="play-actions-menu"
+                      aria-label="Play options"
+                      className="mobile-action-menu theme-panel absolute bottom-[calc(100%+0.5rem)] left-1/2 flex w-40 -translate-x-1/2 flex-col gap-1.5 rounded-2xl border p-2"
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      transition={{ duration: 0.16 }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBottomActionMenu(null);
+                          handleDailyOpen();
+                        }}
+                        className="theme-button-secondary font-fredoka-strong flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-left text-sm"
+                      >
+                        <TbTargetArrow aria-hidden="true" className="text-xl" />
+                        Daily Puzzle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBottomActionMenu(null);
+                          setModeModalOpen(true);
+                        }}
+                        className="theme-button-secondary font-fredoka-strong flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-left text-sm"
+                      >
+                        <VscStarFull aria-hidden="true" className="text-xl" />
+                        Modes
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <button
+                  type="button"
+                  onClick={() => setBottomActionMenu((current) => current === "play" ? null : "play")}
+                  aria-controls="play-actions-menu"
+                  aria-expanded={bottomActionMenu === "play"}
+                  aria-haspopup="true"
+                  className="mobile-group-button theme-card font-fredoka-strong inline-flex h-12 min-w-[5.5rem] items-center justify-center gap-2 rounded-2xl border px-3 text-sm shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+                >
+                  <TbTargetArrow aria-hidden="true" className="text-[1.4rem]" />
+                  Play
+                </button>
+              </div>
+
+              <div className="relative">
+                <AnimatePresence>
+                  {bottomActionMenu === "more" && (
+                    <motion.div
+                      id="more-actions-menu"
+                      aria-label="More options"
+                      className="mobile-action-menu theme-panel absolute bottom-[calc(100%+0.5rem)] left-1/2 flex w-40 -translate-x-1/2 flex-col gap-1.5 rounded-2xl border p-2"
+                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                      transition={{ duration: 0.16 }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBottomActionMenu(null);
+                          setShopModalOpen(true);
+                        }}
+                        className="theme-button-secondary font-fredoka-strong flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-left text-sm"
+                      >
+                        <FaShoppingCart aria-hidden="true" className="text-lg" />
+                        Shop
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBottomActionMenu(null);
+                          setLeaderboardModalOpen(true);
+                        }}
+                        className="theme-button-secondary font-fredoka-strong flex min-h-11 items-center gap-2.5 rounded-xl px-3 text-left text-sm"
+                      >
+                        <IoMdTrophy aria-hidden="true" className="text-xl" />
+                        Leaderboard
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <button
+                  type="button"
+                  onClick={() => setBottomActionMenu((current) => current === "more" ? null : "more")}
+                  aria-controls="more-actions-menu"
+                  aria-expanded={bottomActionMenu === "more"}
+                  aria-haspopup="true"
+                  className="mobile-group-button theme-card font-fredoka-strong inline-flex h-12 min-w-[5.5rem] items-center justify-center gap-2 rounded-2xl border px-3 text-sm shadow-[0_14px_26px_rgba(15,23,42,0.16)]"
+                >
+                  <FiMoreHorizontal aria-hidden="true" className="text-[1.4rem]" />
+                  More
+                </button>
+              </div>
             </motion.div>
           </div>
         </section>

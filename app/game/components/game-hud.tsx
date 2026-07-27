@@ -103,137 +103,137 @@ export function GameHud({
     : "Progress";
 
   return (
-    <section className="flex w-full max-w-none flex-col gap-[clamp(0.3rem,0.7vw,0.75rem)]">
-      <div className="game-hud-compact theme-panel relative overflow-hidden rounded-[clamp(1rem,2vw,1.5rem)] border px-[clamp(0.65rem,1.25vw,1rem)] py-[clamp(0.45rem,1vw,0.8rem)] backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
-              Time
+    <section className="flex w-full max-w-none flex-col">
+      <div className="game-hud-compact flex-col gap-1.5">
+        {dailyInfo && (
+          <div className="theme-card flex min-h-9 items-center justify-between gap-3 rounded-xl border px-3 py-2 backdrop-blur">
+            <p className="theme-text-primary font-fredoka-strong text-sm leading-none">
+              Daily Puzzle
             </p>
-            <p className={`mt-1 font-fredoka-display text-[1.3rem] leading-none tracking-tight ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
-              {timeDisplay}
+            <p className="theme-text-muted whitespace-nowrap font-fredoka-strong text-xs leading-none">
+              {formatDailyResetTime(dailyResetSeconds)} left
             </p>
           </div>
+        )}
 
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="text-center">
-              <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
+        <div className="theme-panel relative overflow-hidden rounded-xl border px-3 py-2 backdrop-blur">
+          <div className="grid min-w-0 grid-cols-3 items-center gap-2">
+            <div className="min-w-0 text-left">
+              <p className="theme-text-muted font-fredoka-strong text-[0.58rem] uppercase leading-none tracking-[0.12em]">
+                Time
+              </p>
+              <p className={`mt-1 font-fredoka-display text-lg leading-none tracking-tight ${timeWarning ? "theme-text-danger" : "theme-text-primary"}`}>
+                {timeDisplay}
+              </p>
+            </div>
+
+            <div className="min-w-0 text-center">
+              <p className="theme-text-muted font-fredoka-strong text-[0.58rem] uppercase leading-none tracking-[0.12em]">
                 {moveLabel}
               </p>
-              <p className="theme-text-primary mt-1 font-fredoka-display text-[1.15rem] leading-none tracking-tight">
+              <p className="theme-text-primary mt-1 font-fredoka-display text-lg leading-none tracking-tight">
                 {moveDisplay}
               </p>
             </div>
-            <div className="h-9 w-px bg-[var(--border-soft)]" aria-hidden="true" />
-            <div className="text-right">
-              <p className="theme-text-muted font-fredoka-strong text-[0.52rem] uppercase leading-none tracking-[0.16em]">
-                {progressLabel}
+
+            <div className="min-w-0 text-right">
+              <p className="theme-text-muted font-fredoka-strong text-[0.58rem] uppercase leading-none tracking-[0.12em]">
+                Progress
               </p>
-              <p className="theme-text-primary mt-1 font-fredoka-display text-[1.15rem] leading-none tracking-[-0.05em]">
+              <p className="theme-text-primary mt-1 font-fredoka-display text-lg leading-none tracking-tight">
                 {animatedQuality}%
               </p>
             </div>
           </div>
-        </div>
 
-        <div className="theme-progress-track relative z-10 mt-2 h-1.5 overflow-hidden rounded-full">
-          <motion.div
-            className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
-            animate={{ width: `${qualityFill}%` }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          />
-        </div>
-
-        {dailyInfo && (
-          <div className="theme-text-muted font-fredoka-strong mt-1.5 flex items-center justify-between gap-2 text-[0.7rem] leading-none">
-            <span className="theme-text-primary">Today&apos;s puzzle</span>
-            <span>{dailyInfo.dateKey}</span>
-            <span>
-              {formatDailyResetTime(dailyResetSeconds)}
-            </span>
+          <div className="theme-progress-track relative z-10 mt-2 h-1 overflow-hidden rounded-full">
+            <motion.div
+              className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
+              animate={{ width: `${qualityFill}%` }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            />
           </div>
-        )}
+        </div>
       </div>
 
       <div className="game-hud-full flex flex-col gap-2">
-  {!endlessInfo && (
-  <div className="grid grid-cols-2 gap-2">
-    <div className="theme-card rounded-xl border px-3 py-2 text-center backdrop-blur">
-      <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
-        Time Record
-      </p>
-      <p className="theme-text-primary mt-0.5 font-fredoka-display text-xl leading-none tracking-tight">
-        {bestTimeDisplay}
-      </p>
-    </div>
+        {!endlessInfo && (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="theme-card rounded-xl border px-3 py-2 text-center backdrop-blur">
+              <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+                Time Record
+              </p>
+              <p className="theme-text-primary mt-0.5 font-fredoka-display text-xl leading-none tracking-tight">
+                {bestTimeDisplay}
+              </p>
+            </div>
 
-    <div className="theme-card rounded-xl border px-3 py-2 text-center backdrop-blur">
-      <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
-        Move Record
-      </p>
-      <p className="theme-text-primary mt-0.5 font-fredoka-display text-xl leading-none tracking-tight">
-        {bestMoves ?? "-"}
-      </p>
-    </div>
-  </div>
-  )}
+            <div className="theme-card rounded-xl border px-3 py-2 text-center backdrop-blur">
+              <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+                Move Record
+              </p>
+              <p className="theme-text-primary mt-0.5 font-fredoka-display text-xl leading-none tracking-tight">
+                {bestMoves ?? "-"}
+              </p>
+            </div>
+          </div>
+        )}
 
-  {dailyInfo && (
-    <div className="theme-card flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 rounded-xl border px-4 py-2.5 backdrop-blur">
-      <p className="theme-text-primary font-fredoka-strong text-base leading-6">Today&apos;s puzzle</p>
-      <p className="theme-text-muted font-fredoka-strong text-base leading-6">
-        {dailyInfo.dateKey}
-      </p>
-      <p className="theme-text-muted font-fredoka-strong text-base leading-6">
-        Next in {formatDailyResetTime(dailyResetSeconds)}
-      </p>
-    </div>
-  )}
+        {dailyInfo && (
+          <div className="theme-card flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 rounded-xl border px-4 py-2.5 backdrop-blur">
+            <p className="theme-text-primary font-fredoka-strong text-base leading-6">Today&apos;s puzzle</p>
+            <p className="theme-text-muted font-fredoka-strong text-base leading-6">
+              {dailyInfo.dateKey}
+            </p>
+            <p className="theme-text-muted font-fredoka-strong text-base leading-6">
+              Next in {formatDailyResetTime(dailyResetSeconds)}
+            </p>
+          </div>
+        )}
 
-  <div className="theme-panel relative overflow-hidden rounded-2xl border px-3 py-2 backdrop-blur">
-    <div className="grid min-w-0 grid-cols-3 gap-2">
-      <div className="min-w-0 text-left">
-        <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
-          Time
-        </p>
-        <p
-          className={`mt-0.5 font-fredoka-display text-[32px] leading-none tracking-tight ${
-            timeWarning ? "theme-text-danger" : "theme-text-primary"
-          }`}
-        >
-          {timeDisplay}
-        </p>
+        <div className="theme-panel relative overflow-hidden rounded-2xl border px-3 py-2 backdrop-blur">
+          <div className="grid min-w-0 grid-cols-3 gap-2">
+            <div className="min-w-0 text-left">
+              <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+                Time
+              </p>
+              <p
+                className={`mt-0.5 font-fredoka-display text-[32px] leading-none tracking-tight ${
+                  timeWarning ? "theme-text-danger" : "theme-text-primary"
+                }`}
+              >
+                {timeDisplay}
+              </p>
+            </div>
+
+            <div className="min-w-0 text-center">
+              <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+                {moveLabel}
+              </p>
+              <p className="theme-text-primary mt-0.5 font-fredoka-display text-[32px] leading-none tracking-tight">
+                {moveDisplay}
+              </p>
+            </div>
+
+            <div className="min-w-0 text-right">
+              <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
+                {progressLabel}
+              </p>
+              <p className="theme-text-primary mt-0.5 font-fredoka-display text-[30px] leading-none tracking-[-0.05em]">
+                {animatedQuality}%
+              </p>
+            </div>
+          </div>
+
+          <div className="theme-progress-track relative z-10 mt-2 h-2 overflow-hidden rounded-full">
+            <motion.div
+              className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
+              animate={{ width: `${qualityFill}%` }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </div>
+        </div>
       </div>
-
-      <div className="min-w-0 text-center">
-        <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
-          {moveLabel}
-        </p>
-        <p className="theme-text-primary mt-0.5 font-fredoka-display text-[32px] leading-none tracking-tight">
-          {moveDisplay}
-        </p>
-      </div>
-
-      <div className="min-w-0 text-right">
-        <p className="theme-text-muted font-fredoka-strong text-[11px] uppercase leading-none tracking-[0.14em]">
-          {progressLabel}
-        </p>
-        <p className="theme-text-primary mt-0.5 font-fredoka-display text-[30px] leading-none tracking-[-0.05em]">
-          {animatedQuality}%
-        </p>
-      </div>
-    </div>
-
-    <div className="theme-progress-track relative z-10 mt-2 h-2 overflow-hidden rounded-full">
-      <motion.div
-        className="h-full rounded-full bg-[linear-gradient(90deg,#ff5f6d_0%,#fbbf24_30%,#34d399_62%,#60a5fa_100%)] shadow-[0_8px_18px_rgba(96,165,250,0.26)]"
-        animate={{ width: `${qualityFill}%` }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      />
-    </div>
-  </div>
-
-</div>
     </section>
   );
 }
