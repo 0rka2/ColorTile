@@ -17,10 +17,22 @@ export const ACHIEVEMENT_IDS = [
   "long-run",
   "star-collector",
   "unbreakable",
+  "tile-turner",
+  "swap-specialist",
+  "master-mover",
+  "steady-start",
+  "fortnight-flow",
+  "monthly-momentum",
 ] as const;
 
 export type AchievementId = (typeof ACHIEVEMENT_IDS)[number];
-export type AchievementCategory = "mastery" | "speed" | "daily" | "endless";
+export const ACHIEVEMENT_USER_ID_HEADER = "X-ColorTile-User-Id";
+export type AchievementCategory =
+  | "mastery"
+  | "speed"
+  | "daily"
+  | "endless"
+  | "milestones";
 
 export type AchievementDefinition = {
   badgePath: string;
@@ -37,6 +49,8 @@ export type AchievementProgress = {
   endlessClears: number;
   bestEndlessStreak: number;
   threeStarClears: number;
+  lifetimeSwaps: number;
+  bestPlayStreak: number;
 };
 
 export type AchievementUnlock = {
@@ -54,18 +68,26 @@ export type AchievementEvent =
       eventId: string;
       kind: "preset";
       mode: PresetModeKey;
+      playedDate: string;
       solveTime: number;
     }
   | {
       dateKey: string;
       eventId: string;
       kind: "daily";
+      playedDate: string;
     }
   | {
       eventId: string;
       isThreeStar: boolean;
       kind: "endless";
+      playedDate: string;
       streak: number;
+    }
+  | {
+      count: number;
+      eventId: string;
+      kind: "swap";
     };
 
 export const EMPTY_ACHIEVEMENT_PROGRESS: AchievementProgress = {
@@ -75,6 +97,8 @@ export const EMPTY_ACHIEVEMENT_PROGRESS: AchievementProgress = {
   endlessClears: 0,
   bestEndlessStreak: 0,
   threeStarClears: 0,
+  lifetimeSwaps: 0,
+  bestPlayStreak: 0,
 };
 
 export const EMPTY_ACHIEVEMENT_SUMMARY: AchievementSummary = {
@@ -92,6 +116,7 @@ export const ACHIEVEMENT_CATEGORIES: ReadonlyArray<{
   { id: "speed", label: "Speed" },
   { id: "daily", label: "Daily" },
   { id: "endless", label: "Endless" },
+  { id: "milestones", label: "Milestones" },
 ];
 
 export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
@@ -207,6 +232,48 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
     description: "Reach an endless streak of ten.",
     badgePath: "/achievements/unbreakable.webp",
   },
+  {
+    id: "tile-turner",
+    category: "milestones",
+    title: "Tile Turner",
+    description: "Make 500 valid tile swaps.",
+    badgePath: "/achievements/tile-turner.webp",
+  },
+  {
+    id: "swap-specialist",
+    category: "milestones",
+    title: "Swap Specialist",
+    description: "Make 1,000 valid tile swaps.",
+    badgePath: "/achievements/swap-specialist.webp",
+  },
+  {
+    id: "master-mover",
+    category: "milestones",
+    title: "Master Mover",
+    description: "Make 5,000 valid tile swaps.",
+    badgePath: "/achievements/master-mover.webp",
+  },
+  {
+    id: "steady-start",
+    category: "milestones",
+    title: "Steady Start",
+    description: "Complete a puzzle on 7 consecutive days.",
+    badgePath: "/achievements/steady-start.webp",
+  },
+  {
+    id: "fortnight-flow",
+    category: "milestones",
+    title: "Fortnight Flow",
+    description: "Complete a puzzle on 14 consecutive days.",
+    badgePath: "/achievements/fortnight-flow.webp",
+  },
+  {
+    id: "monthly-momentum",
+    category: "milestones",
+    title: "Monthly Momentum",
+    description: "Complete a puzzle on 30 consecutive days.",
+    badgePath: "/achievements/monthly-momentum.webp",
+  },
 ];
 
 const COLOR_MODES: PresetModeKey[] = ["normal", "hard", "expert", "extreme"];
@@ -219,6 +286,39 @@ const BLACK_AND_WHITE_MODES: PresetModeKey[] = [
 
 export function getAchievementDefinition(id: AchievementId) {
   return ACHIEVEMENTS.find((achievement) => achievement.id === id);
+}
+
+export function isUtcDateKey(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function getBestPlayStreak(dateKeys: readonly string[]) {
+  const uniqueDates = [...new Set(dateKeys)].sort();
+  let bestStreak = 0;
+  let currentStreak = 0;
+  let previousDay: number | null = null;
+
+  for (const dateKey of uniqueDates) {
+    if (!isUtcDateKey(dateKey)) {
+      continue;
+    }
+
+    const day = Date.parse(`${dateKey}T00:00:00.000Z`);
+
+    currentStreak =
+      previousDay !== null && day - previousDay === 86_400_000
+        ? currentStreak + 1
+        : 1;
+    bestStreak = Math.max(bestStreak, currentStreak);
+    previousDay = day;
+  }
+
+  return bestStreak;
 }
 
 export function getEligibleAchievementIds(
@@ -264,6 +364,12 @@ export function getEligibleAchievementIds(
     progress.endlessClears >= 25 ? "long-run" : null,
     progress.threeStarClears >= 10 ? "star-collector" : null,
     progress.bestEndlessStreak >= 10 ? "unbreakable" : null,
+    progress.lifetimeSwaps >= 500 ? "tile-turner" : null,
+    progress.lifetimeSwaps >= 1_000 ? "swap-specialist" : null,
+    progress.lifetimeSwaps >= 5_000 ? "master-mover" : null,
+    progress.bestPlayStreak >= 7 ? "steady-start" : null,
+    progress.bestPlayStreak >= 14 ? "fortnight-flow" : null,
+    progress.bestPlayStreak >= 30 ? "monthly-momentum" : null,
   ].filter((id): id is AchievementId => id !== null);
 }
 

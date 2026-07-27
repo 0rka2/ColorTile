@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  getBestPlayStreak,
   getEligibleAchievementIds,
   isAchievementId,
   type AchievementEvent,
@@ -21,6 +22,8 @@ type ProgressRow = {
   completed_preset_modes: unknown;
   daily_clears: unknown;
   endless_clears: unknown;
+  lifetime_swaps: unknown;
+  played_dates: unknown;
   three_star_clears: unknown;
 };
 
@@ -67,6 +70,14 @@ function normalizeProgress(row: ProgressRow): AchievementProgress {
     endlessClears: readCount(row.endless_clears),
     bestEndlessStreak: readCount(row.best_endless_streak),
     threeStarClears: readCount(row.three_star_clears),
+    lifetimeSwaps: readCount(row.lifetime_swaps),
+    bestPlayStreak: Array.isArray(row.played_dates)
+      ? getBestPlayStreak(
+          row.played_dates.filter(
+            (dateKey): dateKey is string => typeof dateKey === "string",
+          ),
+        )
+      : 0,
   };
 }
 
@@ -102,7 +113,14 @@ async function getAchievementProgress(userId: string) {
         where kind = 'endless' and is_three_star = true
       ) as three_star_clears,
       coalesce(max(endless_streak) filter (where kind = 'endless'), 0)
-        as best_endless_streak
+        as best_endless_streak,
+      coalesce(sum(swap_count) filter (where kind = 'swap'), 0)
+        as lifetime_swaps,
+      coalesce(
+        array_agg(distinct played_date::text order by played_date::text)
+          filter (where played_date is not null),
+        array[]::text[]
+      ) as played_dates
     from player_achievement_event
     where user_id = ${userId}
   `;
@@ -141,10 +159,12 @@ async function getAchievementUnlocks(userId: string) {
 export async function getAchievementSummary(
   userId: string,
 ): Promise<AchievementSummary> {
-  const [progress, unlocked] = await Promise.all([
-    getAchievementProgress(userId),
-    getAchievementUnlocks(userId),
-  ]);
+  const progress = await getAchievementProgress(userId);
+  await unlockEligibleAchievements(
+    userId,
+    getEligibleAchievementIds(progress),
+  );
+  const unlocked = await getAchievementUnlocks(userId);
 
   return { progress, unlocked };
 }
@@ -155,9 +175,16 @@ async function insertAchievementEvent(userId: string, event: AchievementEvent) {
   if (event.kind === "preset") {
     return sql`
       insert into player_achievement_event (
-        user_id, event_id, kind, preset_mode, solve_time
+        user_id, event_id, kind, preset_mode, solve_time, played_date
       )
-      values (${userId}, ${event.eventId}, 'preset', ${event.mode}, ${event.solveTime})
+      values (
+        ${userId},
+        ${event.eventId},
+        'preset',
+        ${event.mode},
+        ${event.solveTime},
+        ${event.playedDate}
+      )
       on conflict (user_id, event_id) do nothing
       returning event_id
     `;
@@ -166,25 +193,43 @@ async function insertAchievementEvent(userId: string, event: AchievementEvent) {
   if (event.kind === "daily") {
     return sql`
       insert into player_achievement_event (
-        user_id, event_id, kind, daily_date
+        user_id, event_id, kind, daily_date, played_date
       )
-      values (${userId}, ${event.eventId}, 'daily', ${event.dateKey})
+      values (
+        ${userId},
+        ${event.eventId},
+        'daily',
+        ${event.dateKey},
+        ${event.playedDate}
+      )
       on conflict (user_id, event_id) do nothing
       returning event_id
     `;
   }
 
-  return sql`
+  if (event.kind === "endless") {
+    return sql`
     insert into player_achievement_event (
-      user_id, event_id, kind, is_three_star, endless_streak
+      user_id, event_id, kind, is_three_star, endless_streak, played_date
     )
     values (
       ${userId},
       ${event.eventId},
       'endless',
       ${event.isThreeStar},
-      ${event.streak}
+      ${event.streak},
+      ${event.playedDate}
     )
+    on conflict (user_id, event_id) do nothing
+    returning event_id
+    `;
+  }
+
+  return sql`
+    insert into player_achievement_event (
+      user_id, event_id, kind, swap_count
+    )
+    values (${userId}, ${event.eventId}, 'swap', ${event.count})
     on conflict (user_id, event_id) do nothing
     returning event_id
   `;
@@ -194,23 +239,24 @@ async function unlockEligibleAchievements(
   userId: string,
   eligibleIds: AchievementId[],
 ) {
-  const sql = getSql();
-  const newlyUnlocked: AchievementId[] = [];
-
-  for (const achievementId of eligibleIds) {
-    const rows = await sql`
-      insert into player_achievement_unlock (user_id, achievement_id)
-      values (${userId}, ${achievementId})
-      on conflict (user_id, achievement_id) do nothing
-      returning achievement_id
-    `;
-
-    if (Array.isArray(rows) && rows.length > 0) {
-      newlyUnlocked.push(achievementId);
-    }
+  if (eligibleIds.length === 0) {
+    return [];
   }
 
-  return newlyUnlocked;
+  const sql = getSql();
+  const rows = await sql`
+    insert into player_achievement_unlock (user_id, achievement_id)
+    select ${userId}, achievement_id
+    from jsonb_array_elements_text(
+      ${JSON.stringify(eligibleIds)}::jsonb
+    ) as eligible (achievement_id)
+    on conflict (user_id, achievement_id) do nothing
+    returning achievement_id
+  `;
+
+  return (rows as unknown as Array<{ achievement_id: unknown }>).flatMap(
+    (row) => isAchievementId(row.achievement_id) ? [row.achievement_id] : [],
+  );
 }
 
 export async function recordAchievementEvent(

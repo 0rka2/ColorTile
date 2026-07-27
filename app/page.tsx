@@ -350,6 +350,7 @@ export default function Home() {
     currentAnnouncement,
     dismissAnnouncement,
     recordAchievementEvent,
+    recordSwap,
   } = useAccountAchievements(session?.user.id ?? null);
   const hudFeedbackControls = useAnimationControls();
   const clearDragSessionRef = useRef<() => void>(() => {});
@@ -458,11 +459,12 @@ export default function Home() {
     setPersonalBestStatus,
   });
 
-  const handleVerifiedSwap = useCallback((sourceIndex: number, targetIndex: number) => {
+  const handleSwap = useCallback((sourceIndex: number, targetIndex: number) => {
+    recordSwap();
     if (activeVerifiedAttemptRef.current) {
       verifiedSwapsRef.current.push([sourceIndex, targetIndex]);
     }
-  }, []);
+  }, [recordSwap]);
 
   const submitVerifiedCompletion = useCallback((
     pendingCompletion: PendingVerifiedCompletion,
@@ -583,7 +585,7 @@ export default function Home() {
     updateBoard,
   } = useBoardDrag({
     board,
-    onSwap: handleVerifiedSwap,
+    onSwap: handleSwap,
     setBoard,
     setMoves,
     winState,
@@ -958,6 +960,7 @@ export default function Home() {
       recordAchievementEvent({
         dateKey: dailyDateKey,
         kind: "daily",
+        playedDate: getDailyPuzzleDateKey(),
       });
       setWinState(true);
       setWinPhase("boardWave");
@@ -990,6 +993,7 @@ export default function Home() {
       recordAchievementEvent({
         isThreeStar,
         kind: "endless",
+        playedDate: getDailyPuzzleDateKey(),
         streak: nextStreak,
       });
       setWinState(true);
@@ -1086,6 +1090,7 @@ export default function Home() {
       recordAchievementEvent({
         kind: "preset",
         mode: difficulty,
+        playedDate: getDailyPuzzleDateKey(),
         solveTime: finalSolveTime,
       });
     }
@@ -1816,6 +1821,7 @@ export default function Home() {
         onClose={() => setAuthModalOpen(false)}
       />
       <AchievementToast
+        key={session?.user.id ?? "guest"}
         achievement={currentAnnouncement}
         onDismiss={dismissAnnouncement}
       />

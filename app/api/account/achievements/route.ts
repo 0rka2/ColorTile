@@ -1,5 +1,7 @@
 import {
+  ACHIEVEMENT_USER_ID_HEADER,
   getAchievementDefinition,
+  isUtcDateKey,
   type AchievementEvent,
 } from "@/app/game/achievements";
 import {
@@ -14,7 +16,7 @@ import { auth } from "@/app/lib/auth";
 
 const EVENT_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_SWAP_BATCH_SIZE = 25;
 
 async function getSession(request: Request) {
   return auth.api.getSession({ headers: request.headers });
@@ -43,6 +45,7 @@ function parseAchievementEvent(value: unknown): AchievementEvent | null {
   if (
     event.kind === "preset" &&
     isPresetMode(event.mode) &&
+    isUtcDateKey(event.playedDate) &&
     typeof event.solveTime === "number" &&
     Number.isFinite(event.solveTime) &&
     event.solveTime > 0
@@ -51,25 +54,28 @@ function parseAchievementEvent(value: unknown): AchievementEvent | null {
       eventId: event.eventId,
       kind: "preset",
       mode: event.mode,
+      playedDate: event.playedDate,
       solveTime: event.solveTime,
     };
   }
 
   if (
     event.kind === "daily" &&
-    typeof event.dateKey === "string" &&
-    DATE_KEY_PATTERN.test(event.dateKey)
+    isUtcDateKey(event.dateKey) &&
+    isUtcDateKey(event.playedDate)
   ) {
     return {
       dateKey: event.dateKey,
       eventId: event.eventId,
       kind: "daily",
+      playedDate: event.playedDate,
     };
   }
 
   if (
     event.kind === "endless" &&
     typeof event.isThreeStar === "boolean" &&
+    isUtcDateKey(event.playedDate) &&
     typeof event.streak === "number" &&
     Number.isInteger(event.streak) &&
     event.streak > 0
@@ -78,7 +84,22 @@ function parseAchievementEvent(value: unknown): AchievementEvent | null {
       eventId: event.eventId,
       isThreeStar: event.isThreeStar,
       kind: "endless",
+      playedDate: event.playedDate,
       streak: event.streak,
+    };
+  }
+
+  if (
+    event.kind === "swap" &&
+    typeof event.count === "number" &&
+    Number.isInteger(event.count) &&
+    event.count > 0 &&
+    event.count <= MAX_SWAP_BATCH_SIZE
+  ) {
+    return {
+      count: event.count,
+      eventId: event.eventId,
+      kind: "swap",
     };
   }
 
@@ -106,6 +127,12 @@ export async function POST(request: Request) {
   const session = await getSession(request);
   if (!session) {
     return Response.json({ error: "Sign in is required." }, { status: 401 });
+  }
+  if (request.headers.get(ACHIEVEMENT_USER_ID_HEADER) !== session.user.id) {
+    return Response.json(
+      { error: "The active account changed before this event was saved." },
+      { status: 409 },
+    );
   }
 
   try {

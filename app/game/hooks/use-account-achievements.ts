@@ -2,24 +2,41 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type {
-  AchievementDefinition,
-  AchievementEvent,
+import {
+  ACHIEVEMENT_USER_ID_HEADER,
+  type AchievementDefinition,
+  type AchievementEvent,
 } from "../achievements";
+import {
+  appendSwapToQueue,
+  createAchievementFlushCoordinator,
+  readAchievementQueue,
+  removeQueuedEvent,
+  sealNextQueuedEvent,
+  shouldDiscardSubmission,
+  SWAP_BATCH_SIZE,
+  withAchievementQueueLock,
+  writeAchievementQueue,
+} from "../achievement-event-queue";
+
+export { clearPendingAchievementEvents } from "../achievement-event-queue";
 
 type AchievementEventInput =
   | {
       kind: "preset";
       mode: Extract<AchievementEvent, { kind: "preset" }>["mode"];
+      playedDate: string;
       solveTime: number;
     }
   | {
       dateKey: string;
       kind: "daily";
+      playedDate: string;
     }
   | {
       isThreeStar: boolean;
       kind: "endless";
+      playedDate: string;
       streak: number;
     };
 
@@ -27,108 +44,199 @@ type AchievementEventResponse = {
   newlyUnlocked: AchievementDefinition[];
 };
 
-const QUEUE_STORAGE_KEY_PREFIX = "colortile-pending-achievements:";
+type AchievementAnnouncement = {
+  achievement: AchievementDefinition;
+  userId: string;
+};
+
 const UNLOCK_ANNOUNCEMENT_DELAY_MS = 1100;
 
-function getQueueStorageKey(userId: string) {
-  return `${QUEUE_STORAGE_KEY_PREFIX}${userId}`;
+class AchievementSubmissionError extends Error {
+  status: number;
+
+  constructor(status: number) {
+    super("Achievement progress could not be saved.");
+    this.name = "AchievementSubmissionError";
+    this.status = status;
+  }
 }
 
-export function clearPendingAchievementEvents(
-  storage: Pick<Storage, "removeItem">,
+async function submitAchievementEvent(
+  event: AchievementEvent,
   userId: string,
 ) {
-  storage.removeItem(getQueueStorageKey(userId));
-}
-
-function readQueuedEvents(userId: string): AchievementEvent[] {
-  try {
-    const stored = window.localStorage.getItem(getQueueStorageKey(userId));
-    if (!stored) {
-      return [];
-    }
-
-    const parsed: unknown = JSON.parse(stored);
-    return Array.isArray(parsed)
-      ? parsed.filter(
-          (event): event is AchievementEvent =>
-            Boolean(event) &&
-            typeof event === "object" &&
-            typeof (event as { eventId?: unknown }).eventId === "string",
-        )
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeQueuedEvents(userId: string, events: AchievementEvent[]) {
-  const storageKey = getQueueStorageKey(userId);
-  if (events.length === 0) {
-    window.localStorage.removeItem(storageKey);
-    return;
-  }
-
-  window.localStorage.setItem(storageKey, JSON.stringify(events));
-}
-
-async function submitAchievementEvent(event: AchievementEvent) {
   const response = await fetch("/api/account/achievements", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      [ACHIEVEMENT_USER_ID_HEADER]: userId,
+    },
     body: JSON.stringify(event),
+    keepalive: true,
   });
 
   if (!response.ok) {
-    throw new Error("Achievement progress could not be saved.");
+    throw new AchievementSubmissionError(response.status);
   }
 
   return (await response.json()) as AchievementEventResponse;
 }
 
 export function useAccountAchievements(userId: string | null) {
-  const [announcements, setAnnouncements] = useState<AchievementDefinition[]>([]);
-  const flushInProgressRef = useRef(false);
+  const [announcements, setAnnouncements] =
+    useState<AchievementAnnouncement[]>([]);
   const announcementTimeoutsRef = useRef<number[]>([]);
+  const flushCoordinatorRef = useRef<ReturnType<
+    typeof createAchievementFlushCoordinator
+  > | null>(null);
+  if (flushCoordinatorRef.current === null) {
+    flushCoordinatorRef.current = createAchievementFlushCoordinator(userId);
+  }
+  const flushCoordinator = flushCoordinatorRef.current;
 
-  const announceUnlocks = useCallback((achievements: AchievementDefinition[]) => {
-    achievements.forEach((achievement, index) => {
-      const timeoutId = window.setTimeout(() => {
-        setAnnouncements((current) => [...current, achievement]);
-      }, UNLOCK_ANNOUNCEMENT_DELAY_MS + index * 180);
-      announcementTimeoutsRef.current.push(timeoutId);
-    });
+  const getPlayedDate = useCallback(
+    () => new Date().toISOString().slice(0, 10),
+    [],
+  );
+
+  const announceUnlocks = useCallback(
+    (
+      achievements: AchievementDefinition[],
+      announcementUserId: string,
+      isStillActive: () => boolean,
+    ) => {
+      achievements.forEach((achievement, index) => {
+        const timeoutId = window.setTimeout(() => {
+          if (isStillActive()) {
+            setAnnouncements((current) => [
+              ...current,
+              { achievement, userId: announcementUserId },
+            ]);
+          }
+        }, UNLOCK_ANNOUNCEMENT_DELAY_MS + index * 180);
+        announcementTimeoutsRef.current.push(timeoutId);
+      });
+    },
+    [],
+  );
+
+  const clearAnnouncementTimeouts = useCallback(() => {
+    announcementTimeoutsRef.current.forEach((timeoutId) =>
+      window.clearTimeout(timeoutId),
+    );
+    announcementTimeoutsRef.current = [];
   }, []);
 
+  const clearAnnouncements = useCallback(() => {
+    clearAnnouncementTimeouts();
+    setAnnouncements([]);
+  }, [clearAnnouncementTimeouts]);
+
   const flushQueue = useCallback(async () => {
-    if (!userId || flushInProgressRef.current) {
+    if (!userId) {
       return;
     }
 
-    flushInProgressRef.current = true;
+    const flushToken = flushCoordinator.start(userId);
+    if (!flushToken) {
+      return;
+    }
 
     try {
       while (true) {
-        const event = readQueuedEvents(userId)[0];
+        const event = await withAchievementQueueLock(userId, () => {
+          if (!flushCoordinator.isActive(flushToken)) {
+            return null;
+          }
+          const queuedEvents = readAchievementQueue(
+            window.localStorage,
+            userId,
+            getPlayedDate(),
+          );
+          const sealed = sealNextQueuedEvent(queuedEvents);
+          writeAchievementQueue(window.localStorage, userId, sealed.events);
+          return sealed.event;
+        });
+        if (!flushCoordinator.isActive(flushToken)) {
+          return;
+        }
         if (!event) {
           break;
         }
 
         try {
-          const result = await submitAchievementEvent(event);
-          const remainingEvents = readQueuedEvents(userId).filter(
-            (queuedEvent) => queuedEvent.eventId !== event.eventId,
+          if (!flushCoordinator.isActive(flushToken)) {
+            return;
+          }
+          const result = await submitAchievementEvent(event, flushToken.userId);
+          if (!flushCoordinator.isActive(flushToken)) {
+            return;
+          }
+          const removed = await withAchievementQueueLock(userId, () => {
+            if (!flushCoordinator.isActive(flushToken)) {
+              return false;
+            }
+            const queuedEvents = readAchievementQueue(
+              window.localStorage,
+              userId,
+              getPlayedDate(),
+            );
+            writeAchievementQueue(
+              window.localStorage,
+              userId,
+              removeQueuedEvent(queuedEvents, event.eventId),
+            );
+            return true;
+          });
+          if (!removed || !flushCoordinator.isActive(flushToken)) {
+            return;
+          }
+          announceUnlocks(
+            result.newlyUnlocked,
+            flushToken.userId,
+            () => flushCoordinator.isActive(flushToken),
           );
-          writeQueuedEvents(userId, remainingEvents);
-          announceUnlocks(result.newlyUnlocked);
-        } catch {
+        } catch (error) {
+          if (
+            error instanceof AchievementSubmissionError &&
+            shouldDiscardSubmission(error.status)
+          ) {
+            if (!flushCoordinator.isActive(flushToken)) {
+              return;
+            }
+            const removed = await withAchievementQueueLock(userId, () => {
+              if (!flushCoordinator.isActive(flushToken)) {
+                return false;
+              }
+              const queuedEvents = readAchievementQueue(
+                window.localStorage,
+                userId,
+                getPlayedDate(),
+              );
+              writeAchievementQueue(
+                window.localStorage,
+                userId,
+                removeQueuedEvent(queuedEvents, event.eventId),
+              );
+              return true;
+            });
+            if (!removed) {
+              return;
+            }
+            continue;
+          }
           break;
         }
       }
     } finally {
-      flushInProgressRef.current = false;
+      flushCoordinator.finish(flushToken);
     }
-  }, [announceUnlocks, userId]);
+  }, [
+    announceUnlocks,
+    flushCoordinator,
+    getPlayedDate,
+    userId,
+  ]);
 
   const recordAchievementEvent = useCallback(
     (input: AchievementEventInput) => {
@@ -140,44 +248,94 @@ export function useAccountAchievements(userId: string | null) {
         ...input,
         eventId: window.crypto.randomUUID(),
       } as AchievementEvent;
-      const pendingEvents = readQueuedEvents(userId);
-      writeQueuedEvents(userId, [...pendingEvents, event]);
-      void flushQueue();
+      void withAchievementQueueLock(userId, () => {
+        const pendingEvents = readAchievementQueue(
+          window.localStorage,
+          userId,
+          getPlayedDate(),
+        );
+        writeAchievementQueue(window.localStorage, userId, [
+          ...pendingEvents,
+          event,
+        ]);
+      }).then(() => {
+        if (flushCoordinator.isUserActive(userId)) {
+          void flushQueue();
+        }
+      });
     },
-    [flushQueue, userId],
+    [flushCoordinator, flushQueue, getPlayedDate, userId],
   );
+
+  const recordSwap = useCallback(() => {
+    if (!userId) {
+      return;
+    }
+
+    void withAchievementQueueLock(userId, () => {
+      const queuedEvents = readAchievementQueue(
+        window.localStorage,
+        userId,
+        getPlayedDate(),
+      );
+      const result = appendSwapToQueue(
+        queuedEvents,
+        window.crypto.randomUUID(),
+      );
+      writeAchievementQueue(window.localStorage, userId, result.events);
+      return result.count;
+    }).then((count) => {
+      if (
+        count >= SWAP_BATCH_SIZE &&
+        flushCoordinator.isUserActive(userId)
+      ) {
+        void flushQueue();
+      }
+    });
+  }, [flushCoordinator, flushQueue, getPlayedDate, userId]);
 
   const dismissAnnouncement = useCallback(() => {
     setAnnouncements((current) => current.slice(1));
   }, []);
 
   useEffect(() => {
+    clearAnnouncements();
+    flushCoordinator.activate(userId);
+
     if (!userId) {
-      return;
+      return () => flushCoordinator.activate(null);
     }
 
     void flushQueue();
     const handleOnline = () => void flushQueue();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void flushQueue();
+      }
+    };
     window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      flushCoordinator.activate(null);
       window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [flushQueue, userId]);
+  }, [clearAnnouncements, flushCoordinator, flushQueue, userId]);
 
   useEffect(() => {
-    const timeoutIds = announcementTimeoutsRef.current;
+    return clearAnnouncementTimeouts;
+  }, [clearAnnouncementTimeouts]);
 
-    return () => {
-      timeoutIds.forEach((timeoutId) =>
-        window.clearTimeout(timeoutId),
-      );
-    };
-  }, []);
+  const currentAnnouncement = announcements[0];
 
   return {
-    currentAnnouncement: announcements[0] ?? null,
+    currentAnnouncement:
+      currentAnnouncement?.userId === userId
+        ? currentAnnouncement.achievement
+        : null,
     dismissAnnouncement,
     recordAchievementEvent,
+    recordSwap,
   };
 }
