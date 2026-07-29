@@ -37,6 +37,13 @@ import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
 import { useWinSequence } from "./game/hooks/use-win-sequence";
 import { LEADERBOARD_REFRESH_EVENT } from "./game/leaderboard";
 import {
+  CHROMA_BALANCE_UPDATED_EVENT,
+  DAILY_CHROMA_REWARD,
+  ENDLESS_CHROMA_REWARD,
+  getPresetChromaReward,
+  type ChromaCompletionResult,
+} from "./game/chroma";
+import {
   checkCompletion,
   createSeededRandom,
   formatTime,
@@ -56,7 +63,7 @@ import {
   isTileLocked,
   scrambleBoard,
 } from "./game/game-logic";
-import type { BestStats, DailyFailureReason, DifficultyConfig, DifficultyKey, EndlessPuzzleDefinition, Tile } from "./game/game-types";
+import type { BestStats, DailyFailureReason, DifficultyConfig, DifficultyKey, EndlessPuzzleDefinition, PresetModeKey, Tile } from "./game/game-types";
 import {
   completeVerifiedAttempt,
   createVerifiedAttempt,
@@ -177,7 +184,6 @@ function IntroOnboarding({
     }
 
     nameInputRef.current?.focus();
-    nameInputRef.current?.select();
   }, [introStep, isSignedIn]);
 
   return (
@@ -297,6 +303,8 @@ export default function Home() {
   const [moves, setMoves] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [completion, setCompletion] = useState(0);
+  const [chromaResult, setChromaResult] =
+    useState<ChromaCompletionResult | null>(null);
   const [winState, setWinState] = useState(false);
   const [isDailyMode, setIsDailyMode] = useState(true);
   const [dailyModalOpen, setDailyModalOpen] = useState(false);
@@ -428,6 +436,11 @@ export default function Home() {
   const boardDensityClass = getBoardDensityClass(activeConfig.size);
   const currentBest = bestStats[difficulty];
   const isEndlessMode = !isDailyMode && difficulty === "endless";
+  const availableChromaReward = isDailyMode
+    ? DAILY_CHROMA_REWARD
+    : isEndlessMode
+      ? ENDLESS_CHROMA_REWARD
+      : getPresetChromaReward(difficulty as PresetModeKey);
   const isBlackAndWhiteRun = isDailyMode
     ? dailyPuzzleStyle === "black-and-white"
     : isBlackAndWhiteMode(difficulty) ||
@@ -731,6 +744,7 @@ export default function Home() {
     setMoves(0);
     setTimeLeft(initialTime);
     setCompletion(checkCompletion(nextBoard));
+    setChromaResult(null);
     setWinState(false);
     setEndlessLastClear(null);
     setBoardVisualMode("color");
@@ -936,12 +950,31 @@ export default function Home() {
     }
 
     const finalSolveTime = solveTime;
+    const setCompletionChromaResult = (outcome?: VerificationOutcome) => {
+      if (outcome?.status === "verified") {
+        setChromaResult(outcome.result.chroma);
+        window.dispatchEvent(
+          new CustomEvent(CHROMA_BALANCE_UPDATED_EVENT, {
+            detail: outcome.result.chroma.balance,
+          }),
+        );
+        return;
+      }
+
+      setChromaResult({
+        available: availableChromaReward,
+        status: sessionUserIdRef.current
+          ? "unverified"
+          : "sign-in-required",
+      });
+    };
 
     const awardDailyClear = (outcome?: VerificationOutcome) => {
       const verifiedResult = outcome?.status === "verified" ? outcome.result : null;
       const awardedMoves = verifiedResult?.moves ?? moves;
       const awardedSolveTime = verifiedResult?.solveTime ?? finalSolveTime;
 
+      setCompletionChromaResult(outcome);
       setDailyRecord((currentRecord) => {
         const isSameDay = currentRecord?.dateKey === dailyDateKey;
         return {
@@ -970,12 +1003,15 @@ export default function Home() {
 
     const awardEndlessClear = (outcome?: VerificationOutcome) => {
       const completedSwapBudget = endlessUsesSwapLimit ? endlessSwapBudget : null;
-      const isThreeStar = moves <= endlessThreeStarMoveLimit;
+      const awardedMoves =
+        outcome?.status === "verified" ? outcome.result.moves : moves;
+      const isThreeStar = awardedMoves <= endlessThreeStarMoveLimit;
       const verifiedStreak = outcome?.status === "verified"
         ? outcome.result.streakCount
         : undefined;
       const nextStreak = verifiedStreak ?? endlessStreak + 1;
 
+      setCompletionChromaResult(outcome);
       setEndlessLastClear({
         challengeLabel: endlessPuzzle.challengeLabel,
         isThreeStar,
@@ -1002,124 +1038,134 @@ export default function Home() {
       clearDragSession();
     };
 
-    if (isDailyMode || isEndlessMode) {
-      const verificationUserId = activeVerifiedUserIdRef.current;
-      const verifiedCompletion = completeCurrentVerifiedAttempt();
-      if (!verifiedCompletion) {
+    const awardPresetClear = (outcome?: VerificationOutcome) => {
+      const presetDifficulty = difficulty as PresetModeKey;
+      const verifiedResult =
+        outcome?.status === "verified" ? outcome.result : null;
+      const awardedMoves = verifiedResult?.moves ?? moves;
+      const awardedSolveTime = verifiedResult?.solveTime ?? finalSolveTime;
+      const currentBestWithSolveTime = {
+        ...currentBest,
+        bestSolveTime: getBestSolveTime(currentBest, reservedPresetTimeLimit),
+      };
+
+      setCompletionChromaResult(outcome);
+      setPersonalBestStatus(
+        getPersonalBestStatus(currentBestWithSolveTime, {
+          moves: awardedMoves,
+          solveTime: awardedSolveTime,
+        }),
+      );
+      setWinState(true);
+      setWinPhase("boardWave");
+      clearDragSession();
+
+      recordAchievementEvent({
+        kind: "preset",
+        mode: presetDifficulty,
+        playedDate: getDailyPuzzleDateKey(),
+        solveTime: awardedSolveTime,
+      });
+
+      setBestStats((current) => {
+        const currentRecord = current[presetDifficulty] ?? {};
+        const currentBestSolveTime = getBestSolveTime(
+          currentRecord,
+          reservedPresetTimeLimit,
+        );
+        const nextRecord = {
+          bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
+          bestSolveTime:
+            currentBestSolveTime === undefined
+              ? awardedSolveTime
+              : Math.min(currentBestSolveTime, awardedSolveTime),
+          fewestMoves:
+            currentRecord.fewestMoves === undefined
+              ? awardedMoves
+              : Math.min(currentRecord.fewestMoves, awardedMoves),
+        };
+
+        return {
+          ...current,
+          [presetDifficulty]: nextRecord,
+        };
+      });
+    };
+
+    const verificationUserId = activeVerifiedUserIdRef.current;
+    const verifiedCompletion = completeCurrentVerifiedAttempt();
+    if (!verifiedCompletion) {
+      if (isDailyMode) {
+        awardDailyClear();
+      } else if (isEndlessMode) {
+        awardEndlessClear();
+      } else {
+        awardPresetClear();
+      }
+      return;
+    }
+
+    verificationPendingGameSessionIdRef.current = currentGameSessionId;
+    setTimerStarted(false);
+    clearDragSession();
+
+    const handleVerificationOutcome = (outcome: VerificationOutcome) => {
+      if (
+        !verificationUserId ||
+        !isVerifiedGameContextCurrent(
+          {
+            gameSessionId: currentGameSessionId,
+            userId: verificationUserId,
+          },
+          {
+            gameSessionId: gameSessionIdRef.current,
+            userId: sessionUserIdRef.current ?? "",
+          },
+        )
+      ) {
+        return;
+      }
+
+      if (outcome.status === "unavailable") {
+        verificationOutcomeHandlerRef.current = handleVerificationOutcome;
+        setVerificationRetryStatus("ready");
+        return;
+      }
+
+      verificationOutcomeHandlerRef.current = null;
+      setVerificationRetryStatus("hidden");
+      verificationPendingGameSessionIdRef.current = null;
+
+      if (outcome.status === "rejected") {
         if (isDailyMode) {
-          awardDailyClear();
+          resetWinSequenceRef.current();
+          setDailyModalOpen(true);
+          setDailyFailureReason(
+            dailyUsesCountdown ? "time-limit" : "swap-limit",
+          );
+          timeUpSound.play();
+        } else if (isEndlessMode) {
+          setEndlessStreak(0);
+          resetWinSequenceRef.current();
+          timeUpSound.play();
+          void startEndlessPuzzle(1, true);
         } else {
-          awardEndlessClear();
+          awardPresetClear({ status: "unranked" });
         }
         return;
       }
 
-      verificationPendingGameSessionIdRef.current = currentGameSessionId;
-      setTimerStarted(false);
-      clearDragSession();
-
-      const handleVerificationOutcome = (outcome: VerificationOutcome) => {
-        if (
-          !verificationUserId ||
-          !isVerifiedGameContextCurrent(
-            {
-              gameSessionId: currentGameSessionId,
-              userId: verificationUserId,
-            },
-            {
-              gameSessionId: gameSessionIdRef.current,
-              userId: sessionUserIdRef.current ?? "",
-            },
-          )
-        ) {
-          return;
-        }
-
-        if (outcome.status === "unavailable") {
-          verificationOutcomeHandlerRef.current = handleVerificationOutcome;
-          setVerificationRetryStatus("ready");
-          return;
-        }
-
-        verificationOutcomeHandlerRef.current = null;
-        setVerificationRetryStatus("hidden");
-        verificationPendingGameSessionIdRef.current = null;
-
-        if (outcome.status === "rejected") {
-          if (isDailyMode) {
-            resetWinSequenceRef.current();
-            setDailyModalOpen(true);
-            setDailyFailureReason(dailyUsesCountdown ? "time-limit" : "swap-limit");
-            timeUpSound.play();
-          } else {
-            setEndlessStreak(0);
-            resetWinSequenceRef.current();
-            timeUpSound.play();
-            void startEndlessPuzzle(1, true);
-          }
-          return;
-        }
-
-        if (isDailyMode) {
-          awardDailyClear(outcome);
-        } else {
-          awardEndlessClear(outcome);
-        }
-      };
-
-      void verifiedCompletion.then(handleVerificationOutcome);
-      return;
-    }
-
-    const currentBestWithSolveTime = {
-      ...currentBest,
-      bestSolveTime: getBestSolveTime(currentBest, reservedPresetTimeLimit),
+      if (isDailyMode) {
+        awardDailyClear(outcome);
+      } else if (isEndlessMode) {
+        awardEndlessClear(outcome);
+      } else {
+        awardPresetClear(outcome);
+      }
     };
 
-    setPersonalBestStatus(
-      getPersonalBestStatus(currentBestWithSolveTime, {
-        moves,
-        solveTime: finalSolveTime,
-      }),
-    );
-    setWinState(true);
-    setWinPhase("boardWave");
-    clearDragSession();
-
-    void completeCurrentVerifiedAttempt();
-    if (difficulty !== "endless") {
-      recordAchievementEvent({
-        kind: "preset",
-        mode: difficulty,
-        playedDate: getDailyPuzzleDateKey(),
-        solveTime: finalSolveTime,
-      });
-    }
-
-    setBestStats((current) => {
-      const currentRecord = current[difficulty] ?? {};
-      const currentBestSolveTime = getBestSolveTime(
-        currentRecord,
-        reservedPresetTimeLimit,
-      );
-      const nextRecord = {
-        bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
-        bestSolveTime:
-          currentBestSolveTime === undefined
-            ? finalSolveTime
-            : Math.min(currentBestSolveTime, finalSolveTime),
-        fewestMoves:
-          currentRecord.fewestMoves === undefined
-            ? moves
-            : Math.min(currentRecord.fewestMoves, moves),
-      };
-
-      return {
-        ...current,
-        [difficulty]: nextRecord,
-      };
-    });
-  }, [activeUsesCountdown, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, recordAchievementEvent, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
+    void verifiedCompletion.then(handleVerificationOutcome);
+  }, [activeUsesCountdown, availableChromaReward, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, recordAchievementEvent, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
 
   useEffect(() => {
     if (
@@ -1821,6 +1867,12 @@ export default function Home() {
           <GameModal
             activeConfig={activeConfig}
             accuracy={accuracy}
+            chromaResult={
+              chromaResult ?? {
+                available: availableChromaReward,
+                status: session ? "unverified" : "sign-in-required",
+              }
+            }
             completion={completion}
             dailyResult={
               isDailyMode

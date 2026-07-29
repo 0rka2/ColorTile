@@ -1,4 +1,5 @@
 import type { LeaderboardDifficulty } from "./leaderboard";
+import type { ChromaReward } from "./chroma";
 import type { VerifiedPuzzle, VerifiedSwap } from "./verified-attempt";
 
 export type PreparedVerifiedAttempt = {
@@ -12,6 +13,7 @@ export type VerifiedAttempt = PreparedVerifiedAttempt & {
 };
 
 export type VerifiedAttemptResult = {
+  chroma: ChromaReward;
   moves: number;
   solveTime?: number;
   streakCount?: number;

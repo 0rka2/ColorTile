@@ -924,8 +924,59 @@ html[data-theme="dark"] .gradient-text__blob {
   animation: achievement-border-shift 3.2s ease infinite;
 }
 
+.chroma-reward-card {
+  isolation: isolate;
+}
+
+.chroma-reward-card-awarded {
+  box-shadow:
+    0 18px 44px rgba(99, 102, 241, 0.18),
+    0 0 30px rgba(236, 72, 153, 0.12);
+}
+
+.chroma-gem {
+  background: linear-gradient(
+    135deg,
+    #fb7185,
+    #f59e0b 24%,
+    #10b981 48%,
+    #3b82f6 72%,
+    #a855f7
+  );
+  box-shadow:
+    0 10px 24px rgba(99, 102, 241, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.chroma-reward-shimmer {
+  position: absolute;
+  inset: -60% auto -60% -35%;
+  width: 28%;
+  transform: rotate(18deg);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.58),
+    transparent
+  );
+  animation: chroma-reward-shimmer 1.15s 0.35s ease-out both;
+}
+
+@keyframes chroma-reward-shimmer {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 125%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .achievement-toast {
     animation: none;
+  }
+
+  .chroma-reward-shimmer {
+    display: none;
   }
 }

@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { FaRegUser } from "react-icons/fa";
+import { FaGem, FaRegUser } from "react-icons/fa";
 import { HiOutlineSpeakerWave, HiOutlineSpeakerXMark } from "react-icons/hi2";
 
 import { authClient } from "../../lib/auth-client";
@@ -28,6 +28,10 @@ import {
 import { getSoundEnabled, setSoundEnabled } from "../../lib/sounds";
 import { resolveThemeMode } from "../settings-options";
 import type { ThemeMode } from "../settings-options";
+import {
+  CHROMA_BALANCE_UPDATED_EVENT,
+  formatChromaBalance,
+} from "../chroma";
 
 type HeaderProps = {
   onLogoClick: () => void;
@@ -41,6 +45,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [soundIsEnabled, setSoundIsEnabled] = useState(true);
+  const [chromaBalance, setChromaBalance] = useState<number | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] =
     useState<AccountAuthMode>("sign-in");
@@ -91,6 +96,67 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
     window.history.replaceState(null, "", nextUrl);
   }, []);
 
+  useEffect(() => {
+    const userId = session?.user.id;
+    setChromaBalance(null);
+
+    if (!userId) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadChromaBalance = async () => {
+      try {
+        const response = await fetch("/api/account/chroma", {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const result = (await response.json()) as { balance?: unknown };
+        if (
+          typeof result.balance === "number" &&
+          Number.isInteger(result.balance) &&
+          result.balance >= 0
+        ) {
+          setChromaBalance(result.balance);
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("Chroma balance could not be loaded.", error);
+        }
+      }
+    };
+
+    const handleBalanceUpdate = (event: Event) => {
+      const balance = (event as CustomEvent<unknown>).detail;
+      if (
+        typeof balance === "number" &&
+        Number.isInteger(balance) &&
+        balance >= 0
+      ) {
+        setChromaBalance(balance);
+      }
+    };
+
+    void loadChromaBalance();
+    window.addEventListener(
+      CHROMA_BALANCE_UPDATED_EVENT,
+      handleBalanceUpdate,
+    );
+
+    return () => {
+      controller.abort();
+      window.removeEventListener(
+        CHROMA_BALANCE_UPDATED_EVENT,
+        handleBalanceUpdate,
+      );
+    };
+  }, [session?.user.id]);
+
   return (
     <>
       <header ref={ref} className="game-header flex min-h-11 items-center justify-between gap-1">
@@ -126,21 +192,49 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
 
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-[0.875rem]">
         {session ? (
-          <Link
-            href="/account"
-            aria-label={`Open ${session.user.name}'s account`}
-            className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-11 w-11 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:w-auto sm:max-w-[12rem] sm:gap-2 sm:px-3.5"
-          >
+          <>
             <span
-              aria-hidden="true"
-              className="account-action-avatar font-fredoka-strong flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm uppercase leading-none sm:h-8 sm:w-8"
+              aria-label={
+                chromaBalance === null
+                  ? "Chroma balance unavailable"
+                  : `${chromaBalance} Chroma`
+              }
+              aria-live="polite"
+              className="chroma-counter header-action-button theme-header-surface theme-text-primary font-fredoka-strong flex h-11 min-w-11 max-w-[3.5rem] shrink-0 items-center justify-center gap-1 rounded-full border px-1.5 text-[0.7rem] leading-none shadow-[0_14px_26px_rgba(15,23,42,0.16)] max-[400px]:gap-0.5 max-[400px]:px-1 max-[400px]:text-[0.62rem] sm:h-[3.3rem] sm:max-w-[9rem] sm:gap-2 sm:px-3 sm:text-sm"
             >
-              {session.user.name.trim().charAt(0) || "P"}
+              <span
+                aria-hidden="true"
+                className="chroma-gem flex h-5 w-5 shrink-0 items-center justify-center rounded-lg text-[0.58rem] text-white max-[400px]:h-4 max-[400px]:w-4 sm:h-7 sm:w-7 sm:rounded-[0.65rem] sm:text-xs"
+              >
+                <FaGem />
+              </span>
+              <span className="sm:hidden">
+                {chromaBalance === null
+                  ? "—"
+                  : formatChromaBalance(chromaBalance, true)}
+              </span>
+              <span className="hidden whitespace-nowrap sm:inline">
+                {chromaBalance === null
+                  ? "—"
+                  : formatChromaBalance(chromaBalance)}
+              </span>
             </span>
-            <span className="hidden truncate font-fredoka-strong text-sm sm:inline sm:text-base">
-              {session.user.name}
-            </span>
-          </Link>
+            <Link
+              href="/account"
+              aria-label={`Open ${session.user.name}'s account`}
+              className="header-action-button account-action-button theme-header-surface theme-text-primary flex h-11 w-11 items-center justify-center rounded-full border shadow-[0_14px_26px_rgba(15,23,42,0.16)] sm:h-[3.3rem] sm:w-auto sm:max-w-[12rem] sm:gap-2 sm:px-3.5"
+            >
+              <span
+                aria-hidden="true"
+                className="account-action-avatar font-fredoka-strong flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm uppercase leading-none sm:h-8 sm:w-8"
+              >
+                {session.user.name.trim().charAt(0) || "P"}
+              </span>
+              <span className="hidden truncate font-fredoka-strong text-sm sm:inline sm:text-base">
+                {session.user.name}
+              </span>
+            </Link>
+          </>
         ) : (
           <button
             type="button"
