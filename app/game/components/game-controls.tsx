@@ -1,20 +1,39 @@
 type ControlsProps = {
   onAutoSolve: () => void;
+  onRestart: () => void;
   showDevControls: boolean;
 };
 
 export function GameControls({
   onAutoSolve,
+  onRestart,
   showDevControls,
 }: Readonly<ControlsProps>) {
   return (
     <section className="flex w-full justify-center">
-      <div className="flex w-full max-w-[42rem] flex-col gap-[clamp(0.5rem,1.2vw,0.85rem)] sm:flex-row sm:justify-center">
+      <div
+        className={`game-controls-row grid w-full gap-2 ${
+          showDevControls ? "grid-cols-2" : "grid-cols-1"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onRestart}
+          aria-label="Restart game"
+          className="theme-button-primary restart-button font-fredoka-strong flex min-h-11 items-center justify-center gap-2 rounded-full px-5 text-sm shadow-[0_14px_26px_rgba(15,23,42,0.16)] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+        >
+          <span aria-hidden="true" className="inline-flex items-center leading-none">
+            {"\u21BB"}
+          </span>
+          <span>Restart</span>
+        </button>
+
         {showDevControls && (
           <button
             type="button"
             onClick={onAutoSolve}
-            className="theme-button-accent font-fredoka-strong flex min-h-[clamp(3rem,5vw,4rem)] w-full items-center justify-center rounded-[clamp(0.9rem,1.8vw,1.25rem)] px-[clamp(0.8rem,1.6vw,1.1rem)] py-[clamp(0.7rem,1.2vw,0.95rem)] text-center text-[clamp(0.8rem,1.35vw,0.92rem)] leading-tight transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:w-auto sm:min-w-[clamp(7.5rem,13vw,9.5rem)]"
+            aria-label="Automatically solve puzzle"
+            className="theme-button-secondary font-fredoka-strong flex min-h-11 items-center justify-center rounded-full border border-[var(--border-soft)] px-5 text-center text-sm leading-tight transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
           >
             Auto Solve
           </button>
