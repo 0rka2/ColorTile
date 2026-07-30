@@ -61,8 +61,8 @@ test("completion reward copy covers every Chroma state", () => {
   assert.equal(
     getChromaRewardCopy({
       available: 30,
-      status: "unverified",
+      status: "earned",
     }).title,
-    "Unverified — no Chroma earned",
+    "+30 Chroma",
   );
 });

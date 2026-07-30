@@ -27,9 +27,9 @@ export async function getLeaderboardUser(request: Request) {
 }
 
 export function leaderboardApiError(error: unknown) {
-  console.error("Verified leaderboard request failed.", error);
+  console.error("Leaderboard request failed.", error);
   return Response.json(
-    { error: "The verified leaderboard is temporarily unavailable." },
+    { error: "The leaderboard is temporarily unavailable." },
     { status: 503 },
   );
 }

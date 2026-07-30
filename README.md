@@ -12,7 +12,7 @@ Preset puzzles use a stopwatch, so the goal is to solve each board quickly and w
 - Endless puzzle streaks
 - Local progress for guest players
 - Optional accounts with synchronized progress
-- Verified fastest-time, fewest-moves, daily, and endless-streak leaderboards
+- Fastest-time, fewest-moves, daily, and endless-streak leaderboards
 - Responsive mouse, touch, and pointer controls
 
 ## Gameplay
@@ -49,7 +49,7 @@ npm run db:cleanup
 
 Run that command from deployment scheduling appropriate for the hosting environment.
 
-Verified puzzles are returned by the `/start` request, not when an attempt is prepared. The server timer starts with that response; network delay and the black-and-white preview therefore count toward the authoritative solve time.
+Leaderboard puzzles are returned by the `/start` request, not when an attempt is prepared. The server timer starts with that response; network delay and the black-and-white preview therefore count toward the authoritative solve time.
 
 ## Checks
 

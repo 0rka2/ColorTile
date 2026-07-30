@@ -152,3 +152,13 @@ export const boardCompleteSound = createSoundEffect([
   { delay: 0.2, duration: 0.5, frequency: 784, gain: 0.045, type: "triangle" },  // G5
   { delay: 0.35, duration: 0.5, frequency: 1047, gain: 0.045, type: "triangle" }, // C6 (High finish!)
 ]);
+
+export const chromaRewardSound = createSoundEffect([
+  { delay: 0, duration: 0.2, frequency: 988, gain: 0.055, type: "sine" },
+  { delay: 0.08, duration: 0.26, frequency: 1319, gain: 0.06, type: "sine" },
+  { delay: 0.16, duration: 0.32, frequency: 1976, gain: 0.04, type: "triangle" },
+]);
+
+export const chromaCountTickSound = createSoundEffect([
+  { delay: 0, duration: 0.035, frequency: 760, gain: 0.012, type: "sine" },
+]);

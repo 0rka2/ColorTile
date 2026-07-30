@@ -928,24 +928,50 @@ html[data-theme="dark"] .gradient-text__blob {
   isolation: isolate;
 }
 
-.chroma-reward-card-awarded {
+.chroma-reward-card-earned {
+  border-color: rgba(56, 189, 248, 0.3);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(224, 242, 254, 0.72),
+      rgba(238, 242, 255, 0.76) 52%,
+      rgba(250, 245, 255, 0.8)
+    ),
+    var(--surface-solid);
   box-shadow:
-    0 18px 44px rgba(99, 102, 241, 0.18),
-    0 0 30px rgba(236, 72, 153, 0.12);
+    0 18px 44px rgba(14, 165, 233, 0.16),
+    0 0 28px rgba(99, 102, 241, 0.1);
+  animation: chroma-reward-card-glow 0.9s 0.12s ease-out both;
 }
 
-.chroma-gem {
-  background: linear-gradient(
-    135deg,
-    #fb7185,
-    #f59e0b 24%,
-    #10b981 48%,
-    #3b82f6 72%,
-    #a855f7
+html[data-theme="dark"] .chroma-reward-card-earned {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(14, 116, 144, 0.22),
+      rgba(49, 46, 129, 0.2) 52%,
+      rgba(88, 28, 135, 0.17)
+    ),
+    var(--surface-solid);
+}
+
+.chroma-reward-amount {
+  color: #0284c7;
+  background: linear-gradient(100deg, #06b6d4, #2563eb 55%, #7c3aed);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.chroma-reward-glow {
+  position: absolute;
+  inset: -80% 18%;
+  background: radial-gradient(
+    circle,
+    rgba(56, 189, 248, 0.24),
+    transparent 62%
   );
-  box-shadow:
-    0 10px 24px rgba(99, 102, 241, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  animation: chroma-reward-glow-pulse 0.85s 0.12s ease-out both;
 }
 
 .chroma-reward-shimmer {
@@ -962,6 +988,38 @@ html[data-theme="dark"] .gradient-text__blob {
   animation: chroma-reward-shimmer 1.15s 0.35s ease-out both;
 }
 
+@keyframes chroma-reward-card-glow {
+  0% {
+    box-shadow:
+      0 18px 44px rgba(14, 165, 233, 0.1),
+      0 0 0 rgba(99, 102, 241, 0);
+  }
+  45% {
+    box-shadow:
+      0 18px 44px rgba(14, 165, 233, 0.24),
+      0 0 34px rgba(99, 102, 241, 0.2);
+  }
+  100% {
+    box-shadow:
+      0 18px 44px rgba(14, 165, 233, 0.16),
+      0 0 28px rgba(99, 102, 241, 0.1);
+  }
+}
+
+@keyframes chroma-reward-glow-pulse {
+  from {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+  45% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.25;
+    transform: scale(1.25);
+  }
+}
+
 @keyframes chroma-reward-shimmer {
   from {
     left: -35%;
@@ -974,9 +1032,5 @@ html[data-theme="dark"] .gradient-text__blob {
 @media (prefers-reduced-motion: reduce) {
   .achievement-toast {
     animation: none;
-  }
-
-  .chroma-reward-shimmer {
-    display: none;
   }
 }

@@ -25,7 +25,7 @@ export type ChromaCompletionResult =
   | ChromaReward
   | {
       available: number;
-      status: "sign-in-required" | "unverified";
+      status: "earned" | "sign-in-required";
     };
 
 export function getPresetChromaReward(difficulty: PresetModeKey) {
@@ -50,14 +50,13 @@ export function getChromaRewardCopy(result: ChromaCompletionResult) {
     };
   }
 
-  return {
-    detail:
-      result.status === "sign-in-required"
-        ? `This clear is worth ${result.available} Chroma when signed in.`
-        : `This clear was worth ${result.available} Chroma.`,
-    title:
-      result.status === "sign-in-required"
-        ? "Sign in to earn Chroma"
-        : "Unverified — no Chroma earned",
-  };
+  return result.status === "earned"
+    ? {
+        detail: "",
+        title: `+${result.available} Chroma`,
+      }
+    : {
+        detail: `This clear is worth ${result.available} Chroma when signed in.`,
+        title: "Sign in to earn Chroma",
+      };
 }

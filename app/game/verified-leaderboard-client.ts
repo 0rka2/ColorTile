@@ -37,9 +37,43 @@ export class VerifiedLeaderboardRequestError extends Error {
 export function isRetryableVerifiedLeaderboardError(error: unknown) {
   return (
     !(error instanceof VerifiedLeaderboardRequestError) ||
-    error.status === 429 ||
     error.status >= 500
   );
+}
+
+export const VERIFIED_COMPLETION_RETRY_DELAYS_MS = [500, 1_500] as const;
+
+function wait(delayMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, delayMs);
+  });
+}
+
+export async function retryVerifiedCompletionRequest<T>(
+  request: () => Promise<T>,
+  waitForRetry: (delayMs: number) => Promise<void> = wait,
+) {
+  for (
+    let requestIndex = 0;
+    requestIndex <= VERIFIED_COMPLETION_RETRY_DELAYS_MS.length;
+    requestIndex += 1
+  ) {
+    try {
+      return await request();
+    } catch (error) {
+      const retryDelay = VERIFIED_COMPLETION_RETRY_DELAYS_MS[requestIndex];
+      if (
+        retryDelay === undefined ||
+        !isRetryableVerifiedLeaderboardError(error)
+      ) {
+        throw error;
+      }
+
+      await waitForRetry(retryDelay);
+    }
+  }
+
+  throw new Error("The leaderboard completion retry loop ended unexpectedly.");
 }
 
 async function readSuccessfulResponse<T>(response: Response) {
@@ -73,14 +107,16 @@ export async function completeVerifiedAttempt(
   attemptId: string,
   swaps: readonly VerifiedSwap[],
 ) {
-  const response = await fetch(
-    `/api/leaderboard/attempts/${encodeURIComponent(attemptId)}/complete`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ swaps }),
-    },
-  );
+  return retryVerifiedCompletionRequest(async () => {
+    const response = await fetch(
+      `/api/leaderboard/attempts/${encodeURIComponent(attemptId)}/complete`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ swaps }),
+      },
+    );
 
-  return readSuccessfulResponse<VerifiedAttemptResult>(response);
+    return readSuccessfulResponse<VerifiedAttemptResult>(response);
+  });
 }

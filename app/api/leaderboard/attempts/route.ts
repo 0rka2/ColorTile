@@ -37,7 +37,7 @@ type CreateAttemptBody = {
 
 function unauthorized() {
   return Response.json(
-    { error: "Sign in is required for verified leaderboard attempts." },
+    { error: "Sign in is required for leaderboard attempts." },
     { status: 401 },
   );
 }

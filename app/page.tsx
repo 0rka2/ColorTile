@@ -24,7 +24,6 @@ import { GameModal } from "./game/components/modals/game-modal";
 import { GameModeModal } from "./game/components/modals/game-mode-modal";
 import { LeaderboardModal } from "./game/components/modals/leaderboard-modal";
 import { ShopComingSoonModal } from "./game/components/modals/shop-coming-soon-modal";
-import { VerificationRetryModal } from "./game/components/modals/verification-retry-modal";
 import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
@@ -67,7 +66,6 @@ import type { BestStats, DailyFailureReason, DifficultyConfig, DifficultyKey, En
 import {
   completeVerifiedAttempt,
   createVerifiedAttempt,
-  isRetryableVerifiedLeaderboardError,
   startVerifiedAttempt,
   type VerifiedAttempt,
   type VerifiedAttemptResult,
@@ -113,9 +111,9 @@ const INTRO_ACCOUNT_ACTION_CLASS_NAME =
 
 type IntroStep = "welcome" | "name";
 
-type VerificationOutcome =
-  | { result: VerifiedAttemptResult; status: "verified" }
-  | { status: "rejected" | "unavailable" | "unranked" };
+type ScoreSubmissionOutcome =
+  | { result: VerifiedAttemptResult; status: "saved" }
+  | { status: "failed" };
 
 type PendingVerifiedCompletion = {
   attempt: VerifiedAttempt;
@@ -369,17 +367,11 @@ export default function Home() {
   const gameStartPreviewIntervalRef = useRef<number | null>(null);
   const activeVerifiedAttemptRef = useRef<VerifiedAttempt | null>(null);
   const verifiedSwapsRef = useRef<VerifiedSwap[]>([]);
-  const verifiedCompletionRef = useRef<Promise<VerificationOutcome> | null>(null);
+  const verifiedCompletionRef = useRef<Promise<ScoreSubmissionOutcome> | null>(null);
   const pendingVerifiedCompletionRef = useRef<PendingVerifiedCompletion | null>(null);
-  const verificationOutcomeHandlerRef = useRef<
-    ((outcome: VerificationOutcome) => void) | null
-  >(null);
   const activeVerifiedGameSessionIdRef = useRef<number | null>(null);
   const activeVerifiedUserIdRef = useRef<string | null>(null);
   const verificationPendingGameSessionIdRef = useRef<number | null>(null);
-  const [verificationRetryStatus, setVerificationRetryStatus] = useState<
-    "hidden" | "ready" | "retrying"
-  >("hidden");
   const endlessRunIdRef = useRef<string | null>(null);
   const gameRequestIdRef = useRef(0);
   const gameSessionIdRef = useRef(0);
@@ -495,32 +487,28 @@ export default function Home() {
         if (sessionUserIdRef.current === pendingCompletion.userId) {
           notifyLeaderboardRefresh();
         }
-        return { result, status: "verified" } as const;
+        return { result, status: "saved" } as const;
       })
-      .catch((error: unknown) => {
-        if (!isRetryableVerifiedLeaderboardError(error)) {
-          if (pendingVerifiedCompletionRef.current === pendingCompletion) {
-            pendingVerifiedCompletionRef.current = null;
-          }
-          if (
-            pendingCompletion.attempt.puzzle.kind === "endless" &&
-            isVerifiedGameContextCurrent(
-              {
-                gameSessionId: pendingCompletion.gameSessionId,
-                userId: pendingCompletion.userId,
-              },
-              {
-                gameSessionId: gameSessionIdRef.current,
-                userId: sessionUserIdRef.current ?? "",
-              },
-            )
-          ) {
-            endlessRunIdRef.current = null;
-          }
-          return { status: "rejected" } as const;
+      .catch(() => {
+        if (pendingVerifiedCompletionRef.current === pendingCompletion) {
+          pendingVerifiedCompletionRef.current = null;
         }
-
-        return { status: "unavailable" } as const;
+        if (
+          pendingCompletion.attempt.puzzle.kind === "endless" &&
+          isVerifiedGameContextCurrent(
+            {
+              gameSessionId: pendingCompletion.gameSessionId,
+              userId: pendingCompletion.userId,
+            },
+            {
+              gameSessionId: gameSessionIdRef.current,
+              userId: sessionUserIdRef.current ?? "",
+            },
+          )
+        ) {
+          endlessRunIdRef.current = null;
+        }
+        return { status: "failed" } as const;
       });
 
     verifiedCompletionRef.current = completion;
@@ -550,42 +538,6 @@ export default function Home() {
 
     return submitVerifiedCompletion(pendingCompletion);
   }, [submitVerifiedCompletion]);
-
-  const retryPendingVerifiedCompletion = useCallback(() => {
-    const pendingCompletion = pendingVerifiedCompletionRef.current;
-    return pendingCompletion
-      ? submitVerifiedCompletion(pendingCompletion)
-      : null;
-  }, [submitVerifiedCompletion]);
-
-  const handleVerificationRetry = useCallback(() => {
-    const completion = retryPendingVerifiedCompletion();
-    if (!completion) {
-      setVerificationRetryStatus("hidden");
-      return;
-    }
-
-    setVerificationRetryStatus("retrying");
-    void completion.then((outcome) => {
-      verificationOutcomeHandlerRef.current?.(outcome);
-    });
-  }, [retryPendingVerifiedCompletion]);
-
-  const handleContinueUnranked = useCallback(() => {
-    const pendingCompletion = pendingVerifiedCompletionRef.current;
-    const handleOutcome = verificationOutcomeHandlerRef.current;
-    if (!pendingCompletion || !handleOutcome) {
-      setVerificationRetryStatus("hidden");
-      return;
-    }
-
-    if (pendingCompletion.attempt.puzzle.kind === "endless") {
-      endlessRunIdRef.current = null;
-    }
-    pendingVerifiedCompletionRef.current = null;
-    verifiedCompletionRef.current = null;
-    handleOutcome({ status: "unranked" });
-  }, []);
 
   const {
     clearDragSession,
@@ -713,9 +665,7 @@ export default function Home() {
     verifiedSwapsRef.current = [];
     verifiedCompletionRef.current = null;
     pendingVerifiedCompletionRef.current = null;
-    verificationOutcomeHandlerRef.current = null;
     verificationPendingGameSessionIdRef.current = null;
-    setVerificationRetryStatus("hidden");
 
     const authoritativeStartedAt = verifiedAttempt
       ? Date.parse(verifiedAttempt.startedAt)
@@ -950,44 +900,35 @@ export default function Home() {
     }
 
     const finalSolveTime = solveTime;
-    const setCompletionChromaResult = (outcome?: VerificationOutcome) => {
-      if (outcome?.status === "verified") {
-        setChromaResult(outcome.result.chroma);
-        window.dispatchEvent(
-          new CustomEvent(CHROMA_BALANCE_UPDATED_EVENT, {
-            detail: outcome.result.chroma.balance,
-          }),
-        );
-        return;
-      }
-
-      setChromaResult({
-        available: availableChromaReward,
-        status: sessionUserIdRef.current
-          ? "unverified"
-          : "sign-in-required",
-      });
+    const prepareCompletionChromaResult = () => {
+      setChromaResult(
+        sessionUserIdRef.current
+          ? {
+              available: availableChromaReward,
+              status: "earned",
+            }
+          : {
+              available: availableChromaReward,
+              status: "sign-in-required",
+            },
+      );
     };
 
-    const awardDailyClear = (outcome?: VerificationOutcome) => {
-      const verifiedResult = outcome?.status === "verified" ? outcome.result : null;
-      const awardedMoves = verifiedResult?.moves ?? moves;
-      const awardedSolveTime = verifiedResult?.solveTime ?? finalSolveTime;
-
-      setCompletionChromaResult(outcome);
+    const awardDailyClear = () => {
+      prepareCompletionChromaResult();
       setDailyRecord((currentRecord) => {
         const isSameDay = currentRecord?.dateKey === dailyDateKey;
         return {
           bestSolveTime:
             isSameDay && currentRecord.bestSolveTime !== undefined
-              ? Math.min(currentRecord.bestSolveTime, awardedSolveTime)
-              : awardedSolveTime,
+              ? Math.min(currentRecord.bestSolveTime, finalSolveTime)
+              : finalSolveTime,
           completed: true,
           dateKey: dailyDateKey,
           fewestMoves:
             isSameDay && currentRecord.fewestMoves !== undefined
-              ? Math.min(currentRecord.fewestMoves, awardedMoves)
-              : awardedMoves,
+              ? Math.min(currentRecord.fewestMoves, moves)
+              : moves,
           style: dailyPuzzleStyle,
         };
       });
@@ -1001,17 +942,12 @@ export default function Home() {
       clearDragSession();
     };
 
-    const awardEndlessClear = (outcome?: VerificationOutcome) => {
+    const awardEndlessClear = () => {
       const completedSwapBudget = endlessUsesSwapLimit ? endlessSwapBudget : null;
-      const awardedMoves =
-        outcome?.status === "verified" ? outcome.result.moves : moves;
-      const isThreeStar = awardedMoves <= endlessThreeStarMoveLimit;
-      const verifiedStreak = outcome?.status === "verified"
-        ? outcome.result.streakCount
-        : undefined;
-      const nextStreak = verifiedStreak ?? endlessStreak + 1;
+      const isThreeStar = moves <= endlessThreeStarMoveLimit;
+      const nextStreak = endlessStreak + 1;
 
-      setCompletionChromaResult(outcome);
+      prepareCompletionChromaResult();
       setEndlessLastClear({
         challengeLabel: endlessPuzzle.challengeLabel,
         isThreeStar,
@@ -1038,22 +974,18 @@ export default function Home() {
       clearDragSession();
     };
 
-    const awardPresetClear = (outcome?: VerificationOutcome) => {
+    const awardPresetClear = () => {
       const presetDifficulty = difficulty as PresetModeKey;
-      const verifiedResult =
-        outcome?.status === "verified" ? outcome.result : null;
-      const awardedMoves = verifiedResult?.moves ?? moves;
-      const awardedSolveTime = verifiedResult?.solveTime ?? finalSolveTime;
       const currentBestWithSolveTime = {
         ...currentBest,
         bestSolveTime: getBestSolveTime(currentBest, reservedPresetTimeLimit),
       };
 
-      setCompletionChromaResult(outcome);
+      prepareCompletionChromaResult();
       setPersonalBestStatus(
         getPersonalBestStatus(currentBestWithSolveTime, {
-          moves: awardedMoves,
-          solveTime: awardedSolveTime,
+          moves,
+          solveTime: finalSolveTime,
         }),
       );
       setWinState(true);
@@ -1064,7 +996,7 @@ export default function Home() {
         kind: "preset",
         mode: presetDifficulty,
         playedDate: getDailyPuzzleDateKey(),
-        solveTime: awardedSolveTime,
+        solveTime: finalSolveTime,
       });
 
       setBestStats((current) => {
@@ -1077,12 +1009,12 @@ export default function Home() {
           bestCompletion: Math.max(currentRecord.bestCompletion ?? 0, 100),
           bestSolveTime:
             currentBestSolveTime === undefined
-              ? awardedSolveTime
-              : Math.min(currentBestSolveTime, awardedSolveTime),
+              ? finalSolveTime
+              : Math.min(currentBestSolveTime, finalSolveTime),
           fewestMoves:
             currentRecord.fewestMoves === undefined
-              ? awardedMoves
-              : Math.min(currentRecord.fewestMoves, awardedMoves),
+              ? moves
+              : Math.min(currentRecord.fewestMoves, moves),
         };
 
         return {
@@ -1094,22 +1026,23 @@ export default function Home() {
 
     const verificationUserId = activeVerifiedUserIdRef.current;
     const verifiedCompletion = completeCurrentVerifiedAttempt();
+    setTimerStarted(false);
+
+    if (isDailyMode) {
+      awardDailyClear();
+    } else if (isEndlessMode) {
+      awardEndlessClear();
+    } else {
+      awardPresetClear();
+    }
+
     if (!verifiedCompletion) {
-      if (isDailyMode) {
-        awardDailyClear();
-      } else if (isEndlessMode) {
-        awardEndlessClear();
-      } else {
-        awardPresetClear();
-      }
       return;
     }
 
     verificationPendingGameSessionIdRef.current = currentGameSessionId;
-    setTimerStarted(false);
-    clearDragSession();
 
-    const handleVerificationOutcome = (outcome: VerificationOutcome) => {
+    void verifiedCompletion.then((outcome) => {
       if (
         !verificationUserId ||
         !isVerifiedGameContextCurrent(
@@ -1126,45 +1059,19 @@ export default function Home() {
         return;
       }
 
-      if (outcome.status === "unavailable") {
-        verificationOutcomeHandlerRef.current = handleVerificationOutcome;
-        setVerificationRetryStatus("ready");
-        return;
-      }
-
-      verificationOutcomeHandlerRef.current = null;
-      setVerificationRetryStatus("hidden");
       verificationPendingGameSessionIdRef.current = null;
 
-      if (outcome.status === "rejected") {
-        if (isDailyMode) {
-          resetWinSequenceRef.current();
-          setDailyModalOpen(true);
-          setDailyFailureReason(
-            dailyUsesCountdown ? "time-limit" : "swap-limit",
-          );
-          timeUpSound.play();
-        } else if (isEndlessMode) {
-          setEndlessStreak(0);
-          resetWinSequenceRef.current();
-          timeUpSound.play();
-          void startEndlessPuzzle(1, true);
-        } else {
-          awardPresetClear({ status: "unranked" });
-        }
+      if (outcome.status !== "saved") {
         return;
       }
 
-      if (isDailyMode) {
-        awardDailyClear(outcome);
-      } else if (isEndlessMode) {
-        awardEndlessClear(outcome);
-      } else {
-        awardPresetClear(outcome);
-      }
-    };
-
-    void verifiedCompletion.then(handleVerificationOutcome);
+      setChromaResult(outcome.result.chroma);
+      window.dispatchEvent(
+        new CustomEvent(CHROMA_BALANCE_UPDATED_EVENT, {
+          detail: outcome.result.chroma.balance,
+        }),
+      );
+    });
   }, [activeUsesCountdown, availableChromaReward, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, recordAchievementEvent, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
 
   useEffect(() => {
@@ -1413,9 +1320,7 @@ export default function Home() {
     verifiedSwapsRef.current = [];
     verifiedCompletionRef.current = null;
     pendingVerifiedCompletionRef.current = null;
-    verificationOutcomeHandlerRef.current = null;
     verificationPendingGameSessionIdRef.current = null;
-    setVerificationRetryStatus("hidden");
     endlessRunIdRef.current = null;
 
     if (
@@ -1868,10 +1773,13 @@ export default function Home() {
             activeConfig={activeConfig}
             accuracy={accuracy}
             chromaResult={
-              chromaResult ?? {
-                available: availableChromaReward,
-                status: session ? "unverified" : "sign-in-required",
-              }
+              chromaResult ??
+              (session
+                ? null
+                : {
+                    available: availableChromaReward,
+                    status: "sign-in-required",
+                  })
             }
             completion={completion}
             dailyResult={
@@ -1898,12 +1806,6 @@ export default function Home() {
             personalBestStatus={personalBestStatus}
             timeDisplay={formatTime(solveTime)}
             winState={winModalVisible}
-          />
-          <VerificationRetryModal
-            isOpen={verificationRetryStatus !== "hidden"}
-            isRetrying={verificationRetryStatus === "retrying"}
-            onContinueUnranked={handleContinueUnranked}
-            onRetry={handleVerificationRetry}
           />
           <WinConfetti active={confettiActive} />
           <GameModeModal

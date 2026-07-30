@@ -75,8 +75,43 @@ test("attempt completion is rate limited before replay validation", async () => 
   );
 
   assert.notEqual(rateLimitIndex, -1);
-  assert.ok(activeAttemptIndex > rateLimitIndex);
-  assert.ok(replayValidationIndex > activeAttemptIndex);
+  assert.ok(replayValidationIndex > rateLimitIndex);
+  assert.ok(activeAttemptIndex > replayValidationIndex);
+});
+
+test("completed score submissions return their stored result", async () => {
+  const route = await readSource(
+    "app/api/leaderboard/attempts/[id]/complete/route.ts",
+  );
+  const completedResultIndex = route.indexOf(
+    "readCompletedAttemptResult",
+    route.indexOf("async function completeAttempt"),
+  );
+  const activeAttemptIndex = route.indexOf("attempt.is_active !== true");
+
+  assert.match(route, /attempt\.status === "completed"/);
+  assert.ok(completedResultIndex > 0);
+  assert.ok(completedResultIndex < activeAttemptIndex);
+  assert.match(route, /score\.attempt_id = \$\{attemptId\}/);
+});
+
+test("local completion starts before the background score response", async () => {
+  const page = await readSource("app/page.tsx");
+  const completionFlow = page.slice(
+    page.indexOf("const verificationUserId"),
+    page.indexOf("void verifiedCompletion.then") + 100,
+  );
+  const localAwardIndex = completionFlow.indexOf("awardDailyClear()");
+  const responseHandlerIndex = completionFlow.indexOf(
+    "void verifiedCompletion.then",
+  );
+
+  assert.ok(localAwardIndex >= 0);
+  assert.ok(responseHandlerIndex > localAwardIndex);
+  assert.doesNotMatch(
+    completionFlow,
+    /status: "(verified|unverified|unranked)"/,
+  );
 });
 
 test("verified daily and endless countdowns include the start preview allowance", async () => {

@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { FaGem, FaRegUser } from "react-icons/fa";
+import { FaRegUser } from "react-icons/fa";
 import { HiOutlineSpeakerWave, HiOutlineSpeakerXMark } from "react-icons/hi2";
 
 import { authClient } from "../../lib/auth-client";
@@ -18,6 +18,7 @@ import {
 } from "../../account/components/account-auth-modal";
 import type { AppView } from "../../views/app-view";
 import { GradientText } from "../../../components/ui/gradient-text";
+import { ChromaIcon } from "./chroma-icon";
 import { GameDrawer, ThemeToggle } from "./game-drawer";
 import {
   getCookie,
@@ -204,9 +205,9 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
             >
               <span
                 aria-hidden="true"
-                className="chroma-gem flex h-5 w-5 shrink-0 items-center justify-center rounded-lg text-[0.58rem] text-white max-[400px]:h-4 max-[400px]:w-4 sm:h-7 sm:w-7 sm:rounded-[0.65rem] sm:text-xs"
+                className="flex h-5 w-5 shrink-0 items-center justify-center max-[400px]:h-4 max-[400px]:w-4 sm:h-7 sm:w-7"
               >
-                <FaGem />
+                <ChromaIcon className="h-full w-full object-contain drop-shadow-[0_4px_6px_rgba(14,165,233,0.35)]" />
               </span>
               <span className="sm:hidden">
                 {chromaBalance === null

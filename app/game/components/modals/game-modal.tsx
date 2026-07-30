@@ -72,7 +72,7 @@ type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
   completion: number;
-  chromaResult: ChromaCompletionResult;
+  chromaResult: ChromaCompletionResult | null;
   dailyResult?: {
     onModes: () => void;
     onReplay: () => void;
@@ -141,7 +141,6 @@ export function GameModal({
                 <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.95rem] leading-6 sm:text-[1.05rem] sm:leading-7">
                   Today&apos;s puzzle cleared in {moves} swaps.
                 </p>
-                <ChromaRewardCard result={chromaResult} />
                 <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
                     <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
@@ -160,6 +159,7 @@ export function GameModal({
                     <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{completion}%</p>
                   </div>
                 </div>
+                {chromaResult && <ChromaRewardCard result={chromaResult} />}
                 <div className="mt-8 grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
@@ -191,7 +191,6 @@ export function GameModal({
                 <p className="theme-text-muted font-fredoka-regular mt-4 text-[0.95rem] leading-6 sm:text-[1.05rem] sm:leading-7">
                   Cleared in {moves} {endlessResult.usesSwapLimit ? "swaps" : "moves"}. Three-star clears need {endlessResult.threeStarMoveLimit} {endlessResult.usesSwapLimit ? "swaps" : "moves"} or fewer.
                 </p>
-                <ChromaRewardCard result={chromaResult} />
                 <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
                   <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
                     <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
@@ -208,6 +207,7 @@ export function GameModal({
                     <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{completion}%</p>
                   </div>
                 </div>
+                {chromaResult && <ChromaRewardCard result={chromaResult} />}
                 <div className="mt-8 grid gap-3 sm:grid-cols-3">
                   <button
                     type="button"
@@ -254,7 +254,6 @@ export function GameModal({
                   {personalBestLabel}
                 </p>
               )}
-              <ChromaRewardCard result={chromaResult} />
               <div className="mt-6 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-4">
                 <div className="theme-card rounded-[1rem] border px-2 py-3.5 sm:rounded-[1.4rem] sm:px-4 sm:py-5">
                   <p className="theme-text-muted font-fredoka-strong text-[0.72rem] uppercase tracking-[0.16em] sm:text-[0.78rem] sm:tracking-[0.22em]">Time</p>
@@ -269,6 +268,7 @@ export function GameModal({
                   <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{accuracy}%</p>
                 </div>
               </div>
+              {chromaResult && <ChromaRewardCard result={chromaResult} />}
             </>
             )}
 

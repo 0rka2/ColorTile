@@ -33,6 +33,91 @@ function readChromaReward(row: Record<string, unknown>) {
   };
 }
 
+async function readCompletedAttemptResult(
+  attempt: Record<string, unknown>,
+  moves: number,
+) {
+  const sql = getSql();
+  const attemptId = String(attempt.id);
+  const userId = String(attempt.user_id);
+  const kind = String(attempt.kind);
+
+  if (kind === "preset") {
+    const rows = readQueryRows(await sql`
+      select
+        score.moves,
+        score.solve_time,
+        coalesce(reward.amount, 0) as chroma_awarded,
+        coalesce(wallet.balance, 0) as chroma_balance
+      from leaderboard as score
+      left join chroma_reward_claim as reward
+        on reward.attempt_id = score.attempt_id
+      left join player_chroma_wallet as wallet
+        on wallet.user_id = score.user_id
+      where score.attempt_id = ${attemptId}
+        and score.user_id = ${userId}
+      limit 1
+    `);
+
+    return rows[0]
+      ? {
+          chroma: readChromaReward(rows[0]),
+          moves: Number(rows[0].moves),
+          solveTime: Number(rows[0].solve_time),
+        }
+      : null;
+  }
+
+  if (kind === "daily") {
+    const rows = readQueryRows(await sql`
+      select
+        score.moves,
+        score.solve_time,
+        coalesce(reward.amount, 0) as chroma_awarded,
+        coalesce(wallet.balance, 0) as chroma_balance
+      from daily_leaderboard as score
+      left join chroma_reward_claim as reward
+        on reward.attempt_id = score.attempt_id
+      left join player_chroma_wallet as wallet
+        on wallet.user_id = score.user_id
+      where score.attempt_id = ${attemptId}
+        and score.user_id = ${userId}
+      limit 1
+    `);
+
+    return rows[0]
+      ? {
+          chroma: readChromaReward(rows[0]),
+          moves: Number(rows[0].moves),
+          solveTime: Number(rows[0].solve_time),
+        }
+      : null;
+  }
+
+  const rows = readQueryRows(await sql`
+    select
+      score.streak_count,
+      coalesce(reward.amount, 0) as chroma_awarded,
+      coalesce(wallet.balance, 0) as chroma_balance
+    from endless_streak_leaderboard as score
+    left join chroma_reward_claim as reward
+      on reward.attempt_id = ${attemptId}
+    left join player_chroma_wallet as wallet
+      on wallet.user_id = score.user_id
+    where score.run_id = ${String(attempt.endless_run_id)}
+      and score.user_id = ${userId}
+    limit 1
+  `);
+
+  return rows[0]
+    ? {
+        chroma: readChromaReward(rows[0]),
+        moves,
+        streakCount: Number(rows[0].streak_count),
+      }
+    : null;
+}
+
 async function completeAttempt(request: Request, context: RouteContext) {
   const user = await getLeaderboardUser(request);
   if (!user) {
@@ -68,13 +153,6 @@ async function completeAttempt(request: Request, context: RouteContext) {
     return Response.json({ error: "Attempt not found." }, { status: 404 });
   }
 
-  if (attempt.is_active !== true) {
-    return Response.json(
-      { error: "This attempt is no longer active." },
-      { status: 409 },
-    );
-  }
-
   let body: { swaps?: unknown };
   try {
     body = (await request.json()) as { swaps?: unknown };
@@ -91,6 +169,23 @@ async function completeAttempt(request: Request, context: RouteContext) {
   const replay = validateVerifiedReplay(puzzle, swaps);
   if (!replay.valid) {
     return Response.json({ error: replay.error }, { status: 400 });
+  }
+
+  if (attempt.status === "completed") {
+    const completedResult = await readCompletedAttemptResult(
+      attempt,
+      replay.moves,
+    );
+    if (completedResult) {
+      return Response.json(completedResult);
+    }
+  }
+
+  if (attempt.is_active !== true) {
+    return Response.json(
+      { error: "This attempt is no longer active." },
+      { status: 409 },
+    );
   }
 
   if (puzzle.kind === "preset") {
@@ -161,6 +256,13 @@ async function completeAttempt(request: Request, context: RouteContext) {
     `);
 
     if (!rows[0]) {
+      const completedResult = await readCompletedAttemptResult(
+        attempt,
+        replay.moves,
+      );
+      if (completedResult) {
+        return Response.json(completedResult);
+      }
       return Response.json({ error: "This attempt is no longer active." }, { status: 409 });
     }
 
@@ -246,6 +348,13 @@ async function completeAttempt(request: Request, context: RouteContext) {
     `);
 
     if (!rows[0]) {
+      const completedResult = await readCompletedAttemptResult(
+        attempt,
+        replay.moves,
+      );
+      if (completedResult) {
+        return Response.json(completedResult);
+      }
       return Response.json({ error: "This attempt is no longer active." }, { status: 409 });
     }
 
@@ -344,6 +453,13 @@ async function completeAttempt(request: Request, context: RouteContext) {
   `);
 
   if (!rows[0]) {
+    const completedResult = await readCompletedAttemptResult(
+      attempt,
+      replay.moves,
+    );
+    if (completedResult) {
+      return Response.json(completedResult);
+    }
     return Response.json(
       { error: "This attempt is no longer active or exceeded its limit." },
       { status: 409 },

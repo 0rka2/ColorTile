@@ -20,19 +20,35 @@ test("verified completions award Chroma through idempotent server claims", async
   assert.match(route, /'preset:' \|\| id/);
   assert.match(route, /'daily:' \|\| date_key/);
   assert.match(route, /'endless:' \|\| puzzle_number/);
-  assert.equal(route.match(/chroma: readChromaReward\(rows\[0\]\)/g)?.length, 3);
+  assert.ok(
+    (route.match(/chroma: readChromaReward\(rows\[0\]\)/g)?.length ?? 0) >= 3,
+  );
 });
 
-test("Chroma completion effects respect reduced-motion preferences", async () => {
+test("Chroma completion effects always run independently of reduced motion", async () => {
   const card = await readSource(
     "app/game/components/chroma-reward-card.tsx",
   );
   const styles = await readSource("app/globals.css");
+  const sounds = await readSource("app/lib/sounds.ts");
 
-  assert.match(card, /useReducedMotion\(\)/);
-  assert.match(card, /wasAwarded &&\s+!reduceMotion/);
-  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(card, /useReducedMotion|reduceMotion/);
+  assert.match(card, /animate\(animatedAmount, earnedAmount/);
+  assert.match(card, /REWARD_COUNT_DURATION_SECONDS = 0\.7/);
+  assert.match(
+    card,
+    /REWARD_REVEAL_DELAY_SECONDS \* 1_000/,
+  );
+  assert.match(card, /chromaRewardSound\.play\(\)/);
+  assert.match(card, /chromaCountTickSound\.play\(\)/);
+  assert.match(sounds, /export const chromaRewardSound/);
+  assert.match(sounds, /export const chromaCountTickSound/);
   assert.match(styles, /\.chroma-reward-shimmer/);
+  assert.match(styles, /\.chroma-reward-card-earned/);
+  assert.doesNotMatch(
+    styles.match(/@media \(prefers-reduced-motion: reduce\)[\s\S]*$/)?.[0] ?? "",
+    /chroma-reward/,
+  );
 });
 
 test("the authenticated header loads and refreshes its Chroma counter", async () => {
