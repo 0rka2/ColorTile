@@ -26,6 +26,7 @@ import {
   getLeaderboardUser,
   leaderboardApiError,
   readQueryRows,
+  readVerifiedPuzzle,
 } from "@/app/lib/verified-leaderboard";
 
 type CreateAttemptBody = {
@@ -33,6 +34,7 @@ type CreateAttemptBody = {
   difficulty?: string;
   endlessRunId?: string;
   kind?: VerifiedAttemptKind;
+  start?: boolean;
 };
 
 function unauthorized() {
@@ -175,6 +177,47 @@ function attemptResponse(row: Record<string, unknown>) {
   );
 }
 
+async function startCreatedAttempt(
+  userId: string,
+  row: Record<string, unknown>,
+) {
+  const sql = getSql();
+  const attemptId = String(row.id);
+  const startedRows = readQueryRows(await sql`
+    update leaderboard_attempt
+    set status = 'started', started_at = now()
+    where id = ${attemptId}
+      and user_id = ${userId}
+      and status = 'prepared'
+      and expires_at > now()
+    returning *, started_at::text as authoritative_started_at, expires_at::text
+  `);
+
+  if (!startedRows[0]) {
+    return Response.json(
+      { error: "This attempt cannot be started." },
+      { status: 409 },
+    );
+  }
+
+  return Response.json({
+    attemptId,
+    expiresAt: String(startedRows[0].expires_at),
+    puzzle: readVerifiedPuzzle(startedRows[0]),
+    startedAt: String(startedRows[0].authoritative_started_at),
+  });
+}
+
+function respondToCreatedAttempt(
+  userId: string,
+  row: Record<string, unknown>,
+  startImmediately: boolean,
+) {
+  return startImmediately
+    ? startCreatedAttempt(userId, row)
+    : attemptResponse(row);
+}
+
 async function createAttempt(request: Request) {
   const user = await getLeaderboardUser(request);
   if (!user) {
@@ -190,6 +233,10 @@ async function createAttempt(request: Request) {
 
   if (body.kind !== "preset" && body.kind !== "daily" && body.kind !== "endless") {
     return Response.json({ error: "Invalid attempt kind." }, { status: 400 });
+  }
+
+  if (body.start !== undefined && typeof body.start !== "boolean") {
+    return Response.json({ error: "Invalid start option." }, { status: 400 });
   }
 
   const rateLimitResponse = await consumeAttemptRateLimit(request, user.id);
@@ -222,7 +269,7 @@ async function createAttempt(request: Request) {
       timeLimitSeconds: null,
     });
 
-    return attemptResponse(row);
+    return respondToCreatedAttempt(user.id, row, body.start === true);
   }
 
   if (body.kind === "daily") {
@@ -249,7 +296,7 @@ async function createAttempt(request: Request) {
       timeLimitSeconds: definition.timeLimitSeconds,
     });
 
-    return attemptResponse(row);
+    return respondToCreatedAttempt(user.id, row, body.start === true);
   }
 
   if (body.kind === "endless") {
@@ -279,7 +326,7 @@ async function createAttempt(request: Request) {
       timeLimitSeconds: definition.timeLimitSeconds,
     });
 
-    return attemptResponse(row);
+    return respondToCreatedAttempt(user.id, row, body.start === true);
   }
 
   return Response.json({ error: "Invalid attempt kind." }, { status: 400 });

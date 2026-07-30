@@ -39,17 +39,20 @@ test("completion reward copy covers every Chroma state", () => {
       status: "awarded",
     }),
     {
-      detail: "Balance: 120 Chroma",
+      detail: "",
       title: "+45 Chroma",
     },
   );
-  assert.equal(
+  assert.deepEqual(
     getChromaRewardCopy({
       awarded: 0,
       balance: 120,
       status: "already-claimed",
-    }).title,
-    "Reward already claimed",
+    }),
+    {
+      detail: "",
+      title: "Reward already claimed",
+    },
   );
   assert.equal(
     getChromaRewardCopy({

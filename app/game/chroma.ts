@@ -42,7 +42,7 @@ export function formatChromaBalance(balance: number, compact = false) {
 export function getChromaRewardCopy(result: ChromaCompletionResult) {
   if ("balance" in result) {
     return {
-      detail: `Balance: ${result.balance} Chroma`,
+      detail: "",
       title:
         result.status === "awarded"
           ? `+${result.awarded} Chroma`

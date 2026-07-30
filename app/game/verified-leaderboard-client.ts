@@ -2,12 +2,9 @@ import type { LeaderboardDifficulty } from "./leaderboard";
 import type { ChromaReward } from "./chroma";
 import type { VerifiedPuzzle, VerifiedSwap } from "./verified-attempt";
 
-export type PreparedVerifiedAttempt = {
+export type VerifiedAttempt = {
   attemptId: string;
   expiresAt: string;
-};
-
-export type VerifiedAttempt = PreparedVerifiedAttempt & {
   puzzle: VerifiedPuzzle;
   startedAt: string;
 };
@@ -84,21 +81,12 @@ async function readSuccessfulResponse<T>(response: Response) {
   return (await response.json()) as T;
 }
 
-export async function createVerifiedAttempt(input: CreateAttemptInput) {
+export async function createAndStartVerifiedAttempt(input: CreateAttemptInput) {
   const response = await fetch("/api/leaderboard/attempts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, start: true }),
   });
-
-  return readSuccessfulResponse<PreparedVerifiedAttempt>(response);
-}
-
-export async function startVerifiedAttempt(attemptId: string) {
-  const response = await fetch(
-    `/api/leaderboard/attempts/${encodeURIComponent(attemptId)}/start`,
-    { method: "POST" },
-  );
 
   return readSuccessfulResponse<VerifiedAttempt>(response);
 }

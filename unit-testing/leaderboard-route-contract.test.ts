@@ -16,7 +16,7 @@ test("attempt creation withholds puzzle data until the attempt starts", async ()
   );
   const creationResponse = createRoute.slice(
     createRoute.indexOf("function attemptResponse"),
-    createRoute.indexOf("async function createAttempt"),
+    createRoute.indexOf("async function startCreatedAttempt"),
   );
 
   assert.match(
@@ -26,6 +26,18 @@ test("attempt creation withholds puzzle data until the attempt starts", async ()
   assert.doesNotMatch(creationResponse, /\b(seed|puzzle)\b/);
   assert.match(startRoute, /puzzle: readVerifiedPuzzle\(rows\[0\]\)/);
   assert.match(startRoute, /startedAt: String\(rows\[0\]\.authoritative_started_at\)/);
+});
+
+test("the game creates and starts verified attempts in one request", async () => {
+  const page = await readSource("app/page.tsx");
+  const client = await readSource("app/game/verified-leaderboard-client.ts");
+  const createRoute = await readSource("app/api/leaderboard/attempts/route.ts");
+
+  assert.match(page, /createAndStartVerifiedAttempt/);
+  assert.doesNotMatch(page, /\bstartVerifiedAttempt\b/);
+  assert.match(client, /JSON\.stringify\(\{ \.\.\.input, start: true \}\)/);
+  assert.match(createRoute, /body\.start === true/);
+  assert.match(createRoute, /set status = 'started', started_at = now\(\)/);
 });
 
 test("attempt routes enforce ownership and one-time state transitions", async () => {

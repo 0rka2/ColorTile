@@ -49,7 +49,7 @@ npm run db:cleanup
 
 Run that command from deployment scheduling appropriate for the hosting environment.
 
-Leaderboard puzzles are returned by the `/start` request, not when an attempt is prepared. The server timer starts with that response; network delay and the black-and-white preview therefore count toward the authoritative solve time.
+Leaderboard puzzles are only returned when an attempt starts, never while it is merely prepared. The server timer starts with that response; network delay and the black-and-white preview therefore count toward the authoritative solve time.
 
 ## Checks
 

@@ -65,8 +65,7 @@ import {
 import type { BestStats, DailyFailureReason, DifficultyConfig, DifficultyKey, EndlessPuzzleDefinition, PresetModeKey, Tile } from "./game/game-types";
 import {
   completeVerifiedAttempt,
-  createVerifiedAttempt,
-  startVerifiedAttempt,
+  createAndStartVerifiedAttempt,
   type VerifiedAttempt,
   type VerifiedAttemptResult,
 } from "./game/verified-leaderboard-client";
@@ -736,19 +735,10 @@ export default function Home() {
 
     if (requestUserId) {
       try {
-        const preparedAttempt = await createVerifiedAttempt({
+        verifiedAttempt = await createAndStartVerifiedAttempt({
           difficulty: nextDifficulty,
           kind: "preset",
         });
-
-        if (
-          gameRequestIdRef.current !== requestId ||
-          sessionUserIdRef.current !== requestUserId
-        ) {
-          return;
-        }
-
-        verifiedAttempt = await startVerifiedAttempt(preparedAttempt.attemptId);
       } catch {
         verifiedAttempt = null;
       }
@@ -799,19 +789,10 @@ export default function Home() {
       (startNewVerifiedRun || endlessRunIdRef.current)
     ) {
       try {
-        const preparedAttempt = await createVerifiedAttempt({
+        verifiedAttempt = await createAndStartVerifiedAttempt({
           endlessRunId: startNewVerifiedRun ? null : endlessRunIdRef.current,
           kind: "endless",
         });
-
-        if (
-          gameRequestIdRef.current !== requestId ||
-          sessionUserIdRef.current !== requestUserId
-        ) {
-          return;
-        }
-
-        verifiedAttempt = await startVerifiedAttempt(preparedAttempt.attemptId);
       } catch {
         verifiedAttempt = null;
         if (gameRequestIdRef.current === requestId) {
@@ -1250,16 +1231,10 @@ export default function Home() {
 
     if (requestUserId) {
       try {
-        const preparedAttempt = await createVerifiedAttempt({ dateKey, kind: "daily" });
-
-        if (
-          gameRequestIdRef.current !== requestId ||
-          sessionUserIdRef.current !== requestUserId
-        ) {
-          return;
-        }
-
-        verifiedAttempt = await startVerifiedAttempt(preparedAttempt.attemptId);
+        verifiedAttempt = await createAndStartVerifiedAttempt({
+          dateKey,
+          kind: "daily",
+        });
       } catch {
         verifiedAttempt = null;
       }
