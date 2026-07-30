@@ -479,6 +479,11 @@ html[data-theme="dark"] .restart-button:hover {
   border-color: var(--tile-edge);
 }
 
+html[data-theme="dark"] .tile-surface,
+html[data-theme="dark"] .tile-drag-overlay {
+  box-shadow: none !important;
+}
+
 .board-grid {
   --tile-gap: 1.25%;
   --board-padding: clamp(0.2rem, 0.5vw, 0.42rem);
