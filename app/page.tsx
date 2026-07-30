@@ -23,7 +23,7 @@ import { DailyPuzzleModal } from "./game/components/modals/daily-puzzle-modal";
 import { GameModal } from "./game/components/modals/game-modal";
 import { GameModeModal } from "./game/components/modals/game-mode-modal";
 import { LeaderboardModal } from "./game/components/modals/leaderboard-modal";
-import { ShopComingSoonModal } from "./game/components/modals/shop-coming-soon-modal";
+import { ShopModal } from "./game/components/modals/shop-modal";
 import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
@@ -33,6 +33,7 @@ import { useAccountProgressSync } from "./game/hooks/use-account-progress-sync";
 import { usePersistentDailyPuzzle } from "./game/hooks/use-persistent-daily-puzzle";
 import { usePersistentEndlessStats } from "./game/hooks/use-persistent-endless-stats";
 import { usePersistentBestStats } from "./game/hooks/use-persistent-best-stats";
+import { useShopCosmetics } from "./game/hooks/use-shop-cosmetics";
 import { useWinSequence } from "./game/hooks/use-win-sequence";
 import { LEADERBOARD_REFRESH_EVENT } from "./game/leaderboard";
 import {
@@ -352,6 +353,15 @@ export default function Home() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AccountAuthMode>("sign-in");
   const { data: session, isPending: sessionIsPending } = authClient.useSession();
+  const {
+    busyItemId: shopBusyItemId,
+    equip: equipCosmetic,
+    error: shopError,
+    isLoading: shopIsLoading,
+    purchase: purchaseCosmetic,
+    retry: retryShop,
+    shopState,
+  } = useShopCosmetics(session?.user.id ?? null);
   const accountPlayerName = sanitizePlayerName(session?.user.name ?? "");
   const {
     currentAnnouncement,
@@ -1557,6 +1567,7 @@ export default function Home() {
               allowHoverWhenLocked={allowHoverWhenLocked}
               board={board}
               boardDensityClass={boardDensityClass}
+              boardTheme={shopState.equipped["board-theme"]}
               dragSession={dragSession}
               draggedIndex={draggedIndex}
               dropTargetRect={dropTargetRect}
@@ -1565,6 +1576,7 @@ export default function Home() {
               previewCountdown={previewActive ? previewCountdown : null}
               setDragOverlayRef={setDragOverlayRef}
               tileRadiusClass={tileRadiusClass}
+              tileStyle={shopState.equipped["tile-style"]}
               visualMode={isBlackAndWhiteRun && !previewActive ? "grayscale" : boardVisualMode}
               confettiActive={confettiActive}
               winWaveActive={winWaveActive}
@@ -1782,7 +1794,10 @@ export default function Home() {
             timeDisplay={formatTime(solveTime)}
             winState={winModalVisible}
           />
-          <WinConfetti active={confettiActive} />
+          <WinConfetti
+            active={confettiActive}
+            confettiStyle={shopState.equipped["confetti-style"]}
+          />
           <GameModeModal
             currentStreak={endlessStreak}
             difficulty={difficulty}
@@ -1792,9 +1807,20 @@ export default function Home() {
             onDifficultyChange={handleDifficultyChange}
             onEndlessStart={handleEndlessStart}
           />
-          <ShopComingSoonModal
+          <ShopModal
+            busyItemId={shopBusyItemId}
+            error={shopError}
+            isLoading={shopIsLoading}
             isOpen={shopModalOpen}
+            isSignedIn={Boolean(session)}
             onClose={() => setShopModalOpen(false)}
+            onEquip={equipCosmetic}
+            onPurchase={purchaseCosmetic}
+            onRetry={() => {
+              void retryShop();
+            }}
+            onSignIn={() => handleIntroAccountAction("sign-in")}
+            shopState={shopState}
           />
           <DailyPuzzleModal
             dateKey={dailyDateKey}

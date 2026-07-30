@@ -9,6 +9,7 @@ import {
 } from "../game-logic";
 import type { DropTargetRect } from "../drop-target";
 import type { Tile } from "../game-types";
+import type { CosmeticId } from "../shop-catalog";
 
 const TILE_REST_SHADOW = "0 10px 24px rgba(148, 163, 184, 0.12)";
 const TILE_HOVER_SHADOW = "0 20px 38px rgba(148, 163, 184, 0.24)";
@@ -79,6 +80,7 @@ type BoardProps = {
   allowHoverWhenLocked: boolean;
   board: Tile[];
   boardDensityClass: string;
+  boardTheme: CosmeticId;
   dragSession: {
     color: string;
     grabX: number;
@@ -101,6 +103,7 @@ type BoardProps = {
   previewCountdown?: number | null;
   setDragOverlayRef: (element: HTMLDivElement | null) => void;
   tileRadiusClass: string;
+  tileStyle: CosmeticId;
   visualMode: "color" | "grayscale";
   winWaveActive: boolean;
   winState: boolean;
@@ -120,6 +123,7 @@ type TileButtonProps = {
   isPressed: boolean;
   tile: Tile;
   tileRadiusClass: string;
+  tileStyle: CosmeticId;
   visualMode: BoardProps["visualMode"];
   winWaveActive: boolean;
   winWaveDelay: number;
@@ -138,6 +142,7 @@ const TileButton = memo(function TileButton({
   isPressed,
   tile,
   tileRadiusClass,
+  tileStyle,
   visualMode,
   winWaveActive,
   winWaveDelay,
@@ -169,6 +174,8 @@ const TileButton = memo(function TileButton({
   };
 
   const showColorFamilyHint = visualMode === "grayscale" && !isCorrect;
+
+  const tileStyleClass = tileStyle === "gem-tiles" ? "tile-style-gem" : "";
 
   return (
     <motion.button
@@ -235,13 +242,17 @@ const TileButton = memo(function TileButton({
             }
       }
       transformTemplate={TILE_TRANSFORM_TEMPLATE}
-      className={`tile-surface relative aspect-square border border-white/75 ${tileRadiusClass} ${
+      className={`tile-surface relative aspect-square border border-white/75 ${tileRadiusClass} ${tileStyleClass} ${
         isDragging ? "pointer-events-none" : ""
       } ${canDrag && !interactionDisabled ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
       style={{
-        backgroundColor: getVisualModeBackgroundColor(tile.color, visualMode),
+        backgroundColor:
+          tileStyle === "gem-tiles"
+            ? undefined
+            : getVisualModeBackgroundColor(tile.color, visualMode),
+        "--tile-color": getVisualModeBackgroundColor(tile.color, visualMode),
         touchAction: "none",
-      }}
+      } as React.CSSProperties}
       aria-label={`Tile ${index + 1}${tile.isCorner ? ", fixed corner tile" : ""}${isCorrect ? ", correct position" : ""}${!canDrag && !tile.isCorner ? ", locked" : ""}`}
     >
       {showColorFamilyHint && (
@@ -250,6 +261,10 @@ const TileButton = memo(function TileButton({
           className={`pointer-events-none absolute inset-0 ${tileRadiusClass}`}
           style={{
             boxShadow: `inset 0 0 0 3px ${getColorFamilyHintColor(tile.color)}`,
+            clipPath:
+              tileStyle === "gem-tiles"
+                ? "polygon(50% 0%, 88% 13%, 100% 48%, 76% 100%, 24% 100%, 0% 48%, 12% 13%)"
+                : undefined,
           }}
         />
       )}
@@ -273,6 +288,7 @@ const TileButton = memo(function TileButton({
     previousProps.isPressed === nextProps.isPressed &&
     previousProps.tile === nextProps.tile &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
+    previousProps.tileStyle === nextProps.tileStyle &&
     previousProps.visualMode === nextProps.visualMode &&
     previousProps.winWaveActive === nextProps.winWaveActive &&
     previousProps.winWaveDelay === nextProps.winWaveDelay &&
@@ -284,6 +300,7 @@ export const GameBoard = memo(function GameBoard({
   allowHoverWhenLocked,
   board,
   boardDensityClass,
+  boardTheme,
   dragSession,
   draggedIndex,
   dropTargetRect,
@@ -293,6 +310,7 @@ export const GameBoard = memo(function GameBoard({
   previewCountdown,
   setDragOverlayRef,
   tileRadiusClass,
+  tileStyle,
   visualMode,
   winWaveActive,
   winState,
@@ -318,9 +336,12 @@ export const GameBoard = memo(function GameBoard({
           <div
             aria-hidden="true"
             ref={setDragOverlayRef}
-            className={`tile-drag-overlay pointer-events-none fixed flex items-center justify-center border border-white/75 ${tileRadiusClass}`}
+            className={`tile-drag-overlay pointer-events-none fixed flex items-center justify-center border border-white/75 ${tileRadiusClass} ${
+              tileStyle === "gem-tiles" ? "tile-style-gem" : ""
+            }`}
             style={{
-              backgroundColor: dragSession.color,
+              backgroundColor: tileStyle === "gem-tiles" ? undefined : dragSession.color,
+              "--tile-color": dragSession.color,
               boxShadow: TILE_DRAG_SHADOW,
               height: `${dragSession.height}px`,
               left: 0,
@@ -331,7 +352,7 @@ export const GameBoard = memo(function GameBoard({
               filter: dragOverlayVisualMode === "grayscale" ? "grayscale(1)" : "none",
               width: `${dragSession.width}px`,
               zIndex: 50,
-            }}
+            } as React.CSSProperties}
           >
             <span aria-hidden="true" className="tile-glass-sheen" />
             {dragSession.isCorrect && <CheckMark />}
@@ -360,6 +381,7 @@ export const GameBoard = memo(function GameBoard({
   return (
     <>
       <motion.div
+        data-board-theme={boardTheme}
         className="theme-board-frame relative mx-auto aspect-square w-full rounded-[clamp(0.9rem,1.8vw,1.2rem)] p-px"
         initial={false}
         animate={
@@ -426,6 +448,7 @@ export const GameBoard = memo(function GameBoard({
                   isPressed={pressedTileIndex === index}
                   tile={tile}
                   tileRadiusClass={tileRadiusClass}
+                  tileStyle={tileStyle}
                   visualMode={tileVisualMode}
                   winWaveActive={winWaveActive}
                   winWaveDelay={columnIndex * 0.045}

@@ -838,6 +838,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           allowHoverWhenLocked={false}
           board={board}
           boardDensityClass={boardDensityClass}
+          boardTheme="classic-board"
           confettiActive={false}
           dragSession={dragSession}
           draggedIndex={draggedIndex}
@@ -850,6 +851,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           pressedTileIndex={pressedTileIndex}
           setDragOverlayRef={setDragOverlayRef}
           tileRadiusClass={tileRadiusClass}
+          tileStyle="classic-tiles"
           visualMode="color"
           winState={!canInteractWithBoard}
           winWaveActive={stepCompletionPending}

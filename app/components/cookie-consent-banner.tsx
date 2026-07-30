@@ -44,7 +44,9 @@ export function CookieConsentBanner() {
         Cookie preferences
       </p>
       <p className="theme-text-secondary mt-2 font-fredoka-regular text-sm leading-5">
-        ColorTile uses a necessary cookie to remember this choice and optional cookies for small preferences like theme.
+        ColorTile uses necessary cookies to remember this choice and keep signed-in
+        players authenticated. If you accept, an optional cookie remembers your
+        selected theme.
       </p>
       <div className="mt-4 flex gap-2">
         <button

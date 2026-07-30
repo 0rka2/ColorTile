@@ -17,7 +17,7 @@ const privacyItems = [
   {
     title: "Retention and Deletion",
     copy:
-      "Score attempts expire after 24 hours and are removed by maintenance without deleting completed scores. Daily rankings keep the current day, and other rankings reset annually. Deleting your account also deletes its synchronized progress, attempts, runs, and leaderboard entries.",
+      "Score attempts expire after 24 hours and are removed by maintenance without deleting completed scores. Daily rankings keep the current day, and other rankings reset annually. Deleting your account also deletes its synchronized progress, attempts, runs, leaderboard entries, Chroma data, and cosmetic data.",
   },
   {
     title: "Account Email",
@@ -27,7 +27,12 @@ const privacyItems = [
   {
     title: "Cookies and Preferences",
     copy:
-      "A necessary cookie remembers your cookie choice. If you accept optional preferences, a cookie also remembers your selected theme; otherwise theme changes last only for the current page session.",
+      "Necessary cookies remember your cookie choice and keep you signed in when you use an account. If you accept optional preferences, a cookie also remembers your selected theme; otherwise theme changes last only for the current page session.",
+  },
+  {
+    title: "Chroma and Cosmetics",
+    copy:
+      "For signed-in accounts, ColorTile stores Chroma balances and reward claims, purchased cosmetics, and equipped cosmetics so your wallet and appearance remain available when you return.",
   },
   {
     title: "External Links",

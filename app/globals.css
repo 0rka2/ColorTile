@@ -320,6 +320,30 @@ select {
   background: var(--board-shine-gradient);
 }
 
+.theme-board-frame[data-board-theme="ocean-board"] {
+  --board-shell-bg: rgba(224, 251, 255, 0.9);
+  --board-frame-bg:
+    linear-gradient(145deg, #67e8f9 0%, #38bdf8 38%, #2563eb 70%, #2dd4bf 100%);
+  --board-frame-shadow:
+    0 30px 80px rgba(14, 116, 144, 0.22),
+    0 14px 32px rgba(37, 99, 235, 0.16);
+  --board-glow-gradient:
+    radial-gradient(circle at 20% 28%, rgba(34, 211, 238, 0.42), transparent 36%),
+    radial-gradient(circle at 78% 34%, rgba(59, 130, 246, 0.38), transparent 38%),
+    radial-gradient(circle at 54% 82%, rgba(45, 212, 191, 0.34), transparent 40%);
+  --board-shine-gradient:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+}
+
+html[data-theme="dark"] .theme-board-frame[data-board-theme="ocean-board"] {
+  --board-shell-bg: rgba(8, 47, 73, 0.88);
+  --board-frame-bg:
+    linear-gradient(145deg, #164e63 0%, #075985 38%, #1e3a8a 72%, #115e59 100%);
+  --board-frame-shadow:
+    0 34px 88px rgba(2, 132, 199, 0.24),
+    0 16px 36px rgba(13, 148, 136, 0.18);
+}
+
 .theme-chip {
   background-color: var(--surface-muted);
 }
@@ -479,9 +503,143 @@ html[data-theme="dark"] .restart-button:hover {
   border-color: var(--tile-edge);
 }
 
+.tile-style-gem {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.tile-style-gem::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: var(--tile-color);
+  clip-path: polygon(
+    50% 0%,
+    88% 13%,
+    100% 48%,
+    76% 100%,
+    24% 100%,
+    0% 48%,
+    12% 13%
+  );
+}
+
+.tile-style-gem > * {
+  z-index: 1;
+}
+
 html[data-theme="dark"] .tile-surface,
 html[data-theme="dark"] .tile-drag-overlay {
   box-shadow: none !important;
+}
+
+.shop-item-equipped {
+  border-color: color-mix(in srgb, #38bdf8 68%, var(--border-soft));
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 2px rgba(56, 189, 248, 0.16);
+}
+
+.shop-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 3.2rem);
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 9rem;
+  padding: 1.1rem;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(255, 255, 255, 0.68), transparent 48%),
+    var(--surface-muted);
+}
+
+.shop-preview-grid span {
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.shop-preview-grid .shop-preview-gem {
+  border-radius: 0;
+  clip-path: polygon(
+    50% 0%,
+    88% 13%,
+    100% 48%,
+    76% 100%,
+    24% 100%,
+    0% 48%,
+    12% 13%
+  );
+}
+
+.shop-preview-board {
+  min-height: 9rem;
+  padding: 1.25rem;
+  background: var(--surface-muted);
+}
+
+.shop-preview-board > div {
+  display: grid;
+  grid-template-columns: repeat(2, 2.5rem);
+  justify-content: center;
+  gap: 0.3rem;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 0.55rem;
+  border: 0.35rem solid rgba(148, 163, 184, 0.35);
+  border-radius: 1rem;
+  background: var(--surface-solid);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+}
+
+.shop-preview-board > div span {
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+}
+
+.shop-preview-board-ocean {
+  background: linear-gradient(145deg, rgba(103, 232, 249, 0.22), rgba(37, 99, 235, 0.2));
+}
+
+.shop-preview-board-ocean > div {
+  border-color: #38bdf8;
+  background: rgba(224, 251, 255, 0.88);
+  box-shadow: 0 12px 28px rgba(14, 116, 144, 0.24);
+}
+
+.shop-preview-confetti {
+  position: relative;
+  min-height: 9rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 100%, rgba(250, 204, 21, 0.2), transparent 55%),
+    var(--surface-muted);
+}
+
+.shop-preview-confetti span {
+  position: absolute;
+  width: 0.8rem;
+  height: 1.6rem;
+  border-radius: 0.2rem;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+}
+
+.shop-preview-confetti .shop-preview-star {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 0;
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 94%,
+    50% 72%,
+    21% 94%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
 }
 
 .board-grid {

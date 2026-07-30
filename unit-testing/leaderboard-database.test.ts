@@ -79,6 +79,62 @@ async function claimChromaReward(
   );
 }
 
+async function purchaseCosmetic(
+  client: Client,
+  schema: string,
+  {
+    itemId,
+    price,
+    slot,
+  }: {
+    itemId: string;
+    price: number;
+    slot: string;
+  },
+) {
+  return queryInSchema<{ balance: number; purchased: boolean }>(
+    client,
+    schema,
+    `
+      with purchase as (
+        insert into player_cosmetic_ownership (
+          user_id, item_id, purchase_price
+        )
+        select 'user-1', $1, $2
+        where exists (
+          select 1
+          from player_chroma_wallet
+          where user_id = 'user-1' and balance >= $2
+        )
+        on conflict (user_id, item_id) do nothing
+        returning item_id
+      ),
+      debit as (
+        update player_chroma_wallet
+        set balance = player_chroma_wallet.balance - $2
+        where user_id = 'user-1'
+          and exists (select 1 from purchase)
+        returning balance
+      ),
+      equip as (
+        insert into player_cosmetic_loadout (user_id, slot, item_id)
+        select 'user-1', $3, $1
+        from debit
+        on conflict (user_id, slot) do update
+        set item_id = excluded.item_id, updated_at = now()
+      )
+      select
+        exists (select 1 from purchase) as purchased,
+        coalesce(
+          (select balance from debit),
+          (select balance from player_chroma_wallet where user_id = 'user-1'),
+          0
+        )::integer as balance
+    `,
+    [itemId, price, slot],
+  );
+}
+
 test(
   "verified leaderboard database lifecycle and ranking contracts",
   { skip: databaseUrl ? false : "Set TEST_DATABASE_URL to run database tests." },
@@ -110,6 +166,11 @@ test(
         "utf8",
       );
       await queryInSchema(clients[0], schema, chromaMigration);
+      const cosmeticShopMigration = await readFile(
+        resolve(repositoryRoot, "migrations/006-cosmetic-shop.sql"),
+        "utf8",
+      );
+      await queryInSchema(clients[0], schema, cosmeticShopMigration);
       await queryInSchema(clients[0], schema, `
         insert into "user" (id, name)
         values ('user-1', 'One'), ('user-2', 'Two')
@@ -188,6 +249,61 @@ test(
       assert.equal(repeatedEndlessReward.rows[0].awarded, 0);
       assert.equal(nextEndlessReward.rows[0].awarded, 30);
       assert.equal(nextEndlessReward.rows[0].balance, 190);
+
+      await queryInSchema(clients[0], schema, `
+        update player_chroma_wallet
+        set balance = 1000
+        where user_id = 'user-1'
+      `);
+      const duplicatePurchases = await Promise.all([
+        purchaseCosmetic(clients[0], schema, {
+          itemId: "gem-tiles",
+          price: 300,
+          slot: "tile-style",
+        }),
+        purchaseCosmetic(clients[1], schema, {
+          itemId: "gem-tiles",
+          price: 300,
+          slot: "tile-style",
+        }),
+      ]);
+      assert.equal(
+        duplicatePurchases.filter((result) => result.rows[0].purchased).length,
+        1,
+      );
+
+      const cosmeticState = await queryInSchema<{
+        balance: number;
+        equipped_item: string;
+        owned_count: number;
+      }>(clients[0], schema, `
+        select
+          (select balance from player_chroma_wallet where user_id = 'user-1')::integer
+            as balance,
+          (
+            select item_id
+            from player_cosmetic_loadout
+            where user_id = 'user-1' and slot = 'tile-style'
+          ) as equipped_item,
+          (
+            select count(*)::integer
+            from player_cosmetic_ownership
+            where user_id = 'user-1' and item_id = 'gem-tiles'
+          ) as owned_count
+      `);
+      assert.deepEqual(cosmeticState.rows[0], {
+        balance: 700,
+        equipped_item: "gem-tiles",
+        owned_count: 1,
+      });
+
+      const insufficientPurchase = await purchaseCosmetic(clients[0], schema, {
+        itemId: "ocean-board",
+        price: 800,
+        slot: "board-theme",
+      });
+      assert.equal(insufficientPurchase.rows[0].purchased, false);
+      assert.equal(insufficientPurchase.rows[0].balance, 700);
 
       const concurrentRuns = await Promise.allSettled([
         queryInSchema(clients[0], schema, `
@@ -324,6 +440,8 @@ test(
       for (const table of [
         "chroma_reward_claim",
         "player_chroma_wallet",
+        "player_cosmetic_ownership",
+        "player_cosmetic_loadout",
         "leaderboard_attempt",
         "leaderboard_endless_run",
         "leaderboard",
