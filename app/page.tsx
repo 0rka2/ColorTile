@@ -17,6 +17,7 @@ import {
 import { AchievementToast } from "./game/components/achievement-toast";
 import { GameBoard } from "./game/components/game-board";
 import { CompactLeaderboardPanel } from "./game/components/compact-leaderboard-panel";
+import { FloatingClouds } from "./game/components/floating-clouds";
 import { GameControls } from "./game/components/game-controls";
 import { GameHud } from "./game/components/game-hud";
 import { DailyPuzzleModal } from "./game/components/modals/daily-puzzle-modal";
@@ -24,6 +25,8 @@ import { GameModal } from "./game/components/modals/game-modal";
 import { GameModeModal } from "./game/components/modals/game-mode-modal";
 import { LeaderboardModal } from "./game/components/modals/leaderboard-modal";
 import { ShopModal } from "./game/components/modals/shop-modal";
+import { StarfieldTwinkles } from "./game/components/starfield-twinkles";
+import { SwapEffectOverlay } from "./game/components/swap-effect-overlay";
 import { WinConfetti } from "./game/components/win-confetti";
 import { Header } from "./game/components/header";
 import { useBoardDrag } from "./game/hooks/use-board-drag";
@@ -355,6 +358,7 @@ export default function Home() {
   const { data: session, isPending: sessionIsPending } = authClient.useSession();
   const {
     busyItemId: shopBusyItemId,
+    devUnlock: devUnlockCosmetic,
     equip: equipCosmetic,
     error: shopError,
     isLoading: shopIsLoading,
@@ -472,6 +476,7 @@ export default function Home() {
     winWaveActive,
   } = useWinSequence({
     boardLength: board.length,
+    completionEffect: shopState.equipped["completion-effect"],
     setPersonalBestStatus,
   });
 
@@ -558,6 +563,7 @@ export default function Home() {
     handlePointerDown,
     pressedTileIndex,
     setDragOverlayRef,
+    swapEffectEvent,
     updateBoard,
   } = useBoardDrag({
     board,
@@ -599,6 +605,7 @@ export default function Home() {
 
     setPlayerNameInput(nextPlayerName);
     setHasCompletedOnboarding(storedIntroCompleted);
+    setIsIntroVisible(!storedIntroCompleted);
     setIntroStep(storedIntroCompleted ? "name" : "welcome");
     setIsOnboardingReady(true);
   }, []);
@@ -1505,8 +1512,17 @@ export default function Home() {
   }
 
   return (
-    <main className={`game-page theme-page-bg min-h-dvh overflow-x-hidden py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}>
-      <div ref={pageShellRef} className="game-page-shell mx-auto flex h-[100dvh] min-h-0 w-full max-w-[72rem] flex-col gap-[clamp(0.35rem,0.9vw,0.7rem)]">
+    <main
+      className={`game-page theme-page-bg min-h-dvh overflow-x-hidden py-0 ${activeView === "game" || activeView === "tutorial" ? "overflow-y-hidden" : "overflow-y-auto"}`}
+      data-page-background={shopState.equipped["background-style"]}
+    >
+      {shopState.equipped["background-style"] === "starfield-background" && (
+        <StarfieldTwinkles />
+      )}
+      {shopState.equipped["background-style"] === "clouds-background" && (
+        <FloatingClouds />
+      )}
+      <div ref={pageShellRef} className="game-page-shell relative z-[1] mx-auto flex h-[100dvh] min-h-0 w-full max-w-[72rem] flex-col gap-[clamp(0.35rem,0.9vw,0.7rem)]">
         <Header ref={headerRef} onLogoClick={handleLogoClick} onNavigateView={handleNavigateView} />
         <Analytics />
         {activeView === "game" ? (
@@ -1568,6 +1584,7 @@ export default function Home() {
               board={board}
               boardDensityClass={boardDensityClass}
               boardTheme={shopState.equipped["board-theme"]}
+              completionEffect={shopState.equipped["completion-effect"]}
               dragSession={dragSession}
               draggedIndex={draggedIndex}
               dropTargetRect={dropTargetRect}
@@ -1591,7 +1608,7 @@ export default function Home() {
           <motion.div
             {...hudFeedbackMotion}
             ref={controlsRef}
-            className="w-full max-w-full"
+            className="relative z-10 w-full max-w-full"
             style={{ width: boardAreaWidth }}
           >
             <GameControls
@@ -1796,7 +1813,10 @@ export default function Home() {
           />
           <WinConfetti
             active={confettiActive}
-            confettiStyle={shopState.equipped["confetti-style"]}
+          />
+          <SwapEffectOverlay
+            effect={shopState.equipped["swap-effect"]}
+            event={swapEffectEvent}
           />
           <GameModeModal
             currentStreak={endlessStreak}
@@ -1814,6 +1834,7 @@ export default function Home() {
             isOpen={shopModalOpen}
             isSignedIn={Boolean(session)}
             onClose={() => setShopModalOpen(false)}
+            onDevUnlock={devUnlockCosmetic}
             onEquip={equipCosmetic}
             onPurchase={purchaseCosmetic}
             onRetry={() => {

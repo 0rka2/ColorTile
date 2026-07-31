@@ -180,6 +180,33 @@ export async function purchaseAndEquipCosmetic(
   );
 }
 
+export async function devUnlockAndEquipCosmetic(
+  userId: string,
+  item: CosmeticDefinition,
+) {
+  const sql = getSql();
+
+  await sql`
+    with grant_ownership as (
+      insert into player_cosmetic_ownership (
+        user_id,
+        item_id,
+        purchase_price
+      )
+      values (${userId}, ${item.id}, 0)
+      on conflict (user_id, item_id) do nothing
+    )
+    insert into player_cosmetic_loadout (user_id, slot, item_id, updated_at)
+    values (${userId}, ${item.slot}, ${item.id}, now())
+    on conflict (user_id, slot) do update
+    set
+      item_id = excluded.item_id,
+      updated_at = excluded.updated_at
+  `;
+
+  return getCosmeticShopState(userId);
+}
+
 export async function equipCosmetic(
   userId: string,
   slot: CosmeticSlot,

@@ -161,7 +161,7 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
   return (
     <>
       <header ref={ref} className="game-header flex min-h-11 items-center justify-between gap-1">
-      <div className="flex min-w-0 flex-nowrap items-center gap-1 sm:gap-[clamp(1rem,2.6vw,2rem)]">
+      <div className="relative flex min-w-0 flex-nowrap items-center gap-1 sm:gap-[clamp(1rem,2.6vw,2rem)]">
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
@@ -180,15 +180,17 @@ export const Header = forwardRef<HTMLElement, HeaderProps>(function Header(
               aria-label="Go to ColorTile home"
               className="game-logo font-fredoka-display theme-text-primary flex min-h-11 min-w-0 items-center text-[1.55rem] font-black leading-none tracking-[-0.05em] sm:text-[clamp(2rem,2.5vw,2.5rem)]"
             >
-              <GradientText className="px-1">ColorTile</GradientText>
+              <GradientText className="gradient-text--intro px-1" showBlend={false}>
+                ColorTile
+              </GradientText>
             </button>
           </div>
-          <GameDrawer
-            isOpen={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
-            onNavigateView={onNavigateView}
-          />
         </div>
+        <GameDrawer
+          isOpen={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          onNavigateView={onNavigateView}
+        />
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-[0.875rem]">

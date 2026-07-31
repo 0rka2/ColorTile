@@ -139,6 +139,15 @@ export function useShopCosmetics(userId: string | null) {
     }),
   ), [updateItem]);
 
+  const devUnlock = useCallback((itemId: CosmeticId) => updateItem(
+    itemId,
+    () => fetch("/api/account/shop/dev-unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId }),
+    }),
+  ), [updateItem]);
+
   const equip = useCallback((
     slot: CosmeticSlot,
     itemId: CosmeticId,
@@ -153,6 +162,7 @@ export function useShopCosmetics(userId: string | null) {
 
   return {
     busyItemId,
+    devUnlock,
     equip,
     error,
     isLoading,

@@ -15,6 +15,7 @@ test("getWinWaveDuration returns zero when there are no tiles", () => {
 });
 
 test("getWinWaveDuration applies one pop plus stagger per additional column", () => {
+  assert.equal(WIN_TILE_POP_DURATION_MS, 460);
   assert.equal(getWinWaveDuration(1), WIN_TILE_POP_DURATION_MS);
   assert.equal(
     getWinWaveDuration(4),
@@ -36,4 +37,14 @@ test("getWinSequenceDurations uses the configured modal delay", () => {
   assert.equal(durations.boardWaveDurationMs, getWinWaveDuration(16));
   assert.equal(durations.confettiLeadInMs, WIN_CONFETTI_LEAD_IN_MS);
   assert.equal(durations.modalDelayMs, WIN_MODAL_TOTAL_DELAY_MS);
+});
+
+test("completion effects finish before confetti advances to the modal", () => {
+  const colorExplosion = getWinSequenceDurations(
+    16,
+    "color-explosion-completion",
+  );
+
+  assert.equal(colorExplosion.boardWaveDurationMs, 820);
+  assert.ok(colorExplosion.modalDelayMs > colorExplosion.boardWaveDurationMs);
 });
