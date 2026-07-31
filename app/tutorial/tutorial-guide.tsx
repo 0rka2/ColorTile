@@ -839,6 +839,7 @@ export default function TutorialGuide({ onPlay }: Readonly<TutorialGuideProps>) 
           board={board}
           boardDensityClass={boardDensityClass}
           boardTheme="classic-board"
+          completionEffect="classic-completion"
           confettiActive={false}
           dragSession={dragSession}
           draggedIndex={draggedIndex}

@@ -146,11 +146,25 @@ export const countdownSound = createSoundEffect([
   { delay: 0.02, duration: 0.15, frequency: 50, gain: 0.03, type: "sine" },
 ]);
 
-export const boardCompleteSound = createSoundEffect([
-  { delay: 0, duration: 0.5, frequency: 523, gain: 0.045, type: "triangle" },  // C5
-  { delay: 0.1, duration: 0.5, frequency: 659, gain: 0.045, type: "triangle" },  // E5
-  { delay: 0.2, duration: 0.5, frequency: 784, gain: 0.045, type: "triangle" },  // G5
-  { delay: 0.35, duration: 0.5, frequency: 1047, gain: 0.045, type: "triangle" }, // C6 (High finish!)
+export const classicCompleteSound = createSoundEffect([
+  { delay: 0, duration: 0.24, frequency: 523, gain: 0.035, type: "triangle" },
+  { delay: 0.1, duration: 0.28, frequency: 659, gain: 0.035, type: "triangle" },
+  { delay: 0.2, duration: 0.34, frequency: 784, gain: 0.035, type: "triangle" },
+]);
+
+export const boardWaveCompleteSound = createSoundEffect([
+  { delay: 0, duration: 0.18, frequency: 392, gain: 0.04, type: "triangle" },
+  { delay: 0.08, duration: 0.2, frequency: 523, gain: 0.042, type: "triangle" },
+  { delay: 0.16, duration: 0.22, frequency: 659, gain: 0.044, type: "triangle" },
+  { delay: 0.24, duration: 0.28, frequency: 784, gain: 0.046, type: "triangle" },
+]);
+
+export const colorExplosionCompleteSound = createSoundEffect([
+  { delay: 0, duration: 0.18, frequency: 90, gain: 0.07, type: "triangle" },
+  { delay: 0.03, duration: 0.12, frequency: 140, gain: 0.025, type: "square" },
+  { delay: 0.1, duration: 0.22, frequency: 659, gain: 0.035, type: "sine" },
+  { delay: 0.17, duration: 0.24, frequency: 988, gain: 0.04, type: "sine" },
+  { delay: 0.25, duration: 0.3, frequency: 1319, gain: 0.035, type: "triangle" },
 ]);
 
 export const chromaRewardSound = createSoundEffect([

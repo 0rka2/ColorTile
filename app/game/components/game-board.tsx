@@ -1,4 +1,8 @@
-import { memo, PointerEvent as ReactPointerEvent, useState } from "react";
+import {
+  memo,
+  PointerEvent as ReactPointerEvent,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -8,6 +12,7 @@ import {
   hexToRgb,
 } from "../game-logic";
 import type { DropTargetRect } from "../drop-target";
+import { getColorExplosionTileMotion } from "../cosmetic-effects";
 import type { Tile } from "../game-types";
 import type { CosmeticId } from "../shop-catalog";
 
@@ -76,11 +81,18 @@ function getColorFamilyHintColor(color: string) {
   return COLOR_FAMILY_HINTS.find(({ maxHue }) => h <= maxHue)?.color ?? COLOR_FAMILY_HINTS[0].color;
 }
 
+function getTileStyleClass(tileStyle: CosmeticId) {
+  return tileStyle === "classic-tiles"
+    ? ""
+    : `tile-style-${tileStyle.replace("-tiles", "")}`;
+}
+
 type BoardProps = {
   allowHoverWhenLocked: boolean;
   board: Tile[];
   boardDensityClass: string;
   boardTheme: CosmeticId;
+  completionEffect: CosmeticId;
   dragSession: {
     color: string;
     grabX: number;
@@ -116,12 +128,14 @@ type BoardProps = {
 type TileButtonProps = {
   canDrag: boolean;
   canHover: boolean;
+  completionEffect: CosmeticId;
   index: number;
   interactionDisabled: boolean;
   isCorrect: boolean;
   isDragging: boolean;
   isPressed: boolean;
   tile: Tile;
+  tileCount: number;
   tileRadiusClass: string;
   tileStyle: CosmeticId;
   visualMode: BoardProps["visualMode"];
@@ -135,12 +149,14 @@ type TileButtonProps = {
 const TileButton = memo(function TileButton({
   canDrag,
   canHover,
+  completionEffect,
   index,
   interactionDisabled,
   isCorrect,
   isDragging,
   isPressed,
   tile,
+  tileCount,
   tileRadiusClass,
   tileStyle,
   visualMode,
@@ -175,7 +191,13 @@ const TileButton = memo(function TileButton({
 
   const showColorFamilyHint = visualMode === "grayscale" && !isCorrect;
 
-  const tileStyleClass = tileStyle === "gem-tiles" ? "tile-style-gem" : "";
+  const tileStyleClass = getTileStyleClass(tileStyle);
+  const enhancedBoardWave = completionEffect === "board-wave-completion";
+  const classicCompletionActive =
+    winWaveActive && completionEffect === "classic-completion";
+  const colorExplosionActive =
+    winWaveActive && completionEffect === "color-explosion-completion";
+  const colorExplosionMotion = getColorExplosionTileMotion(index, tileCount);
 
   return (
     <motion.button
@@ -202,11 +224,43 @@ const TileButton = memo(function TileButton({
       onPointerLeave={resetTilt}
       onBlur={resetTilt}
       animate={{
-        opacity: isDragging ? 0 : 1,
+        opacity: colorExplosionActive
+          ? [1, 1, 0.45, 1]
+          : isDragging
+            ? 0
+            : 1,
         rotateX: winWaveActive ? 0 : tilt.rotateX,
         rotateY: winWaveActive ? 0 : tilt.rotateY,
-        scale: winWaveActive ? [1, 1.08, 1.03, 1] : isPressed ? TILE_PRESS_SCALE : isHovering && !isDragging ? TILE_HOVER_SCALE : 1,
-        y: winWaveActive ? [0, -8, -3, 0] : isPressed ? TILE_PRESS_LIFT_PX : isHovering && !isDragging ? TILE_HOVER_LIFT_PX : 0,
+        x:
+          colorExplosionActive
+            ? [0, colorExplosionMotion.x * 0.18, colorExplosionMotion.x, 0]
+            : 0,
+        scale: winWaveActive
+          ? colorExplosionActive
+            ? [1, 1.12, 0.82, 1]
+            : enhancedBoardWave
+              ? [1, 1.12, 1.04, 1]
+              : classicCompletionActive
+                ? [1, 1.055, 0.995, 1]
+                : [1, 1.035, 1]
+          : isPressed
+            ? TILE_PRESS_SCALE
+            : isHovering && !isDragging
+              ? TILE_HOVER_SCALE
+              : 1,
+        y: winWaveActive
+          ? colorExplosionActive
+            ? [0, colorExplosionMotion.y * 0.18, colorExplosionMotion.y, 0]
+            : enhancedBoardWave
+              ? [0, -11, -4, 0]
+              : classicCompletionActive
+                ? [0, -4, -1, 0]
+                : [0, -2, 0]
+          : isPressed
+            ? TILE_PRESS_LIFT_PX
+            : isHovering && !isDragging
+              ? TILE_HOVER_LIFT_PX
+              : 0,
         boxShadow: winWaveActive
           ? [TILE_REST_SHADOW, TILE_HOVER_SHADOW, TILE_DRAG_SHADOW, TILE_REST_SHADOW]
           : isCorrect
@@ -232,9 +286,14 @@ const TileButton = memo(function TileButton({
       transition={
         winWaveActive
           ? {
-              duration: 0.46,
+              duration: colorExplosionActive ? 0.68 : 0.46,
               ease: [0.22, 1, 0.36, 1],
-              delay: winWaveDelay,
+              delay:
+                colorExplosionActive
+                  ? colorExplosionMotion.delaySeconds
+                  : enhancedBoardWave
+                    ? winWaveDelay
+                    : 0,
             }
           : {
               ...TILE_INTERACTION_SPRING,
@@ -263,7 +322,7 @@ const TileButton = memo(function TileButton({
             boxShadow: `inset 0 0 0 3px ${getColorFamilyHintColor(tile.color)}`,
             clipPath:
               tileStyle === "gem-tiles"
-                ? "polygon(50% 0%, 88% 13%, 100% 48%, 76% 100%, 24% 100%, 0% 48%, 12% 13%)"
+                ? "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)"
                 : undefined,
           }}
         />
@@ -281,12 +340,14 @@ const TileButton = memo(function TileButton({
   return (
     previousProps.canHover === nextProps.canHover &&
     previousProps.canDrag === nextProps.canDrag &&
+    previousProps.completionEffect === nextProps.completionEffect &&
     previousProps.index === nextProps.index &&
     previousProps.interactionDisabled === nextProps.interactionDisabled &&
     previousProps.isCorrect === nextProps.isCorrect &&
     previousProps.isDragging === nextProps.isDragging &&
     previousProps.isPressed === nextProps.isPressed &&
     previousProps.tile === nextProps.tile &&
+    previousProps.tileCount === nextProps.tileCount &&
     previousProps.tileRadiusClass === nextProps.tileRadiusClass &&
     previousProps.tileStyle === nextProps.tileStyle &&
     previousProps.visualMode === nextProps.visualMode &&
@@ -301,6 +362,7 @@ export const GameBoard = memo(function GameBoard({
   board,
   boardDensityClass,
   boardTheme,
+  completionEffect,
   dragSession,
   draggedIndex,
   dropTargetRect,
@@ -336,9 +398,7 @@ export const GameBoard = memo(function GameBoard({
           <div
             aria-hidden="true"
             ref={setDragOverlayRef}
-            className={`tile-drag-overlay pointer-events-none fixed flex items-center justify-center border border-white/75 ${tileRadiusClass} ${
-              tileStyle === "gem-tiles" ? "tile-style-gem" : ""
-            }`}
+            className={`tile-drag-overlay pointer-events-none fixed flex items-center justify-center border border-white/75 ${tileRadiusClass} ${getTileStyleClass(tileStyle)}`}
             style={{
               backgroundColor: tileStyle === "gem-tiles" ? undefined : dragSession.color,
               "--tile-color": dragSession.color,
@@ -382,7 +442,7 @@ export const GameBoard = memo(function GameBoard({
     <>
       <motion.div
         data-board-theme={boardTheme}
-        className="theme-board-frame relative mx-auto aspect-square w-full rounded-[clamp(0.9rem,1.8vw,1.2rem)] p-px"
+        className="theme-board-frame relative mx-auto aspect-square w-full rounded-[clamp(0.9rem,1.8vw,1.2rem)] p-[5px]"
         initial={false}
         animate={
           confettiActive
@@ -409,7 +469,26 @@ export const GameBoard = memo(function GameBoard({
             transition={{ duration: 1.85, ease: [0.16, 1, 0.3, 1] }}
           />
         )}
-        <div className="theme-board-shell relative h-full w-full overflow-hidden rounded-[calc(clamp(0.9rem,1.8vw,1.2rem)-1px)] p-[clamp(0.2rem,0.45vw,0.4rem)] backdrop-blur-[20px]">
+        {winWaveActive && completionEffect === "board-wave-completion" && (
+          <span
+            aria-hidden="true"
+            className="completion-board-ripple pointer-events-none absolute inset-0"
+          />
+        )}
+        <div
+          className="theme-board-shell relative h-full w-full overflow-hidden rounded-[calc(clamp(0.9rem,1.8vw,1.2rem)-2.5px)] p-[clamp(0.2rem,0.45vw,0.4rem)] backdrop-blur-[20px]"
+          data-game-board-effects
+        >
+          {winWaveActive && completionEffect === "color-explosion-completion" && (
+            <span
+              aria-hidden="true"
+              className="completion-color-explosion pointer-events-none absolute inset-0"
+            >
+              <span />
+              <span />
+              <span />
+            </span>
+          )}
           {confettiActive && (
             <motion.div
               aria-hidden="true"
@@ -420,7 +499,7 @@ export const GameBoard = memo(function GameBoard({
             />
           )}
           <div
-            className={`board-grid ${boardDensityClass} grid h-full w-full rounded-[clamp(0.9rem,1.6vw,1.35rem)]`}
+            className={`board-grid ${boardDensityClass} relative z-[2] grid h-full w-full rounded-[clamp(0.9rem,1.6vw,1.35rem)]`}
             style={{
               gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
             }}
@@ -441,12 +520,14 @@ export const GameBoard = memo(function GameBoard({
                   key={tile.id}
                   canDrag={canDrag}
                   canHover={canHover}
+                  completionEffect={completionEffect}
                   index={index}
                   interactionDisabled={interactionDisabled}
                   isCorrect={isCorrect}
                   isDragging={isDragging && dragSession !== null}
                   isPressed={pressedTileIndex === index}
                   tile={tile}
+                  tileCount={board.length}
                   tileRadiusClass={tileRadiusClass}
                   tileStyle={tileStyle}
                   visualMode={tileVisualMode}
