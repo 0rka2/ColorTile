@@ -242,6 +242,12 @@ export function ShopModal({
               </div>
             )}
 
+            {activeView === "inventory" && isSignedIn && (
+              <p className="theme-text-muted mb-4 text-sm">
+                Your purchased and default cosmetics. Equip an item to use it immediately.
+              </p>
+            )}
+
             {(activeView === "shop" || isSignedIn) && (
               <div className="grid gap-3 sm:grid-cols-2">
                 {visibleItems.map((item) => {

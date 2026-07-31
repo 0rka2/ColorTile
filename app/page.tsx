@@ -329,6 +329,7 @@ export default function Home() {
   const [shopModalOpen, setShopModalOpen] = useState(false);
   const [leaderboardModalOpen, setLeaderboardModalOpen] = useState(false);
   const [bottomActionMenu, setBottomActionMenu] = useState<"play" | "more" | null>(null);
+  const mobileActionsRef = useRef<HTMLDivElement | null>(null);
   const [timerStarted, setTimerStarted] = useState(true);
   const [personalBestStatus, setPersonalBestStatus] = useState<PersonalBestStatus>(EMPTY_PERSONAL_BEST_STATUS);
   const [boardResetKey, setBoardResetKey] = useState(0);
@@ -609,6 +610,26 @@ export default function Home() {
     setIntroStep(storedIntroCompleted ? "name" : "welcome");
     setIsOnboardingReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!bottomActionMenu) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !mobileActionsRef.current?.contains(event.target)
+      ) {
+        setBottomActionMenu(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [bottomActionMenu]);
 
   useEffect(() => {
     if (!isOnboardingReady || hasCompletedOnboarding) {
@@ -1657,14 +1678,18 @@ export default function Home() {
               </button>
             </motion.div>
 
-            <motion.div {...hudFeedbackMotion} className="mobile-action-groups">
+            <motion.div
+              {...hudFeedbackMotion}
+              ref={mobileActionsRef}
+              className="mobile-action-groups"
+            >
               <div className="relative">
                 <AnimatePresence>
                   {bottomActionMenu === "play" && (
                     <motion.div
                       id="play-actions-menu"
                       aria-label="Play options"
-                      className="mobile-action-menu theme-panel absolute bottom-[calc(100%+0.5rem)] left-1/2 flex w-40 -translate-x-1/2 flex-col gap-1.5 rounded-2xl border p-2"
+                      className="mobile-action-menu theme-panel absolute bottom-[calc(100%+0.5rem)] left-1/2 flex w-40 flex-col gap-1.5 rounded-2xl border p-2"
                       initial={{ opacity: 0, y: 8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 8, scale: 0.96 }}
@@ -1715,7 +1740,7 @@ export default function Home() {
                     <motion.div
                       id="more-actions-menu"
                       aria-label="More options"
-                      className="mobile-action-menu theme-panel absolute bottom-[calc(100%+0.5rem)] left-1/2 flex w-40 -translate-x-1/2 flex-col gap-1.5 rounded-2xl border p-2"
+                      className="mobile-action-menu theme-panel absolute bottom-[calc(100%+0.5rem)] left-1/2 flex w-40 flex-col gap-1.5 rounded-2xl border p-2"
                       initial={{ opacity: 0, y: 8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 8, scale: 0.96 }}

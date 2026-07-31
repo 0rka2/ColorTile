@@ -416,6 +416,7 @@ html[data-theme="dark"] .game-logo .gradient-text {
 
 .mobile-action-menu {
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+  translate: -50% 0;
 }
 
 .side-action-button {
