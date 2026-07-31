@@ -5,11 +5,13 @@ import { Dispatch, PointerEvent as ReactPointerEvent, SetStateAction, useCallbac
 import { clamp, isTileCorrect, isTileLocked, swapTiles } from "../game-logic";
 import { findNearestTileIndex } from "../drop-target";
 import type { DropTargetRect } from "../drop-target";
+import type { SwapEffectEvent } from "../cosmetic-effects";
 import type { Tile } from "../game-types";
 import { swapSound } from "../../lib/sounds";
 
 const TILE_SWAP_ANIMATION_DURATION_MS = 220;
 const TILE_SWAP_ANIMATION_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const SWAP_EFFECT_LIFETIME_MS = 600;
 const DRAG_ROTATION_MAX_DEGREES = 3;
 const DRAG_START_DISTANCE_PX = 6;
 const TILE_DRAG_SCALE = 1.065;
@@ -48,6 +50,8 @@ export function useBoardDrag({
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
   const [pressedTileIndex, setPressedTileIndex] = useState<number | null>(null);
   const [dropTargetRect, setDropTargetRect] = useState<DropTargetRect | null>(null);
+  const [swapEffectEvent, setSwapEffectEvent] =
+    useState<SwapEffectEvent | null>(null);
   const dragSessionRef = useRef<DragSession | null>(null);
   const tileElementsRef = useRef<Record<string, HTMLButtonElement | null>>({});
   const pendingSwapAnimationRef = useRef<Map<string, DOMRect> | null>(null);
@@ -58,6 +62,8 @@ export function useBoardDrag({
   const dragAnimationFrameRef = useRef<number | null>(null);
   const hoveredTargetIndexRef = useRef<number | null>(null);
   const latestBoardRef = useRef<Tile[]>([]);
+  const swapEffectIdRef = useRef(0);
+  const swapEffectTimeoutRef = useRef<number | null>(null);
 
   const getTileRef = useCallback(
     (tileId: string) => (element: HTMLButtonElement | null) => {
@@ -310,10 +316,32 @@ export function useBoardDrag({
         const targetTileElement = tileElementsRef.current[targetTile.id];
 
         if (draggedTileElement && targetTileElement) {
+          const sourceRect = draggedTileElement.getBoundingClientRect();
+          const targetRect = targetTileElement.getBoundingClientRect();
           pendingSwapAnimationRef.current = new Map([
-            [draggedTile.id, draggedTileElement.getBoundingClientRect()],
-            [targetTile.id, targetTileElement.getBoundingClientRect()],
+            [draggedTile.id, sourceRect],
+            [targetTile.id, targetRect],
           ]);
+
+          swapEffectIdRef.current += 1;
+          setSwapEffectEvent({
+            from: {
+              x: sourceRect.left + sourceRect.width / 2,
+              y: sourceRect.top + sourceRect.height / 2,
+            },
+            id: swapEffectIdRef.current,
+            to: {
+              x: targetRect.left + targetRect.width / 2,
+              y: targetRect.top + targetRect.height / 2,
+            },
+          });
+          if (swapEffectTimeoutRef.current !== null) {
+            window.clearTimeout(swapEffectTimeoutRef.current);
+          }
+          swapEffectTimeoutRef.current = window.setTimeout(() => {
+            setSwapEffectEvent(null);
+            swapEffectTimeoutRef.current = null;
+          }, SWAP_EFFECT_LIFETIME_MS);
         } else {
           pendingSwapAnimationRef.current = null;
         }
@@ -406,6 +434,9 @@ export function useBoardDrag({
   useEffect(() => {
     return () => {
       cancelDragAnimationFrame();
+      if (swapEffectTimeoutRef.current !== null) {
+        window.clearTimeout(swapEffectTimeoutRef.current);
+      }
     };
   }, [cancelDragAnimationFrame]);
 
@@ -458,6 +489,7 @@ export function useBoardDrag({
     latestBoardRef,
     pressedTileIndex,
     setDragOverlayRef,
+    swapEffectEvent,
     updateBoard,
   };
 }

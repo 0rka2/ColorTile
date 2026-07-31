@@ -12,12 +12,12 @@ const privacyItems = [
   {
     title: "Public Leaderboards",
     copy:
-      "Verified scores and endless streaks may appear publicly with your current account name. Leaderboard attempts temporarily store puzzle and timing data, and short-lived pseudonymous counters help limit abusive attempt creation.",
+      "Leaderboard scores and endless streaks may appear publicly with your current account name. Score attempts temporarily store puzzle and timing data, and short-lived pseudonymous counters help limit abusive attempt creation.",
   },
   {
     title: "Retention and Deletion",
     copy:
-      "Verification attempts expire after 24 hours and are removed by maintenance without deleting completed scores. Daily rankings keep the current day, and other rankings reset annually. Deleting your account also deletes its synchronized progress, attempts, runs, and leaderboard entries.",
+      "Score attempts expire after 24 hours and are removed by maintenance without deleting completed scores. Daily rankings keep the current day, and other rankings reset annually. Deleting your account also deletes its synchronized progress, attempts, runs, leaderboard entries, Chroma data, and cosmetic data.",
   },
   {
     title: "Account Email",
@@ -27,7 +27,12 @@ const privacyItems = [
   {
     title: "Cookies and Preferences",
     copy:
-      "A necessary cookie remembers your cookie choice. If you accept optional preferences, a cookie also remembers your selected theme; otherwise theme changes last only for the current page session.",
+      "Necessary cookies remember your cookie choice and keep you signed in when you use an account. If you accept optional preferences, a cookie also remembers your selected theme; otherwise theme changes last only for the current page session.",
+  },
+  {
+    title: "Chroma and Cosmetics",
+    copy:
+      "For signed-in accounts, ColorTile stores Chroma balances and reward claims, purchased cosmetics, and equipped cosmetics so your wallet and appearance remain available when you return.",
   },
   {
     title: "External Links",
@@ -51,7 +56,7 @@ export function PrivacyView() {
           Your data, clearly explained
         </h1>
         <p className="theme-text-secondary mx-auto mt-4 max-w-[32rem] text-base leading-7 sm:text-lg sm:leading-8">
-          This page describes the information used by the current ColorTile app and how it supports accounts, progress, and verified rankings.
+          This page describes the information used by the current ColorTile app and how it supports accounts, progress, and rankings.
         </p>
       </div>
 

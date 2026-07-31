@@ -1,4 +1,3 @@
-import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { FiHeart } from "react-icons/fi";
 
@@ -152,7 +151,7 @@ export function GameDrawer({
   onClose,
   onNavigateView,
 }: Readonly<GameDrawerProps>) {
-  if (!isOpen || typeof document === "undefined") {
+  if (!isOpen) {
     return null;
   }
 
@@ -163,17 +162,14 @@ export function GameDrawer({
 
   return (
     <>
-      {createPortal(
-        <motion.div
-          className="theme-overlay fixed inset-0 z-40"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-          onClick={onClose}
-          aria-hidden="true"
-        />,
-        document.body,
-      )}
+      <motion.div
+        className="theme-overlay fixed inset-0 z-40"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
       <motion.aside
         role="dialog"
         aria-modal="true"

@@ -1,5 +1,11 @@
 import { GAME_START_PREVIEW_SECONDS } from "@/app/game/game-logic";
 import {
+  DAILY_CHROMA_REWARD,
+  ENDLESS_CHROMA_REWARD,
+  getPresetChromaReward,
+} from "@/app/game/chroma";
+import type { PresetModeKey } from "@/app/game/game-types";
+import {
   normalizeVerifiedSwaps,
   validateVerifiedReplay,
 } from "@/app/game/verified-attempt";
@@ -16,6 +22,101 @@ import {
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+function readChromaReward(row: Record<string, unknown>) {
+  const awarded = Number(row.chroma_awarded);
+
+  return {
+    awarded,
+    balance: Number(row.chroma_balance),
+    status: awarded > 0 ? "awarded" : "already-claimed",
+  };
+}
+
+async function readCompletedAttemptResult(
+  attempt: Record<string, unknown>,
+  moves: number,
+) {
+  const sql = getSql();
+  const attemptId = String(attempt.id);
+  const userId = String(attempt.user_id);
+  const kind = String(attempt.kind);
+
+  if (kind === "preset") {
+    const rows = readQueryRows(await sql`
+      select
+        score.moves,
+        score.solve_time,
+        coalesce(reward.amount, 0) as chroma_awarded,
+        coalesce(wallet.balance, 0) as chroma_balance
+      from leaderboard as score
+      left join chroma_reward_claim as reward
+        on reward.attempt_id = score.attempt_id
+      left join player_chroma_wallet as wallet
+        on wallet.user_id = score.user_id
+      where score.attempt_id = ${attemptId}
+        and score.user_id = ${userId}
+      limit 1
+    `);
+
+    return rows[0]
+      ? {
+          chroma: readChromaReward(rows[0]),
+          moves: Number(rows[0].moves),
+          solveTime: Number(rows[0].solve_time),
+        }
+      : null;
+  }
+
+  if (kind === "daily") {
+    const rows = readQueryRows(await sql`
+      select
+        score.moves,
+        score.solve_time,
+        coalesce(reward.amount, 0) as chroma_awarded,
+        coalesce(wallet.balance, 0) as chroma_balance
+      from daily_leaderboard as score
+      left join chroma_reward_claim as reward
+        on reward.attempt_id = score.attempt_id
+      left join player_chroma_wallet as wallet
+        on wallet.user_id = score.user_id
+      where score.attempt_id = ${attemptId}
+        and score.user_id = ${userId}
+      limit 1
+    `);
+
+    return rows[0]
+      ? {
+          chroma: readChromaReward(rows[0]),
+          moves: Number(rows[0].moves),
+          solveTime: Number(rows[0].solve_time),
+        }
+      : null;
+  }
+
+  const rows = readQueryRows(await sql`
+    select
+      score.streak_count,
+      coalesce(reward.amount, 0) as chroma_awarded,
+      coalesce(wallet.balance, 0) as chroma_balance
+    from endless_streak_leaderboard as score
+    left join chroma_reward_claim as reward
+      on reward.attempt_id = ${attemptId}
+    left join player_chroma_wallet as wallet
+      on wallet.user_id = score.user_id
+    where score.run_id = ${String(attempt.endless_run_id)}
+      and score.user_id = ${userId}
+    limit 1
+  `);
+
+  return rows[0]
+    ? {
+        chroma: readChromaReward(rows[0]),
+        moves,
+        streakCount: Number(rows[0].streak_count),
+      }
+    : null;
+}
 
 async function completeAttempt(request: Request, context: RouteContext) {
   const user = await getLeaderboardUser(request);
@@ -52,13 +153,6 @@ async function completeAttempt(request: Request, context: RouteContext) {
     return Response.json({ error: "Attempt not found." }, { status: 404 });
   }
 
-  if (attempt.is_active !== true) {
-    return Response.json(
-      { error: "This attempt is no longer active." },
-      { status: 409 },
-    );
-  }
-
   let body: { swaps?: unknown };
   try {
     body = (await request.json()) as { swaps?: unknown };
@@ -77,7 +171,27 @@ async function completeAttempt(request: Request, context: RouteContext) {
     return Response.json({ error: replay.error }, { status: 400 });
   }
 
+  if (attempt.status === "completed") {
+    const completedResult = await readCompletedAttemptResult(
+      attempt,
+      replay.moves,
+    );
+    if (completedResult) {
+      return Response.json(completedResult);
+    }
+  }
+
+  if (attempt.is_active !== true) {
+    return Response.json(
+      { error: "This attempt is no longer active." },
+      { status: 409 },
+    );
+  }
+
   if (puzzle.kind === "preset") {
+    const chromaReward = getPresetChromaReward(
+      puzzle.difficulty as PresetModeKey,
+    );
     const rows = readQueryRows(await sql`
       with completed as (
         update leaderboard_attempt as attempt
@@ -101,15 +215,59 @@ async function completeAttempt(request: Request, context: RouteContext) {
         select id, user_id, difficulty, ${replay.moves}, solve_time
         from completed
         returning moves, solve_time
+      ),
+      reward_claim as (
+        insert into chroma_reward_claim (
+          user_id,
+          reward_key,
+          attempt_id,
+          source_kind,
+          amount
+        )
+        select
+          user_id,
+          'preset:' || id,
+          id,
+          'preset',
+          ${chromaReward}
+        from completed
+        on conflict do nothing
+        returning user_id, amount
+      ),
+      updated_wallet as (
+        insert into player_chroma_wallet (user_id, balance, updated_at)
+        select user_id, amount, now()
+        from reward_claim
+        on conflict (user_id) do update set
+          balance = player_chroma_wallet.balance + excluded.balance,
+          updated_at = now()
+        returning balance
       )
-      select moves, solve_time from saved_score
+      select
+        saved_score.moves,
+        saved_score.solve_time,
+        coalesce((select amount from reward_claim), 0) as chroma_awarded,
+        coalesce(
+          (select balance from updated_wallet),
+          (select balance from player_chroma_wallet where user_id = ${user.id}),
+          0
+        ) as chroma_balance
+      from saved_score
     `);
 
     if (!rows[0]) {
+      const completedResult = await readCompletedAttemptResult(
+        attempt,
+        replay.moves,
+      );
+      if (completedResult) {
+        return Response.json(completedResult);
+      }
       return Response.json({ error: "This attempt is no longer active." }, { status: 409 });
     }
 
     return Response.json({
+      chroma: readChromaReward(rows[0]),
       moves: Number(rows[0].moves),
       solveTime: Number(rows[0].solve_time),
     });
@@ -149,15 +307,59 @@ async function completeAttempt(request: Request, context: RouteContext) {
         select id, user_id, date_key, style, ${replay.moves}, solve_time
         from completed
         returning moves, solve_time
+      ),
+      reward_claim as (
+        insert into chroma_reward_claim (
+          user_id,
+          reward_key,
+          attempt_id,
+          source_kind,
+          amount
+        )
+        select
+          user_id,
+          'daily:' || date_key,
+          id,
+          'daily',
+          ${DAILY_CHROMA_REWARD}
+        from completed
+        on conflict do nothing
+        returning user_id, amount
+      ),
+      updated_wallet as (
+        insert into player_chroma_wallet (user_id, balance, updated_at)
+        select user_id, amount, now()
+        from reward_claim
+        on conflict (user_id) do update set
+          balance = player_chroma_wallet.balance + excluded.balance,
+          updated_at = now()
+        returning balance
       )
-      select moves, solve_time from saved_score
+      select
+        saved_score.moves,
+        saved_score.solve_time,
+        coalesce((select amount from reward_claim), 0) as chroma_awarded,
+        coalesce(
+          (select balance from updated_wallet),
+          (select balance from player_chroma_wallet where user_id = ${user.id}),
+          0
+        ) as chroma_balance
+      from saved_score
     `);
 
     if (!rows[0]) {
+      const completedResult = await readCompletedAttemptResult(
+        attempt,
+        replay.moves,
+      );
+      if (completedResult) {
+        return Response.json(completedResult);
+      }
       return Response.json({ error: "This attempt is no longer active." }, { status: 409 });
     }
 
     return Response.json({
+      chroma: readChromaReward(rows[0]),
       moves: Number(rows[0].moves),
       solveTime: Number(rows[0].solve_time),
     });
@@ -211,11 +413,53 @@ async function completeAttempt(request: Request, context: RouteContext) {
         streak_count = excluded.streak_count,
         updated_at = now()
       returning streak_count
+    ),
+    reward_claim as (
+      insert into chroma_reward_claim (
+        user_id,
+        reward_key,
+        attempt_id,
+        source_kind,
+        amount
+      )
+      select
+        ${user.id},
+        'endless:' || puzzle_number,
+        ${id},
+        'endless',
+        ${ENDLESS_CHROMA_REWARD}
+      from completed
+      on conflict do nothing
+      returning user_id, amount
+    ),
+    updated_wallet as (
+      insert into player_chroma_wallet (user_id, balance, updated_at)
+      select user_id, amount, now()
+      from reward_claim
+      on conflict (user_id) do update set
+        balance = player_chroma_wallet.balance + excluded.balance,
+        updated_at = now()
+      returning balance
     )
-    select streak_count from saved_streak
+    select
+      saved_streak.streak_count,
+      coalesce((select amount from reward_claim), 0) as chroma_awarded,
+      coalesce(
+        (select balance from updated_wallet),
+        (select balance from player_chroma_wallet where user_id = ${user.id}),
+        0
+      ) as chroma_balance
+    from saved_streak
   `);
 
   if (!rows[0]) {
+    const completedResult = await readCompletedAttemptResult(
+      attempt,
+      replay.moves,
+    );
+    if (completedResult) {
+      return Response.json(completedResult);
+    }
     return Response.json(
       { error: "This attempt is no longer active or exceeded its limit." },
       { status: 409 },
@@ -223,6 +467,7 @@ async function completeAttempt(request: Request, context: RouteContext) {
   }
 
   return Response.json({
+    chroma: readChromaReward(rows[0]),
     moves: replay.moves,
     streakCount: Number(rows[0].streak_count),
   });

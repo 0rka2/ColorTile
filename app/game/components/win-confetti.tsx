@@ -8,7 +8,9 @@ type ConfettiProps = {
   active: boolean;
 };
 
-export function WinConfetti({ active }: Readonly<ConfettiProps>) {
+export function WinConfetti({
+  active,
+}: Readonly<ConfettiProps>) {
   const [viewportSize, setViewportSize] = useState(() =>
     typeof window === "undefined" ? { width: 0, height: 0 } : getConfettiViewportSize(window),
   );

@@ -17,6 +17,15 @@ import {
   AchievementCollection,
   AchievementPreview,
 } from "./achievement-collection";
+import { CosmeticInventory } from "./cosmetic-inventory";
+
+const ACCOUNT_TABS = [
+  ["overview", "Overview"],
+  ["inventory", "Inventory"],
+  ["achievements", "Achievements"],
+] as const;
+
+type AccountTab = (typeof ACCOUNT_TABS)[number][0];
 
 type AccountDashboardProps = {
   achievements: AchievementSummary;
@@ -69,9 +78,7 @@ export function AccountDashboard({
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(
     null,
   );
-  const [activeTab, setActiveTab] = useState<"overview" | "achievements">(
-    "overview",
-  );
+  const [activeTab, setActiveTab] = useState<AccountTab>("overview");
 
   const bestRecords = Object.values(progress.bestStats);
   const fastestTime = getLowestValue(
@@ -288,12 +295,9 @@ export function AccountDashboard({
       <div
         role="tablist"
         aria-label="Account sections"
-        className="theme-card mb-6 inline-flex rounded-full border p-1.5"
+        className="theme-card mb-6 flex w-full rounded-full border p-1.5 sm:inline-flex sm:w-auto"
       >
-        {([
-          ["overview", "Overview"],
-          ["achievements", "Achievements"],
-        ] as const).map(([tab, label]) => (
+        {ACCOUNT_TABS.map(([tab, label], tabIndex) => (
           <button
             key={tab}
             type="button"
@@ -309,20 +313,17 @@ export function AccountDashboard({
               }
 
               event.preventDefault();
-              const nextTab =
-                event.key === "ArrowRight"
-                  ? tab === "overview"
-                    ? "achievements"
-                    : "overview"
-                  : tab === "achievements"
-                    ? "overview"
-                    : "achievements";
+              const direction = event.key === "ArrowRight" ? 1 : -1;
+              const nextIndex =
+                (tabIndex + direction + ACCOUNT_TABS.length) %
+                ACCOUNT_TABS.length;
+              const nextTab = ACCOUNT_TABS[nextIndex][0];
               setActiveTab(nextTab);
               window.requestAnimationFrame(() => {
                 document.getElementById(`${nextTab}-tab`)?.focus();
               });
             }}
-            className={`font-fredoka-strong rounded-full px-5 py-2.5 text-sm transition sm:text-base ${
+            className={`font-fredoka-strong flex-1 rounded-full px-3 py-2.5 text-sm transition sm:flex-none sm:px-5 sm:text-base ${
               activeTab === tab
                 ? "theme-button-primary"
                 : "theme-text-muted hover:theme-text-primary"
@@ -333,7 +334,7 @@ export function AccountDashboard({
         ))}
       </div>
 
-      {activeTab === "overview" ? (
+      {activeTab === "overview" && (
         <div
           id="overview-panel"
           role="tabpanel"
@@ -631,7 +632,19 @@ export function AccountDashboard({
         )}
       </section>
         </div>
-      ) : (
+      )}
+
+      {activeTab === "inventory" && (
+        <div
+          id="inventory-panel"
+          role="tabpanel"
+          aria-labelledby="inventory-tab"
+        >
+          <CosmeticInventory userId={userId} />
+        </div>
+      )}
+
+      {activeTab === "achievements" && (
         <div
           id="achievements-panel"
           role="tabpanel"

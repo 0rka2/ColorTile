@@ -2,7 +2,9 @@ import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 
 import type { DifficultyConfig } from "../../game-types";
+import type { ChromaCompletionResult } from "../../chroma";
 import type { PersonalBestStatus } from "../../personal-best";
+import { ChromaRewardCard } from "../chroma-reward-card";
 
 const COMPLETE_TITLE_RAINBOW = [
   "#ef4444",
@@ -70,6 +72,7 @@ type ModalProps = {
   activeConfig: DifficultyConfig;
   accuracy: number;
   completion: number;
+  chromaResult: ChromaCompletionResult | null;
   dailyResult?: {
     onModes: () => void;
     onReplay: () => void;
@@ -98,6 +101,7 @@ export function GameModal({
   activeConfig,
   accuracy,
   completion,
+  chromaResult,
   dailyResult,
   endlessResult,
   moves,
@@ -155,6 +159,7 @@ export function GameModal({
                     <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{completion}%</p>
                   </div>
                 </div>
+                {chromaResult && <ChromaRewardCard result={chromaResult} />}
                 <div className="mt-8 grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
@@ -202,6 +207,7 @@ export function GameModal({
                     <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{completion}%</p>
                   </div>
                 </div>
+                {chromaResult && <ChromaRewardCard result={chromaResult} />}
                 <div className="mt-8 grid gap-3 sm:grid-cols-3">
                   <button
                     type="button"
@@ -262,6 +268,7 @@ export function GameModal({
                   <p className="theme-text-primary font-fredoka-strong mt-2 text-[1.3rem] leading-none sm:mt-3 sm:text-[1.7rem]">{accuracy}%</p>
                 </div>
               </div>
+              {chromaResult && <ChromaRewardCard result={chromaResult} />}
             </>
             )}
 

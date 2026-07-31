@@ -2,18 +2,39 @@
 
 import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 
-import { boardCompleteSound } from "../../lib/sounds";
+import {
+  boardWaveCompleteSound,
+  classicCompleteSound,
+  colorExplosionCompleteSound,
+} from "../../lib/sounds";
 import { EMPTY_PERSONAL_BEST_STATUS } from "../personal-best";
 import type { PersonalBestStatus } from "../personal-best";
+import type { CosmeticId } from "../shop-catalog";
 import { getWinSequenceDurations } from "../win-sequence";
 import type { WinPhase } from "../win-sequence";
 
 type WinSequenceOptions = {
   boardLength: number;
+  completionEffect: CosmeticId;
   setPersonalBestStatus: Dispatch<SetStateAction<PersonalBestStatus>>;
 };
 
-export function useWinSequence({ boardLength, setPersonalBestStatus }: WinSequenceOptions) {
+function getCompletionSound(completionEffect: CosmeticId) {
+  switch (completionEffect) {
+    case "board-wave-completion":
+      return boardWaveCompleteSound;
+    case "color-explosion-completion":
+      return colorExplosionCompleteSound;
+    default:
+      return classicCompleteSound;
+  }
+}
+
+export function useWinSequence({
+  boardLength,
+  completionEffect,
+  setPersonalBestStatus,
+}: WinSequenceOptions) {
   const [winPhase, setWinPhase] = useState<WinPhase>("idle");
   const winSequenceTimeoutsRef = useRef<number[]>([]);
   const lastWinPhaseSoundRef = useRef<WinPhase>("idle");
@@ -41,11 +62,14 @@ export function useWinSequence({ boardLength, setPersonalBestStatus }: WinSequen
 
     clearWinSequenceTimeouts();
 
-    const { boardWaveDurationMs, modalDelayMs } = getWinSequenceDurations(boardLength);
+    const { boardWaveDurationMs, modalDelayMs } = getWinSequenceDurations(
+      boardLength,
+      completionEffect,
+    );
 
     if (winPhase === "boardWave") {
       if (lastWinPhaseSoundRef.current !== "boardWave") {
-        boardCompleteSound.play();
+        getCompletionSound(completionEffect).play();
         lastWinPhaseSoundRef.current = "boardWave";
       }
 
@@ -66,7 +90,7 @@ export function useWinSequence({ boardLength, setPersonalBestStatus }: WinSequen
     return () => {
       clearWinSequenceTimeouts();
     };
-  }, [boardLength, clearWinSequenceTimeouts, winPhase]);
+  }, [boardLength, clearWinSequenceTimeouts, completionEffect, winPhase]);
 
   useEffect(() => {
     return () => {

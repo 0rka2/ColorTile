@@ -17,6 +17,7 @@
     "../app/game/leaderboard.ts",
     "../app/game/game-types.ts",
     "../app/game/confetti-logic.ts",
+    "../app/game/chroma.ts",
     "../app/game/gradient-quality.ts",
     "../app/game/game-timer.ts",
     "../app/game/personal-best.ts",
