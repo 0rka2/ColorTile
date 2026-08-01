@@ -13,13 +13,17 @@ const client = new Client({
 });
 
 const migrationDirectory = resolve("migrations");
+const migrationLockId = 1_128_550_404;
 const migrationFiles = (await readdir(migrationDirectory))
   .filter((fileName) => fileName.endsWith(".sql"))
   .sort((first, second) => first.localeCompare(second));
 
 await client.connect();
+let migrationLockAcquired = false;
 
 try {
+  await client.query("select pg_advisory_lock($1)", [migrationLockId]);
+  migrationLockAcquired = true;
   await client.query(`
     create table if not exists schema_migration (
       file_name text primary key,
@@ -56,5 +60,11 @@ try {
 } catch (error) {
   throw error;
 } finally {
-  await client.end();
+  try {
+    if (migrationLockAcquired) {
+      await client.query("select pg_advisory_unlock($1)", [migrationLockId]);
+    }
+  } finally {
+    await client.end();
+  }
 }

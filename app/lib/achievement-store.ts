@@ -13,6 +13,10 @@ import type {
   PresetDifficultyKey,
   PresetModeKey,
 } from "@/app/game/game-types";
+import {
+  getEndlessPuzzleDefinition,
+  PRESET_MODE_KEYS,
+} from "@/app/game/game-logic";
 
 import { getSql } from "./db";
 
@@ -30,6 +34,16 @@ type ProgressRow = {
 type UnlockRow = {
   achievement_id: unknown;
   unlocked_at: unknown;
+};
+
+type VerifiedCompletionRow = {
+  completed_at: unknown;
+  date_key: unknown;
+  difficulty: unknown;
+  kind: unknown;
+  puzzle_number: unknown;
+  solve_time: unknown;
+  verified_moves: unknown;
 };
 
 const COLOR_MODES = new Set<PresetDifficultyKey>([
@@ -259,20 +273,125 @@ async function unlockEligibleAchievements(
   );
 }
 
-export async function recordAchievementEvent(
+export async function recordVerifiedAchievementCompletion(
   userId: string,
-  event: AchievementEvent,
+  attemptId: string,
 ) {
-  await insertAchievementEvent(userId, event);
+  const sql = getSql();
+  const rows = await sql`
+    select
+      attempt.completed_at::text,
+      attempt.date_key,
+      attempt.difficulty,
+      attempt.kind,
+      attempt.puzzle_number,
+      attempt.verified_moves,
+      coalesce(preset_score.solve_time, daily_score.solve_time) as solve_time
+    from leaderboard_attempt as attempt
+    left join leaderboard as preset_score
+      on preset_score.attempt_id = attempt.id
+    left join daily_leaderboard as daily_score
+      on daily_score.attempt_id = attempt.id
+    where attempt.id = ${attemptId}
+      and attempt.user_id = ${userId}
+      and attempt.status = 'completed'
+    limit 1
+  `;
+  const completion = (rows as unknown as VerifiedCompletionRow[])[0];
+
+  if (!completion) {
+    throw new Error("Verified achievement completion was not found.");
+  }
+
+  // Endless attempts completed before verified move storage cannot be
+  // reconstructed safely. Preserve their idempotent completion response
+  // without creating achievement progress from unknown moves.
+  if (
+    completion.kind === "endless" &&
+    completion.verified_moves === null
+  ) {
+    return [];
+  }
+
+  const completedAt = new Date(String(completion.completed_at));
+  const moves = Number(completion.verified_moves);
+  if (
+    Number.isNaN(completedAt.getTime()) ||
+    !Number.isInteger(moves) ||
+    moves <= 0
+  ) {
+    throw new Error("Verified achievement completion is incomplete.");
+  }
+
+  const completionEventId = `verified:${attemptId}:completion`;
+  const playedDate = completedAt.toISOString().slice(0, 10);
+
+  if (
+    completion.kind === "preset" &&
+    typeof completion.difficulty === "string" &&
+    (PRESET_MODE_KEYS as readonly string[]).includes(completion.difficulty)
+  ) {
+    const solveTime = Number(completion.solve_time);
+    if (!Number.isFinite(solveTime) || solveTime <= 0) {
+      throw new Error("Verified preset completion is incomplete.");
+    }
+
+    await insertAchievementEvent(userId, {
+      eventId: completionEventId,
+      kind: "preset",
+      mode: completion.difficulty as PresetModeKey,
+      playedDate,
+      solveTime,
+    });
+  } else if (
+    completion.kind === "daily" &&
+    typeof completion.date_key === "string"
+  ) {
+    await insertAchievementEvent(userId, {
+      dateKey: completion.date_key,
+      eventId: completionEventId,
+      kind: "daily",
+      playedDate,
+    });
+  } else if (completion.kind === "endless") {
+    const puzzleNumber = Number(completion.puzzle_number);
+    if (!Number.isInteger(puzzleNumber) || puzzleNumber <= 0) {
+      throw new Error("Verified endless completion is incomplete.");
+    }
+
+    await insertAchievementEvent(userId, {
+      eventId: completionEventId,
+      isThreeStar:
+        moves <= getEndlessPuzzleDefinition(puzzleNumber).threeStarMoveLimit,
+      kind: "endless",
+      playedDate,
+      streak: puzzleNumber,
+    });
+  } else {
+    throw new Error("Verified achievement completion has an invalid kind.");
+  }
+
+  const swapBatches = Array.from(
+    { length: Math.ceil(moves / 25) },
+    (_, batchIndex) => ({
+      event_id: `verified:${attemptId}:swaps:${batchIndex}`,
+      swap_count: Math.min(25, moves - batchIndex * 25),
+    }),
+  );
+
+  await sql`
+    insert into player_achievement_event (
+      user_id, event_id, kind, swap_count
+    )
+    select ${userId}, batch.event_id, 'swap', batch.swap_count
+    from jsonb_to_recordset(${JSON.stringify(swapBatches)}::jsonb)
+      as batch (event_id text, swap_count integer)
+    on conflict (user_id, event_id) do nothing
+  `;
+
   const progress = await getAchievementProgress(userId);
-  const newlyUnlocked = await unlockEligibleAchievements(
+  return unlockEligibleAchievements(
     userId,
     getEligibleAchievementIds(progress),
   );
-  const unlocked = await getAchievementUnlocks(userId);
-
-  return {
-    newlyUnlocked,
-    summary: { progress, unlocked },
-  };
 }

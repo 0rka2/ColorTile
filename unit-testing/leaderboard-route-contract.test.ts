@@ -55,7 +55,7 @@ test("attempt routes enforce ownership and one-time state transitions", async ()
 
   assert.match(startRoute, /status = 'prepared'/);
   assert.match(completeRoute, /attempt\.status = 'started'/);
-  assert.match(completeRoute, /set status = 'completed'/);
+  assert.match(completeRoute, /set\s+status = 'completed'/);
 });
 
 test("leaderboard GET handling contains no database mutations", async () => {
@@ -105,6 +105,8 @@ test("completed score submissions return their stored result", async () => {
   assert.ok(completedResultIndex > 0);
   assert.ok(completedResultIndex < activeAttemptIndex);
   assert.match(route, /score\.attempt_id = \$\{attemptId\}/);
+  assert.match(route, /recordVerifiedAchievementCompletion/);
+  assert.match(route, /newlyUnlocked/);
 });
 
 test("local completion starts before the background score response", async () => {

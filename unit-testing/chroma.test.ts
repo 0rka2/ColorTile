@@ -64,8 +64,15 @@ test("completion reward copy covers every Chroma state", () => {
   assert.equal(
     getChromaRewardCopy({
       available: 30,
-      status: "earned",
+      status: "pending",
     }).title,
-    "+30 Chroma",
+    "Saving Chroma reward",
+  );
+  assert.equal(
+    getChromaRewardCopy({
+      available: 30,
+      status: "unavailable",
+    }).title,
+    "Reward unavailable",
   );
 });

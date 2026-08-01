@@ -12,7 +12,7 @@ import {
   sanitizePlayerName,
 } from "@/app/game/player-progress";
 import { authClient } from "@/app/lib/auth-client";
-import { clearPendingAchievementEvents } from "@/app/game/hooks/use-account-achievements";
+import { clearPendingAchievementEvents } from "@/app/game/achievement-event-queue";
 import {
   AchievementCollection,
   AchievementPreview,

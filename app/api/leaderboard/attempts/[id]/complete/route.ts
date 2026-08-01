@@ -1,4 +1,5 @@
 import { GAME_START_PREVIEW_SECONDS } from "@/app/game/game-logic";
+import { getAchievementDefinition } from "@/app/game/achievements";
 import {
   DAILY_CHROMA_REWARD,
   ENDLESS_CHROMA_REWARD,
@@ -11,6 +12,7 @@ import {
 } from "@/app/game/verified-attempt";
 import { MAX_LEADERBOARD_STREAK } from "@/app/game/leaderboard";
 import { getSql } from "@/app/lib/db";
+import { recordVerifiedAchievementCompletion } from "@/app/lib/achievement-store";
 import {
   consumeAttemptRateLimit,
   getLeaderboardUser,
@@ -35,7 +37,6 @@ function readChromaReward(row: Record<string, unknown>) {
 
 async function readCompletedAttemptResult(
   attempt: Record<string, unknown>,
-  moves: number,
 ) {
   const sql = getSql();
   const attemptId = String(attempt.id);
@@ -97,9 +98,13 @@ async function readCompletedAttemptResult(
   const rows = readQueryRows(await sql`
     select
       score.streak_count,
+      attempt.verified_moves,
       coalesce(reward.amount, 0) as chroma_awarded,
       coalesce(wallet.balance, 0) as chroma_balance
     from endless_streak_leaderboard as score
+    join leaderboard_attempt as attempt
+      on attempt.id = ${attemptId}
+      and attempt.endless_run_id = score.run_id
     left join chroma_reward_claim as reward
       on reward.attempt_id = ${attemptId}
     left join player_chroma_wallet as wallet
@@ -110,12 +115,29 @@ async function readCompletedAttemptResult(
   `);
 
   return rows[0]
-    ? {
-        chroma: readChromaReward(rows[0]),
-        moves,
-        streakCount: Number(rows[0].streak_count),
-      }
-    : null;
+      ? {
+          chroma: readChromaReward(rows[0]),
+          moves: Number(rows[0].verified_moves) || 0,
+          streakCount: Number(rows[0].streak_count),
+        }
+      : null;
+}
+
+async function completedAttemptResponse(
+  userId: string,
+  attemptId: string,
+  result: Record<string, unknown>,
+) {
+  const newlyUnlockedIds = await recordVerifiedAchievementCompletion(
+    userId,
+    attemptId,
+  );
+  const newlyUnlocked = newlyUnlockedIds.flatMap((achievementId) => {
+    const definition = getAchievementDefinition(achievementId);
+    return definition ? [definition] : [];
+  });
+
+  return Response.json({ ...result, newlyUnlocked });
 }
 
 async function completeAttempt(request: Request, context: RouteContext) {
@@ -172,12 +194,9 @@ async function completeAttempt(request: Request, context: RouteContext) {
   }
 
   if (attempt.status === "completed") {
-    const completedResult = await readCompletedAttemptResult(
-      attempt,
-      replay.moves,
-    );
+    const completedResult = await readCompletedAttemptResult(attempt);
     if (completedResult) {
-      return Response.json(completedResult);
+      return completedAttemptResponse(user.id, id, completedResult);
     }
   }
 
@@ -195,7 +214,10 @@ async function completeAttempt(request: Request, context: RouteContext) {
     const rows = readQueryRows(await sql`
       with completed as (
         update leaderboard_attempt as attempt
-        set status = 'completed', completed_at = now()
+        set
+          status = 'completed',
+          completed_at = now(),
+          verified_moves = ${replay.moves}
         where attempt.id = ${id}
           and attempt.user_id = ${user.id}
           and attempt.status = 'started'
@@ -256,17 +278,14 @@ async function completeAttempt(request: Request, context: RouteContext) {
     `);
 
     if (!rows[0]) {
-      const completedResult = await readCompletedAttemptResult(
-        attempt,
-        replay.moves,
-      );
+      const completedResult = await readCompletedAttemptResult(attempt);
       if (completedResult) {
-        return Response.json(completedResult);
+        return completedAttemptResponse(user.id, id, completedResult);
       }
       return Response.json({ error: "This attempt is no longer active." }, { status: 409 });
     }
 
-    return Response.json({
+    return completedAttemptResponse(user.id, id, {
       chroma: readChromaReward(rows[0]),
       moves: Number(rows[0].moves),
       solveTime: Number(rows[0].solve_time),
@@ -277,7 +296,10 @@ async function completeAttempt(request: Request, context: RouteContext) {
     const rows = readQueryRows(await sql`
       with completed as (
         update leaderboard_attempt as attempt
-        set status = 'completed', completed_at = now()
+        set
+          status = 'completed',
+          completed_at = now(),
+          verified_moves = ${replay.moves}
         where attempt.id = ${id}
           and attempt.user_id = ${user.id}
           and attempt.status = 'started'
@@ -348,17 +370,14 @@ async function completeAttempt(request: Request, context: RouteContext) {
     `);
 
     if (!rows[0]) {
-      const completedResult = await readCompletedAttemptResult(
-        attempt,
-        replay.moves,
-      );
+      const completedResult = await readCompletedAttemptResult(attempt);
       if (completedResult) {
-        return Response.json(completedResult);
+        return completedAttemptResponse(user.id, id, completedResult);
       }
       return Response.json({ error: "This attempt is no longer active." }, { status: 409 });
     }
 
-    return Response.json({
+    return completedAttemptResponse(user.id, id, {
       chroma: readChromaReward(rows[0]),
       moves: Number(rows[0].moves),
       solveTime: Number(rows[0].solve_time),
@@ -368,7 +387,10 @@ async function completeAttempt(request: Request, context: RouteContext) {
   const rows = readQueryRows(await sql`
     with completed as (
       update leaderboard_attempt as attempt
-      set status = 'completed', completed_at = now()
+      set
+        status = 'completed',
+        completed_at = now(),
+        verified_moves = ${replay.moves}
       where attempt.id = ${id}
         and attempt.user_id = ${user.id}
         and attempt.status = 'started'
@@ -453,12 +475,9 @@ async function completeAttempt(request: Request, context: RouteContext) {
   `);
 
   if (!rows[0]) {
-    const completedResult = await readCompletedAttemptResult(
-      attempt,
-      replay.moves,
-    );
+    const completedResult = await readCompletedAttemptResult(attempt);
     if (completedResult) {
-      return Response.json(completedResult);
+      return completedAttemptResponse(user.id, id, completedResult);
     }
     return Response.json(
       { error: "This attempt is no longer active or exceeded its limit." },
@@ -466,7 +485,7 @@ async function completeAttempt(request: Request, context: RouteContext) {
     );
   }
 
-  return Response.json({
+  return completedAttemptResponse(user.id, id, {
     chroma: readChromaReward(rows[0]),
     moves: replay.moves,
     streakCount: Number(rows[0].streak_count),

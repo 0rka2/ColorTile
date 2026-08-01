@@ -1,4 +1,5 @@
 import type { LeaderboardDifficulty } from "./leaderboard";
+import type { AchievementDefinition } from "./achievements";
 import type { ChromaReward } from "./chroma";
 import type { VerifiedPuzzle, VerifiedSwap } from "./verified-attempt";
 
@@ -12,6 +13,7 @@ export type VerifiedAttempt = {
 export type VerifiedAttemptResult = {
   chroma: ChromaReward;
   moves: number;
+  newlyUnlocked: AchievementDefinition[];
   solveTime?: number;
   streakCount?: number;
 };

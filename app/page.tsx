@@ -369,10 +369,9 @@ export default function Home() {
   } = useShopCosmetics(session?.user.id ?? null);
   const accountPlayerName = sanitizePlayerName(session?.user.name ?? "");
   const {
+    announceVerifiedUnlocks,
     currentAnnouncement,
     dismissAnnouncement,
-    recordAchievementEvent,
-    recordSwap,
   } = useAccountAchievements(session?.user.id ?? null);
   const hudFeedbackControls = useAnimationControls();
   const clearDragSessionRef = useRef<() => void>(() => {});
@@ -482,11 +481,10 @@ export default function Home() {
   });
 
   const handleSwap = useCallback((sourceIndex: number, targetIndex: number) => {
-    recordSwap();
     if (activeVerifiedAttemptRef.current) {
       verifiedSwapsRef.current.push([sourceIndex, targetIndex]);
     }
-  }, [recordSwap]);
+  }, []);
 
   const submitVerifiedCompletion = useCallback((
     pendingCompletion: PendingVerifiedCompletion,
@@ -919,12 +917,16 @@ export default function Home() {
     }
 
     const finalSolveTime = solveTime;
+    const verificationUserId = activeVerifiedUserIdRef.current;
+    const verifiedCompletion = completeCurrentVerifiedAttempt();
+    setTimerStarted(false);
+
     const prepareCompletionChromaResult = () => {
       setChromaResult(
         sessionUserIdRef.current
           ? {
               available: availableChromaReward,
-              status: "earned",
+              status: verifiedCompletion ? "pending" : "unavailable",
             }
           : {
               available: availableChromaReward,
@@ -950,11 +952,6 @@ export default function Home() {
               : moves,
           style: dailyPuzzleStyle,
         };
-      });
-      recordAchievementEvent({
-        dateKey: dailyDateKey,
-        kind: "daily",
-        playedDate: getDailyPuzzleDateKey(),
       });
       setWinState(true);
       setWinPhase("boardWave");
@@ -982,12 +979,6 @@ export default function Home() {
         threeStarClears: currentStats.threeStarClears + (isThreeStar ? 1 : 0),
         bestStreak: Math.max(currentStats.bestStreak, nextStreak),
       }));
-      recordAchievementEvent({
-        isThreeStar,
-        kind: "endless",
-        playedDate: getDailyPuzzleDateKey(),
-        streak: nextStreak,
-      });
       setWinState(true);
       setWinPhase("boardWave");
       clearDragSession();
@@ -1010,13 +1001,6 @@ export default function Home() {
       setWinState(true);
       setWinPhase("boardWave");
       clearDragSession();
-
-      recordAchievementEvent({
-        kind: "preset",
-        mode: presetDifficulty,
-        playedDate: getDailyPuzzleDateKey(),
-        solveTime: finalSolveTime,
-      });
 
       setBestStats((current) => {
         const currentRecord = current[presetDifficulty] ?? {};
@@ -1042,10 +1026,6 @@ export default function Home() {
         };
       });
     };
-
-    const verificationUserId = activeVerifiedUserIdRef.current;
-    const verifiedCompletion = completeCurrentVerifiedAttempt();
-    setTimerStarted(false);
 
     if (isDailyMode) {
       awardDailyClear();
@@ -1081,17 +1061,22 @@ export default function Home() {
       verificationPendingGameSessionIdRef.current = null;
 
       if (outcome.status !== "saved") {
+        setChromaResult({
+          available: availableChromaReward,
+          status: "unavailable",
+        });
         return;
       }
 
       setChromaResult(outcome.result.chroma);
+      announceVerifiedUnlocks(outcome.result.newlyUnlocked);
       window.dispatchEvent(
         new CustomEvent(CHROMA_BALANCE_UPDATED_EVENT, {
           detail: outcome.result.chroma.balance,
         }),
       );
     });
-  }, [activeUsesCountdown, availableChromaReward, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, recordAchievementEvent, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
+  }, [activeUsesCountdown, announceVerifiedUnlocks, availableChromaReward, board, clearDragSession, completeCurrentVerifiedAttempt, currentBest, dailyDateKey, dailyPuzzleStyle, dailySwapBudget, dailyUsesCountdown, difficulty, endlessPuzzle, endlessPuzzleNumber, endlessStreak, endlessSwapBudget, endlessThreeStarMoveLimit, endlessUsesSwapLimit, isDailyMode, isEndlessMode, moves, reservedPresetTimeLimit, setBestStats, setDailyRecord, setEndlessStats, setWinPhase, solveTime, startEndlessPuzzle, winState]);
 
   useEffect(() => {
     if (

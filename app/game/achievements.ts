@@ -26,7 +26,6 @@ export const ACHIEVEMENT_IDS = [
 ] as const;
 
 export type AchievementId = (typeof ACHIEVEMENT_IDS)[number];
-export const ACHIEVEMENT_USER_ID_HEADER = "X-ColorTile-User-Id";
 export type AchievementCategory =
   | "mastery"
   | "speed"

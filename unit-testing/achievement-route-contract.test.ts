@@ -48,16 +48,11 @@ test("achievement event retries are idempotent", () => {
   );
 });
 
-test("achievement submissions are bound to the authenticated account", () => {
-  assert.match(
-    achievementHook,
-    /\[ACHIEVEMENT_USER_ID_HEADER\]: userId/,
-  );
-  assert.match(
-    route,
-    /request\.headers\.get\(ACHIEVEMENT_USER_ID_HEADER\) !== session\.user\.id/,
-  );
-  assert.match(route, /\{ status: 409 \}/);
+test("client-authored achievement submissions are rejected", () => {
+  assert.match(route, /export function POST\(\)/);
+  assert.match(route, /status: 405/);
+  assert.match(route, /verified game completions/);
+  assert.doesNotMatch(route, /recordAchievementEvent/);
 });
 
 test("achievement announcements are cleared and owned by the active account", () => {
@@ -73,11 +68,15 @@ test("achievement announcements are cleared and owned by the active account", ()
   );
 });
 
-test("swap progress is durably batched and sealed before submission", () => {
-  assert.match(achievementHook, /withAchievementQueueLock/);
-  assert.match(achievementHook, /count >= SWAP_BATCH_SIZE/);
-  assert.match(achievementHook, /visibilitychange/);
-  assert.doesNotMatch(achievementHook, /SWAP_FLUSH_DELAY_MS/);
+test("verified completions record idempotent swap batches on the server", () => {
+  assert.match(store, /attempt\.verified_moves/);
+  assert.match(
+    store,
+    /completion\.kind === "endless" &&\s+completion\.verified_moves === null/,
+  );
+  assert.match(store, /verified:\$\{attemptId\}:swaps:\$\{batchIndex\}/);
+  assert.match(store, /jsonb_to_recordset/);
+  assert.match(store, /on conflict \(user_id, event_id\) do nothing/);
 });
 
 test("achievement summaries reconcile unlocks with one bulk insert", () => {

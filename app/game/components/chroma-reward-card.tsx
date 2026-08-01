@@ -41,9 +41,7 @@ export function ChromaRewardCard({
   const earnedAmount =
     result.status === "awarded"
       ? result.awarded
-      : result.status === "earned"
-        ? result.available
-        : null;
+      : null;
   const isEarned = earnedAmount !== null;
   const { detail, title } = getChromaRewardCopy(result);
   const animatedAmount = useMotionValue(0);
